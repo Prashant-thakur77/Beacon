@@ -1,0 +1,446 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Beacon console stack: the Night Board web app on S3 + CloudFront, the
+  voice-turn Lambda (Strands agent on Nova 2 Lite, Transcribe creds vend,
+  Polly) and the read-only dashboard API, both behind Lambda Function URLs.
+
+Parameters:
+  BaseStackName:
+    Type: String
+    Default: beacon
+
+  AgentImageUri:
+    Type: String
+    Description: ECR URI of the slim agent image (Dockerfile.agent, git-SHA tag)
+
+  LambdaArchitecture:
+    Type: String
+    Default: x86_64
+    AllowedValues: [x86_64, arm64]
+
+  RemediateFunctionArn:
+    Type: String
+    Description: ARN of beacon-remediate-<stack> (remediation stack output); the voice Lambda may invoke it for dry-runs
+
+  Passcode:
+    Type: String
+    NoEcho: true
+    MinLength: 4
+    Description: Shared passcode required on /session and /turn (stops strangers burning credits)
+
+  ApplyEnabled:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Kill switch for approve_fix / grant_sleep_contract in the voice Lambda
+
+  NovaModelId:
+    Type: String
+    Default: us.amazon.nova-2-lite-v1:0
+
+  BedrockRegion:
+    Type: String
+    Default: us-east-1
+
+  PollyVoiceId:
+    Type: String
+    Default: Kajal
+    Description: Polly voice for Beacon's replies (Kajal = en-IN neural; fallback Joanna)
+
+  SttLanguage:
+    Type: String
+    Default: en-IN
+    Description: Transcribe streaming language code used by the browser
+
+  VoiceEngine:
+    Type: String
+    Default: strands
+    AllowedValues: [strands, litellm]
+    Description: strands = Strands Agents SDK loop; litellm = fallback tool-calling loop with the same schemas
+
+Resources:
+
+  # ---------- Static site ----------
+
+  BeaconConsoleBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "beacon-console-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  BeaconConsoleOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "beacon-console-${BaseStackName}"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  BeaconConsoleDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "Beacon console (${BaseStackName})"
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: console-s3
+            DomainName: !GetAtt BeaconConsoleBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt BeaconConsoleOAC.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: console-s3
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # Managed-CachingOptimized
+        CacheBehaviors:
+          - PathPattern: /config.json
+            TargetOriginId: console-s3
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # Managed-CachingDisabled
+          - PathPattern: /replay/*
+            TargetOriginId: console-s3
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # Managed-CachingDisabled
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  BeaconConsoleBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BeaconConsoleBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${BeaconConsoleBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${BeaconConsoleDistribution}"
+
+  # ---------- Voice turn (read-only agent role) ----------
+
+  BeaconVoiceTurnRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "beacon-voice-turn-${BaseStackName}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BeaconVoiceTurnReads
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - "arn:aws:bedrock:*::foundation-model/amazon.nova-*"
+                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*amazon.nova-*"
+              - Effect: Allow
+                Action: polly:SynthesizeSpeech
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-incidents-${BaseStackName}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-approvals-${BaseStackName}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-contracts-${BaseStackName}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-changes-${BaseStackName}"
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:beacon-remediate-${BaseStackName}"
+              - Effect: Allow
+                Action:
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:DescribeAlarms
+                  - logs:FilterLogEvents
+                  - logs:DescribeLogGroups
+                  - ec2:DescribeSecurityGroups
+                  - ecs:DescribeServices
+                  - rds:DescribeDBInstances
+                  - lambda:GetFunction
+                  - cloudtrail:LookupEvents
+                Resource: "*"
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/beacon/*"
+              - Effect: Allow
+                Action:
+                  - xray:PutTraceSegments
+                  - xray:PutTelemetryRecords
+                Resource: "*"
+
+  # The browser gets 15-minute credentials for exactly one action. The trust
+  # policy names the voice role by ARN (fixed RoleName) to avoid a circular
+  # reference; the AssumeRole grant lives in a separate policy resource.
+  BeaconMicRole:
+    Type: AWS::IAM::Role
+    DependsOn: BeaconVoiceTurnRole
+    Properties:
+      RoleName: !Sub "beacon-mic-${BaseStackName}"
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/beacon-voice-turn-${BaseStackName}"
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BeaconMicTranscribeOnly
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - transcribe:StartStreamTranscription
+                  - transcribe:StartStreamTranscriptionWebSocket
+                Resource: "*"
+
+  BeaconVoiceTurnAssumePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "beacon-voice-turn-assume-${BaseStackName}"
+      Roles:
+        - !Ref BeaconVoiceTurnRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Resource: !GetAtt BeaconMicRole.Arn
+          - Effect: Allow
+            Action: lambda:InvokeFunction
+            Resource: !Ref RemediateFunctionArn
+
+  BeaconVoiceTurnFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: BeaconVoiceTurnAssumePolicy
+    Properties:
+      FunctionName: !Sub "beacon-voice-turn-${BaseStackName}"
+      PackageType: Image
+      Architectures:
+        - !Ref LambdaArchitecture
+      Code:
+        ImageUri: !Ref AgentImageUri
+      ImageConfig:
+        Command: ["beacon.voice_turn.handler"]
+      Role: !GetAtt BeaconVoiceTurnRole.Arn
+      MemorySize: 2048
+      Timeout: 45
+      TracingConfig:
+        Mode: Active
+      Environment:
+        Variables:
+          PASSCODE: !Ref Passcode
+          APPLY_ENABLED: !Ref ApplyEnabled
+          VOICE_ENGINE: !Ref VoiceEngine
+          NOVA_MODEL_ID: !Ref NovaModelId
+          BEDROCK_REGION: !Ref BedrockRegion
+          POLLY_VOICE_ID: !Ref PollyVoiceId
+          STT_LANGUAGE: !Ref SttLanguage
+          MIC_ROLE_ARN: !GetAtt BeaconMicRole.Arn
+          REMEDIATE_FUNCTION_ARN: !Ref RemediateFunctionArn
+          STATE_MACHINE_ARN: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:beacon-remediate-${BaseStackName}"
+          INCIDENTS_TABLE_NAME: !Sub "beacon-incidents-${BaseStackName}"
+          APPROVALS_TABLE_NAME: !Sub "beacon-approvals-${BaseStackName}"
+          CONTRACTS_TABLE_NAME: !Sub "beacon-contracts-${BaseStackName}"
+          CHANGES_TABLE_NAME: !Sub "beacon-changes-${BaseStackName}"
+          GOLDEN_SG_PARAM: !Sub "/beacon/${BaseStackName}/golden-sg"
+          SESSION_CAP_TURNS: "30"
+          POWERTOOLS_SERVICE_NAME: beacon-voice-turn
+          POWERTOOLS_METRICS_NAMESPACE: Beacon
+          LITELLM_LOCAL_MODEL_COST_MAP: "True"
+
+  BeaconVoiceTurnUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !Ref BeaconVoiceTurnFunction
+      AuthType: NONE
+      Cors:
+        AllowOrigins: ["*"]
+        AllowHeaders: ["content-type", "x-beacon-passcode"]
+        AllowMethods: ["*"]
+        MaxAge: 300
+
+  BeaconVoiceTurnUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BeaconVoiceTurnFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+  BeaconVoiceTurnWarmRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Keep the voice-turn Lambda warm so the first turn is not dead air
+      ScheduleExpression: rate(4 minutes)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt BeaconVoiceTurnFunction.Arn
+          Id: BeaconVoiceTurnWarmTarget
+          Input: '{"mode": "warm"}'
+
+  BeaconVoiceTurnWarmPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BeaconVoiceTurnFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt BeaconVoiceTurnWarmRule.Arn
+
+  # ---------- Dashboard API (read-only) ----------
+
+  BeaconDashboardRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BeaconDashboardReads
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-incidents-${BaseStackName}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-approvals-${BaseStackName}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-contracts-${BaseStackName}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-changes-${BaseStackName}"
+              - Effect: Allow
+                Action: dynamodb:DeleteItem
+                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-contracts-${BaseStackName}"
+              - Effect: Allow
+                Action:
+                  - states:DescribeExecution
+                  - states:GetExecutionHistory
+                Resource: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:beacon-remediate-${BaseStackName}:*"
+              - Effect: Allow
+                Action:
+                  - lambda:GetFunctionConfiguration
+                Resource:
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:beacon-${BaseStackName}"
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:beacon-voice-turn-${BaseStackName}"
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:beacon-remediate-${BaseStackName}"
+              - Effect: Allow
+                Action: cloudwatch:GetMetricStatistics
+                Resource: "*"
+
+  BeaconDashboardFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "beacon-dashboard-${BaseStackName}"
+      PackageType: Image
+      Architectures:
+        - !Ref LambdaArchitecture
+      Code:
+        ImageUri: !Ref AgentImageUri
+      ImageConfig:
+        Command: ["beacon.dashboard_api.handler"]
+      Role: !GetAtt BeaconDashboardRole.Arn
+      MemorySize: 512
+      Timeout: 15
+      Environment:
+        Variables:
+          PASSCODE: !Ref Passcode
+          BASE_STACK_NAME: !Ref BaseStackName
+          INCIDENTS_TABLE_NAME: !Sub "beacon-incidents-${BaseStackName}"
+          APPROVALS_TABLE_NAME: !Sub "beacon-approvals-${BaseStackName}"
+          CONTRACTS_TABLE_NAME: !Sub "beacon-contracts-${BaseStackName}"
+          CHANGES_TABLE_NAME: !Sub "beacon-changes-${BaseStackName}"
+          STATE_MACHINE_ARN: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:beacon-remediate-${BaseStackName}"
+          POWERTOOLS_SERVICE_NAME: beacon-dashboard
+          LITELLM_LOCAL_MODEL_COST_MAP: "True"
+
+  BeaconDashboardUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !Ref BeaconDashboardFunction
+      AuthType: NONE
+      Cors:
+        AllowOrigins: ["*"]
+        AllowHeaders: ["content-type", "x-beacon-passcode"]
+        AllowMethods: ["*"]
+        MaxAge: 300
+
+  BeaconDashboardUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BeaconDashboardFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+Outputs:
+  ConsoleUrl:
+    Value: !Sub "https://${BeaconConsoleDistribution.DomainName}"
+  VoiceTurnUrl:
+    Value: !GetAtt BeaconVoiceTurnUrl.FunctionUrl
+  DashboardUrl:
+    Value: !GetAtt BeaconDashboardUrl.FunctionUrl
+  BucketName:
+    Value: !Ref BeaconConsoleBucket
+  DistributionId:
+    Value: !Ref BeaconConsoleDistribution
+  VoiceTurnFunctionName:
+    Value: !Ref BeaconVoiceTurnFunction
+  DashboardFunctionName:
+    Value: !Ref BeaconDashboardFunction
+  MicRoleArn:
+    Value: !GetAtt BeaconMicRole.Arn

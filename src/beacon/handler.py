@@ -67,6 +67,12 @@ def _process_sources(
         if plan.needs_reduction and plan.anomaly_percentile is not None:
             reduced = analyze_logs(plan.log_text, plan.anomaly_percentile, config)
             sections.append(f"{label}\n{reduced}")
+            logger.info(
+                "Cordon reduced %s to top %.0f%% (model %s)",
+                plan.log_group,
+                plan.anomaly_percentile * 100,
+                config.embedding_model_id,
+            )
             if timeline is not None:
                 timeline.append(
                     _event(
