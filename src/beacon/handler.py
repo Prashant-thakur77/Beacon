@@ -496,9 +496,13 @@ def _remediate_under_contract(
         notify(analysis, trigger, config, link=_dashboard_link(config))
         return {"incident_id": incident_id}
 
+    latest = store.get_incident(incident_id, table_name=config.incidents_table_name)
+    status = str(latest.get("status") or "auto_remediating")
+    if status not in ("resolved", "escalated"):  # inline mode may already be done
+        status = "auto_remediating"
     store.update_status(
         incident_id,
-        "auto_remediating",
+        status,
         table_name=config.incidents_table_name,
         extra={"execution_arn": execution_arn, "handled_by": "contract"},
     )

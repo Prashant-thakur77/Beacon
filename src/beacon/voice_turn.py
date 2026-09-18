@@ -300,9 +300,12 @@ def turn() -> Response[str]:
 
     new_messages = [m for m in agent.messages[history_len:] if isinstance(m, dict)]
     conversation = (history + new_messages)[-_MAX_HISTORY:]
+    # Tools may have moved the status during this turn (approve -> remediating,
+    # or resolved when the loop runs inline), so re-read before persisting.
+    fresh = store.get_incident(incident_id, table_name=_incidents_table())
     store.update_status(
         incident_id,
-        str(incident.get("status") or "awaiting_engineer"),
+        str(fresh.get("status") or incident.get("status") or "awaiting_engineer"),
         table_name=_incidents_table(),
         extra={
             "conversation": conversation,

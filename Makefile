@@ -4,7 +4,7 @@
        snapshot-sg tag-remediable dry-run changes incidents lint-templates \
        deploy-console teardown-console web-build set-passcode console-config \
        check-reduction capture-run propose approve replay-approval demo-alarm demo-reset \
-       demo-sleep demo-rehearse apply-on apply-off warm latest-incident
+       demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix
 
 # Deploy variables persisted by earlier runs (IMAGE_URI, EMAIL, ...). Gitignored.
 -include .beacon.env
@@ -577,6 +577,23 @@ warm:
 	@for FN in beacon-voice-turn-$(STACK_NAME) beacon-remediate-$(STACK_NAME) beacon-dashboard-$(STACK_NAME); do \
 		aws lambda invoke --function-name $$FN --region $(REGION) --cli-binary-format raw-in-base64-out --payload '{"mode":"warm"}' /dev/null > /dev/null && echo "warm: $$FN"; \
 	done
+
+# ---------- Local / Build It mode (no AWS account) ----------
+
+LOCAL_PORT     ?= 8000
+LOCAL_PASSCODE ?= local
+
+# The whole product on localhost against an in-process moto AWS: real tools,
+# real safety checks, scripted agent instead of Bedrock, browser TTS.
+local: web-build
+	@echo "==> http://localhost:$(LOCAL_PORT)  (passcode: $(LOCAL_PASSCODE)). Ctrl-C to stop."
+	BEACON_LOCAL_PASSCODE=$(LOCAL_PASSCODE) PORT=$(LOCAL_PORT) $(PYTHON) scripts/local_server.py
+
+local-break:
+	@curl -s -X POST -H "x-beacon-passcode: $(LOCAL_PASSCODE)" http://localhost:$(LOCAL_PORT)/local/break && echo
+
+local-fix:
+	@curl -s -X POST -H "x-beacon-passcode: $(LOCAL_PASSCODE)" http://localhost:$(LOCAL_PORT)/local/fix && echo
 
 # ---------- Development ----------
 
