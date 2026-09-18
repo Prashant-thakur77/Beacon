@@ -29,6 +29,8 @@ class BeaconConfig:
     connect_enabled: bool = False
     oncall_phone: str = ""
     incidents_table_name: str = ""
+    incidents_enabled: bool = False
+    dashboard_url: str = ""
 
     @classmethod
     def from_env(cls) -> BeaconConfig:
@@ -63,6 +65,8 @@ class BeaconConfig:
             connect_enabled=os.environ.get("CONNECT_ENABLED", "").lower() == "true",
             oncall_phone=os.environ.get("ONCALL_PHONE", ""),
             incidents_table_name=os.environ.get("INCIDENTS_TABLE_NAME", ""),
+            incidents_enabled=os.environ.get("INCIDENTS_ENABLED", "").lower() == "true",
+            dashboard_url=os.environ.get("DASHBOARD_URL", ""),
         )
 
     @property

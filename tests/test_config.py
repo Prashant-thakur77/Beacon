@@ -80,3 +80,24 @@ class TestNovaLitellmModel:
             nova_model_id="bedrock/us.amazon.nova-2-lite-v1:0",
         )
         assert config.litellm_model == "bedrock/us.amazon.nova-2-lite-v1:0"
+
+
+def test_incidents_flags_and_dashboard_url_from_env(monkeypatch) -> None:
+    monkeypatch.setenv("LOG_GROUP_PATTERNS", "/a")
+    monkeypatch.setenv("SNS_TOPIC_ARN", "arn:aws:sns:us-east-1:1:t")
+    monkeypatch.setenv("INCIDENTS_ENABLED", "true")
+    monkeypatch.setenv("DASHBOARD_URL", "https://d123.cloudfront.net")
+    from beacon.config import BeaconConfig
+
+    config = BeaconConfig.from_env()
+    assert config.incidents_enabled is True
+    assert config.dashboard_url == "https://d123.cloudfront.net"
+
+
+def test_incidents_disabled_by_default(monkeypatch) -> None:
+    monkeypatch.setenv("LOG_GROUP_PATTERNS", "/a")
+    monkeypatch.setenv("SNS_TOPIC_ARN", "arn:aws:sns:us-east-1:1:t")
+    monkeypatch.delenv("INCIDENTS_ENABLED", raising=False)
+    from beacon.config import BeaconConfig
+
+    assert BeaconConfig.from_env().incidents_enabled is False
