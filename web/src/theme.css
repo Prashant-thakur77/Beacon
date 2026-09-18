@@ -159,6 +159,7 @@ button { font: inherit; }
 .bubble.user { align-self: flex-end; background: var(--surface-2); border: 1px solid var(--line); }
 .bubble.user .who { color: var(--faint); }
 .bubble.beacon { align-self: stretch; background: var(--surface); border: 1px solid var(--line); }
+.bubble.interrupted { border-style: dashed; }
 .bubble .who { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: var(--amber); margin-bottom: 4px; }
 .sentence { transition: background 150ms; border-radius: 4px; }
 .sentence.hot { background: var(--amber-soft); }

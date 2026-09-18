@@ -57,6 +57,13 @@ Parameters:
     Default: en-IN
     Description: Transcribe streaming language code used by the browser
 
+  AssemblyAIKeyParam:
+    Type: String
+    Default: ""
+    Description: >
+      SSM SecureString parameter holding the AssemblyAI API key (phase 2). Empty = the
+      /assemblyai/token route answers 503 and the console uses the AWS cascade.
+
   VoiceEngine:
     Type: String
     Default: strands
@@ -302,6 +309,7 @@ Resources:
           CHANGES_TABLE_NAME: !Sub "beacon-changes-${BaseStackName}"
           GOLDEN_SG_PARAM: !Sub "/beacon/${BaseStackName}/golden-sg"
           REMEDIABLE_ECS_SERVICES: !Ref RemediableEcsServices
+          ASSEMBLYAI_KEY_PARAM: !Ref AssemblyAIKeyParam
           SESSION_CAP_TURNS: "30"
           POWERTOOLS_SERVICE_NAME: beacon-voice-turn
           POWERTOOLS_METRICS_NAMESPACE: Beacon

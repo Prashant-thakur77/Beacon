@@ -2,7 +2,7 @@
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
        test lint check-image-tags smoke-strands export-tools deploy-remediation teardown-remediation \
        snapshot-sg tag-remediable dry-run changes incidents lint-templates remediable-ecs break-demo-deploy fix-demo-deploy \
-       deploy-console teardown-console web-build set-passcode console-config \
+       deploy-console teardown-console web-build set-passcode console-config set-assemblyai-key \
        check-reduction capture-run propose approve replay-approval demo-alarm demo-reset \
        demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix preflight dashboard build-replay
 
@@ -124,6 +124,7 @@ POLLY_VOICE_ID  ?= Kajal
 STT_LANGUAGE    ?= en-IN
 VOICE_ENGINE    ?= strands
 VOICE_BACKEND   ?= aws
+ASSEMBLYAI_KEY_PARAM ?=
 
 # Remediation stack
 REMEDIATION_STACK      ?= $(STACK_NAME)-remediation
@@ -485,7 +486,8 @@ deploy-console: web-build
 			LambdaArchitecture=$(LAMBDA_ARCH) RemediateFunctionArn=$$REMEDIATE_ARN Passcode=$(PASSCODE) \
 			PollyVoiceId=$(POLLY_VOICE_ID) SttLanguage=$(STT_LANGUAGE) VoiceEngine=$(VOICE_ENGINE) \
 			$(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),) \
-			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),)
+			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),) \
+			$(if $(ASSEMBLYAI_KEY_PARAM),AssemblyAIKeyParam=$(ASSEMBLYAI_KEY_PARAM),)
 	$(call save_env,PASSCODE,$(PASSCODE))
 	@BUCKET=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
 		--query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' --output text) && \
@@ -497,6 +499,13 @@ deploy-console: web-build
 	touch .beacon.env && grep -v '^DASHBOARD_URL=' .beacon.env > .beacon.env.tmp || true; \
 	echo "DASHBOARD_URL=$$CONSOLE_URL" >> .beacon.env.tmp && mv .beacon.env.tmp .beacon.env && \
 	echo "Done. DASHBOARD_URL=$$CONSOLE_URL saved to .beacon.env (run 'make deploy' again so SNS emails link to it)."
+
+# Store the AssemblyAI API key as a SecureString and remember the parameter name for deploy-console.
+set-assemblyai-key:
+	$(call check_param,ASSEMBLYAI_API_KEY)
+	aws ssm put-parameter --name /beacon/$(STACK_NAME)/assemblyai-key --type SecureString --value "$(ASSEMBLYAI_API_KEY)" --overwrite --region $(REGION) > /dev/null
+	$(call save_env,ASSEMBLYAI_KEY_PARAM,/beacon/$(STACK_NAME)/assemblyai-key)
+	@echo "Stored. Next: make deploy-console VOICE_BACKEND=assemblyai"
 
 # Re-upload the site + config without touching the stack.
 console-config: web-build

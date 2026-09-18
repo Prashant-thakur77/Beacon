@@ -24,6 +24,16 @@ Facts verified from the docs on 18 Sep (re-verify on day 1, the spike):
 - **Server** `POST /tools/<name>` on the voice Lambda: runs one tool with a `TurnContext` built from the **browser-supplied final transcript and its confidence**. Consent tools (`approve_fix`, `grant_sleep_contract`) are refused below 0.85 confidence with "please repeat the exact phrase". `POST /assemblyai/token` mints a short-lived token from an SSM SecureString (`ASSEMBLYAI_KEY_PARAM`), passcode-gated.
 - **Everything else is unchanged:** triage, ledger, registry, Step Functions loop, contracts, dashboard, DynamoDB, Bedrock inside the tools. Both entries share one backend and one CloudFront URL (`?voice=assemblyai` / `?voice=aws`).
 
+## Already built on this branch (beyond the scaffold)
+
+- `web/src/voice/select.ts`: `chooseBackend` (`?voice=` / `config.voiceBackend`) and `makeTransport` for both backends.
+- `web/src/voice/awsCascade.ts`: the First Commit path behind `VoiceTransport` (for the side-by-side comparison).
+- `web/src/voice/pcmPlayer.ts`: PCM16 ring playback with `flush()` for barge-in.
+- `web/src/components/TalkDuplex.tsx`: full-duplex Talk — continuous mic, interrupt button, *interrupted* marker on the cut-off reply, "heard: … (97%)" line, per-incident keyterms sent in `session.update`, tool results routed through `/tools/<name>`.
+- `console-template.yaml` `AssemblyAIKeyParam` → `ASSEMBLYAI_KEY_PARAM`; `make set-assemblyai-key ASSEMBLYAI_API_KEY=…` then `make deploy-console VOICE_BACKEND=assemblyai`.
+
+Day 1's spike is now: connect, confirm the token path, confirm event names against `assemblyai.ts`, and fix whatever differs in that one file.
+
 ## Day by day
 
 | Day | Work | Done when |

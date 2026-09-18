@@ -5,6 +5,8 @@ import { ArchivedRunCard, IncidentCard, JudgeCard, TallyStrip } from "./componen
 import { Contracts } from "./components/Contracts";
 import { Safety } from "./components/Safety";
 import { Talk } from "./components/Talk";
+import { TalkDuplex } from "./components/TalkDuplex";
+import { chooseBackend } from "./voice/select";
 import { useClock, useLocalState, usePoll } from "./hooks";
 import { loadReplay, type ReplayBundle } from "./replay";
 import type { Contract, Incident, Safety as SafetyData, Tally } from "./types";
@@ -182,7 +184,21 @@ export default function App() {
               )}
             </div>
           </section>
-          {current ? (
+          {current && api && config && !replay && chooseBackend(config) === "assemblyai" ? (
+            <section>
+              <TalkDuplex
+                key={`duplex-${current.incident_id}`}
+                api={api}
+                config={config}
+                backend="assemblyai"
+                incident={current}
+                stt={stt}
+                passcode={() => passcode}
+                onIncident={onIncident}
+                series={null}
+              />
+            </section>
+          ) : current ? (
             <section>
               <Talk
                 key={current.incident_id}

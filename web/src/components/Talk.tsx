@@ -12,11 +12,11 @@ type State = "idle" | "listening" | "thinking" | "speaking" | "error";
 
 const SENTENCE_RE = /[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g;
 
-function splitSentences(text: string): string[] {
+export function splitSentences(text: string): string[] {
   return (text.match(SENTENCE_RE) ?? [text]).map((s) => s.trim()).filter(Boolean);
 }
 
-function Sentence({ text, hot, onChip }: { text: string; hot: boolean; onChip: (id: string) => void }) {
+export function Sentence({ text, hot, onChip }: { text: string; hot: boolean; onChip: (id: string) => void }) {
   const parts = text.split(/(\[E\d+\])/g);
   return (
     <span className={`sentence${hot ? " hot" : ""}`}>
@@ -34,7 +34,7 @@ function Sentence({ text, hot, onChip }: { text: string; hot: boolean; onChip: (
   );
 }
 
-function EvidenceCard({ ev, hot }: { ev: Evidence; hot: boolean }) {
+export function EvidenceCard({ ev, hot }: { ev: Evidence; hot: boolean }) {
   const body = typeof ev.payload === "string" ? ev.payload : JSON.stringify(ev.payload, null, 1);
   return (
     <div className={`ev${hot ? " hot" : ""}`} id={`ev-${ev.id}`}>
@@ -48,7 +48,7 @@ function EvidenceCard({ ev, hot }: { ev: Evidence; hot: boolean }) {
   );
 }
 
-function FixCard({ incident, proposal, series }: { incident: Incident; proposal: Proposal | null; series: MetricSeries | null }) {
+export function FixCard({ incident, proposal, series }: { incident: Incident; proposal: Proposal | null; series: MetricSeries | null }) {
   const status = incident.status;
   if (status === "resolved") {
     const verifies = (incident.timeline ?? []).filter((e) => e.event === "verify_attempt");
