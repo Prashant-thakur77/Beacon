@@ -4,7 +4,7 @@
        snapshot-sg tag-remediable dry-run changes incidents lint-templates \
        deploy-console teardown-console web-build set-passcode console-config \
        check-reduction capture-run propose approve replay-approval demo-alarm demo-reset \
-       demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix
+       demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix preflight
 
 # Deploy variables persisted by earlier runs (IMAGE_URI, EMAIL, ...). Gitignored.
 -include .beacon.env
@@ -573,6 +573,10 @@ apply-on:
 	done
 	$(call save_env,APPLY_ENABLED,true)
 	@echo "APPLY_ENABLED=true on triage, voice and remediate."
+
+# Everything that must be true before recording, as one green/red table.
+preflight:
+	@PYTHON=$(PYTHON) bash scripts/preflight.sh $(STACK_NAME) $(REGION)
 
 # Warm the voice and remediate Lambdas before recording.
 warm:
