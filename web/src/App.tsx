@@ -141,24 +141,24 @@ export default function App() {
             <TallyStrip tally={tally} />
             {!replay && !passcode ? (
               <form
-                className="panel"
+                className="unlock"
                 onSubmit={(e) => {
                   e.preventDefault();
                   const v = (new FormData(e.currentTarget).get("passcode") as string) ?? "";
                   setPasscode(v.trim());
                 }}
               >
-                <div className="panel-b row">
-                  <input id="passcode" name="passcode" className="input" style={{ maxWidth: 260 }} type="password" placeholder="passcode to talk to Beacon" autoComplete="off" />
+                <div className="row">
+                  <input id="passcode" name="passcode" className="input" style={{ maxWidth: 240 }} type="password" placeholder="passcode" autoComplete="off" />
                   <button className="btn primary" type="submit">
                     Unlock voice
                   </button>
-                  <span className="faint small">reads are public; talking and approving need the passcode</span>
+                  <span className="faint small">reads are public · talking and approving need the passcode</span>
                 </div>
               </form>
             ) : null}
             {incidentsQ.error && !replay ? <div className="err">Dashboard API: {incidentsQ.error}</div> : null}
-            {!passcode || new URLSearchParams(window.location.search).get("judge") === "1" ? <JudgeCard hasPasscode={!!passcode} /> : null}
+            <JudgeCard hasPasscode={!!passcode} open={new URLSearchParams(window.location.search).get("judge") === "1" || incidents.length === 0} />
             <div className="feed">
               {incidents.length === 0 ? (
                 <div className="panel">
