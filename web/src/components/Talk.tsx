@@ -113,12 +113,14 @@ export function Talk({
   stt,
   replayTurns,
   onIncident,
+  unlocked,
 }: {
   api: Api | null;
   incident: Incident;
   stt: SttChoice;
   replayTurns?: TurnResponse[];
   onIncident: (i: Incident) => void;
+  unlocked: boolean;
 }) {
   const [state, setState] = useState<State>("idle");
   const [partial, setPartial] = useState("");
@@ -209,8 +211,9 @@ export function Talk({
     [runTurn],
   );
 
-  // auto-brief once per incident, and react to resolved/escalated
+  // auto-brief once per incident (once the voice is unlocked), and react to resolved/escalated
   useEffect(() => {
+    if (!unlocked && !replayTurns) return;
     if (briefedFor.current !== incident.incident_id) {
       briefedFor.current = incident.incident_id;
       eventFor.current = null;
@@ -219,7 +222,7 @@ export function Talk({
       replayIdx.current = 0;
       void runTurn({ mode: "brief" });
     }
-  }, [incident.incident_id, runTurn]);
+  }, [incident.incident_id, runTurn, unlocked, replayTurns]);
 
   useEffect(() => {
     if ((incident.status === "resolved" || incident.status === "escalated") && eventFor.current !== `${incident.incident_id}:${incident.status}`) {
@@ -312,7 +315,7 @@ export function Talk({
             </button>
             <div className="stack" style={{ gap: 4 }}>
               <div className={`state ${state}`}>{stateLabel[state]}</div>
-              <div className="partial">{partial || (state === "listening" ? "…" : "hold the mic and speak, or type below")}</div>
+              <div className="partial">{partial || (state === "listening" ? "…" : unlocked || replayTurns ? "hold the mic and speak, or type below" : "enter the passcode on the left to talk")}</div>
               <div className="row small">
                 <label className="dim">STT</label>
                 <select className="input" style={{ width: "auto", padding: "4px 8px" }} value={activeStt} onChange={(e) => setActiveStt(e.target.value as SttChoice)} id="stt-select">

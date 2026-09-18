@@ -190,6 +190,7 @@ export default function App() {
                 stt={stt}
                 replayTurns={replay ? replay.turns[current.incident_id] ?? [] : undefined}
                 onIncident={onIncident}
+                unlocked={!!passcode}
               />
             </section>
           ) : null}
