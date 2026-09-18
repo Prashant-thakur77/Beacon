@@ -9,7 +9,7 @@ os.environ.setdefault("TQDM_DISABLE", "1")  # noqa: E402
 
 from typing import Any  # noqa: E402
 
-from beacon import rca
+from beacon import changes, rca
 from beacon.analyzer import analyze_logs
 from beacon.budget import SourcePlan, compute_available_tokens, plan_token_budget
 from beacon.config import BeaconConfig
@@ -153,8 +153,23 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
     combined_input = _process_sources(plans, config, timeline)
 
+    # Deterministic sources come first: they outrank anything inferred from logs.
+    diagnostics = _run_diagnostics(config, timeline)
+    change_rows = _recent_changes(trigger, config, timeline)
+    prefix_sections = []
+    if diagnostics is not None:
+        prefix_sections.append(f"[diagnostics]\n{diagnostics['text']}")
+    if change_rows is not None:
+        alarm_at = _alarm_time(trigger)
+        prefix_sections.append(
+            f"[changes]\n{changes.format_changes(change_rows, alarm_at=alarm_at)}"
+        )
+    if prefix_sections:
+        combined_input = "\n\n".join([*prefix_sections, combined_input])
+
     analysis = triage(combined_input, trigger, config)
     parsed = rca.parse(analysis)
+    _apply_deterministic_action(parsed, diagnostics)
     timeline.append(
         _event(
             "rca_ready",
@@ -168,13 +183,31 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         logger.info("Scheduled scan found no issues, skipping notification")
         return {"statusCode": 200, "body": "Healthy, no notification sent"}
 
-    notify(analysis, trigger, config)
+    result: dict[str, Any] = {"statusCode": 200, "body": "Analysis complete"}
+    contract = _matching_contract(parsed, trigger, config, timeline)
+
+    if contract is not None:
+        # Handled while they sleep: no page, the loop runs, the morning email says so.
+        outcome = _remediate_under_contract(
+            analysis,
+            parsed,
+            trigger,
+            config,
+            timeline,
+            diagnostics,
+            change_rows,
+            contract,
+        )
+        result.update(outcome)
+        logger.info("Incident handled under Sleep Contract %s", contract["contract_id"])
+        return result
+
+    notify(analysis, trigger, config, link=_dashboard_link(config))
     timeline.append(_event("sns_sent"))
 
-    result: dict[str, Any] = {"statusCode": 200, "body": "Analysis complete"}
     if config.incidents_enabled or config.connect_enabled:
         incident_id = _store_and_investigate(
-            analysis, parsed, trigger, config, timeline
+            analysis, parsed, trigger, config, timeline, diagnostics, change_rows
         )
         if incident_id:
             result["incident_id"] = incident_id
@@ -210,6 +243,8 @@ def _store_and_investigate(
     trigger: TriggerInfo,
     config: BeaconConfig,
     timeline: list[dict[str, Any]],
+    diagnostics: dict[str, Any] | None = None,
+    change_rows: list[dict[str, Any]] | None = None,
 ) -> str | None:
     """Store the incident, pre-fetch investigation data, optionally call.
 
@@ -226,6 +261,8 @@ def _store_and_investigate(
             config,
             rca_json=parsed.to_dict(),
             timeline=timeline,
+            diagnostics=diagnostics,
+            changes=change_rows,
         )
         with ThreadPoolExecutor(max_workers=2) as pool:
             futures: list[Future[Any]] = [
@@ -241,6 +278,249 @@ def _store_and_investigate(
     except Exception:
         logger.exception("Incident pipeline failed, SNS notification was still sent")
         return None
+
+
+def _alarm_time(trigger: TriggerInfo) -> datetime:
+    """When the alarm changed state (falls back to now)."""
+    if trigger.alarm_time:
+        try:
+            return datetime.fromisoformat(trigger.alarm_time.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+    return datetime.now(tz=UTC)
+
+
+def _dashboard_link(config: BeaconConfig) -> str:
+    return config.dashboard_url
+
+
+def _run_diagnostics(
+    config: BeaconConfig, timeline: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """Security-group drift vs the golden snapshot; None when no snapshot exists."""
+    if not config.incidents_enabled:
+        return None
+    from beacon import diagnose
+    from beacon.remediation import actions_sg
+
+    golden = actions_sg.load_golden_snapshot()
+    if not golden:
+        timeline.append(_event("diagnostics_skipped", reason="no golden snapshot"))
+        return None
+    try:
+        result = diagnose.run(golden)
+    except Exception:
+        logger.exception("diagnostics failed")
+        timeline.append(_event("diagnostics_failed"))
+        return None
+    timeline.append(
+        _event(
+            "diagnostics_ran",
+            missing_rules=len(result["missing_rules"]),
+            suggested_action=result["suggested_action"],
+        )
+    )
+    return result
+
+
+def _recent_changes(
+    trigger: TriggerInfo, config: BeaconConfig, timeline: list[dict[str, Any]]
+) -> list[dict[str, Any]] | None:
+    """Write API calls before the alarm from the ledger (LookupEvents fallback)."""
+    if not config.incidents_enabled:
+        return None
+    try:
+        rows = changes.recent(60, before=_alarm_time(trigger), lookup_fallback=True)
+    except Exception:
+        logger.exception("change lookup failed")
+        timeline.append(_event("changes_failed"))
+        return None
+    timeline.append(
+        _event(
+            "changes_checked",
+            count=len(rows),
+            top=rows[0].get("event_name") if rows else None,
+            source=rows[0].get("source") if rows else None,
+        )
+    )
+    return rows
+
+
+def _apply_deterministic_action(
+    parsed: rca.RcaJson, diagnostics: dict[str, Any] | None
+) -> None:
+    """Exact ids from diagnostics beat whatever the model guessed."""
+    if not diagnostics or not diagnostics.get("suggested_action"):
+        return
+    parsed.beacon_json["suggested_action"] = diagnostics["suggested_action"]
+    parsed.beacon_json["action_params"] = diagnostics["action_params"]
+    parsed.beacon_json["action_source"] = "diagnostics"
+    parsed.beacon_json.setdefault(
+        "fingerprint", diagnostics["suggested_action"].replace(".", "-")
+    )
+
+
+def _matching_contract(
+    parsed: rca.RcaJson,
+    trigger: TriggerInfo,
+    config: BeaconConfig,
+    timeline: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """A live Sleep Contract covering this alarm + action + exact params, if allowed."""
+    if not (config.incidents_enabled and trigger.alarm_name):
+        return None
+    action = parsed.suggested_action
+    params = parsed.beacon_json.get("action_params")
+    if not action or not isinstance(params, dict):
+        return None
+    table = os.environ.get("CONTRACTS_TABLE_NAME", "")
+    if not table:
+        return None
+    from beacon import contracts
+    from beacon.remediation import actions_sg, registry
+
+    try:
+        registry.validate_params(action, params)
+        contract = contracts.match(trigger.alarm_name, action, params, table_name=table)
+    except Exception:
+        logger.exception("contract match failed")
+        return None
+    if contract is None:
+        return None
+    if action == "sg.restore_ingress":
+        golden = actions_sg.load_golden_snapshot() or {}
+        if not actions_sg.in_golden_snapshot(params, golden):
+            timeline.append(
+                _event("contract_ignored", reason="params not in golden snapshot")
+            )
+            return None
+    if not config.apply_enabled:
+        timeline.append(
+            _event(
+                "contract_matched_apply_disabled", contract_id=contract["contract_id"]
+            )
+        )
+        return None
+    return contract
+
+
+def _start_execution(payload: dict[str, Any]) -> str:
+    """Start the Step Functions remediation loop; returns the execution ARN."""
+    import json
+
+    import boto3
+
+    arn = os.environ.get("STATE_MACHINE_ARN", "")
+    if not arn:
+        raise RuntimeError("STATE_MACHINE_ARN not set")
+    resp = boto3.client("stepfunctions").start_execution(
+        stateMachineArn=arn, input=json.dumps(payload, default=str)
+    )
+    return str(resp["executionArn"])
+
+
+def _remediate_under_contract(
+    analysis: str,
+    parsed: rca.RcaJson,
+    trigger: TriggerInfo,
+    config: BeaconConfig,
+    timeline: list[dict[str, Any]],
+    diagnostics: dict[str, Any] | None,
+    change_rows: list[dict[str, Any]] | None,
+    contract: dict[str, Any],
+) -> dict[str, Any]:
+    """Consume one contract use, record the approval, start the loop, say so."""
+    from beacon import approvals, contracts, store
+
+    action = str(parsed.suggested_action)
+    params = dict(parsed.beacon_json["action_params"])
+    contracts_table = os.environ["CONTRACTS_TABLE_NAME"]
+    approvals_table = os.environ.get("APPROVALS_TABLE_NAME", "")
+
+    if not contracts.use(contract["contract_id"], table_name=contracts_table):
+        timeline.append(
+            _event("contract_exhausted", contract_id=contract["contract_id"])
+        )
+        notify(analysis, trigger, config, link=_dashboard_link(config))
+        incident_id = _store_and_investigate(
+            analysis, parsed, trigger, config, timeline, diagnostics, change_rows
+        )
+        return {"incident_id": incident_id} if incident_id else {}
+
+    timeline.append(
+        _event(
+            "contract_matched",
+            contract_id=contract["contract_id"],
+            uses_left=int(contract.get("max_uses", 0))
+            - int(contract.get("uses", 0))
+            - 1,
+        )
+    )
+    incident_id = store.put_incident(
+        analysis,
+        trigger,
+        config,
+        rca_json=parsed.to_dict(),
+        timeline=timeline,
+        diagnostics=diagnostics,
+        changes=change_rows,
+        status="auto_remediating",
+        woken=False,
+    )
+    approval = approvals.create(
+        incident_id,
+        action,
+        params,
+        source="contract",
+        channel="contract",
+        transcript_quote=str(contract.get("transcript_quote", "")),
+        contract_id=str(contract["contract_id"]),
+        table_name=approvals_table,
+    )
+    payload = {
+        "approval_id": approval["approval_id"],
+        "incident_id": incident_id,
+        "action": action,
+        "params": params,
+    }
+    try:
+        execution_arn = _start_execution(payload)
+    except Exception:
+        logger.exception("could not start remediation loop; paging instead")
+        store.update_status(
+            incident_id,
+            "awaiting_engineer",
+            table_name=config.incidents_table_name,
+            extra={"woken": True},
+        )
+        notify(analysis, trigger, config, link=_dashboard_link(config))
+        return {"incident_id": incident_id}
+
+    store.update_status(
+        incident_id,
+        "auto_remediating",
+        table_name=config.incidents_table_name,
+        extra={"execution_arn": execution_arn, "handled_by": "contract"},
+    )
+    store.append_timeline(
+        incident_id,
+        "remediation_started",
+        table_name=config.incidents_table_name,
+        detail={"execution_arn": execution_arn, "source": "contract"},
+    )
+    notify(
+        analysis,
+        trigger,
+        config,
+        link=_dashboard_link(config),
+        variant="contract",
+        contract=contract,
+    )
+    return {
+        "incident_id": incident_id,
+        "contract_id": contract["contract_id"],
+        "execution_arn": execution_arn,
+    }
 
 
 def _is_healthy(analysis: str) -> bool:

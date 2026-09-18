@@ -33,6 +33,7 @@ class TriggerInfo:
     alarm_reason: str | None = None
     raw_logs: str | None = None
     lookback_minutes: int | None = None
+    alarm_time: str | None = None
 
     def format_context(self) -> str:
         """Format trigger metadata into a human-readable context string."""
@@ -67,12 +68,14 @@ def _parse_alarm_event(event: dict[str, Any], config: BeaconConfig) -> TriggerIn
     """Extract alarm name and state-change reason from an EventBridge alarm event."""
     detail = event.get("detail", {})
     alarm_name = detail.get("alarmName", "Unknown")
-    reason = detail.get("state", {}).get("reason", "")
+    state = detail.get("state", {})
+    reason = state.get("reason", "")
     return TriggerInfo(
         trigger_type=TriggerType.ALARM,
         alarm_name=alarm_name,
         alarm_reason=reason,
         lookback_minutes=config.lookback_minutes,
+        alarm_time=state.get("timestamp") or event.get("time"),
     )
 
 
