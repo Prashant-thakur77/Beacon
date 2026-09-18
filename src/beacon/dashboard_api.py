@@ -35,6 +35,18 @@ _ARN_RE = re.compile(
 )
 _PRIVATE_FIELDS = ("conversation", "rca", "cached_data")
 
+SAFETY_RULES = [
+    "Only allowlisted actions can run; params must match the schema exactly.",
+    "Security-group restores must exist in the golden snapshot taken on a healthy stack.",  # noqa: E501
+    "Every action is dry-run under the write-only remediator role before execution.",
+    "Approval is checked against the engineer's raw transcript, never the model's claim.",  # noqa: E501
+    "One approval executes exactly once (Powertools idempotency on approval_id).",
+    "Verification needs alarm OK after the fix, error metric zero, and the post-condition.",  # noqa: E501
+    "Sleep Contracts are scoped to alarm + action + exact resources, expire, and count uses.",  # noqa: E501
+    "APPLY_ENABLED=false stops every write path: triage contract branch, voice approvals, Execute.",  # noqa: E501
+]
+
+
 app = LambdaFunctionUrlResolver(
     cors=CORSConfig(allow_origin="*", allow_headers=["x-beacon-passcode"])
 )
@@ -352,24 +364,7 @@ def safety() -> Response[str]:
         {
             "allowlist": allowlist,
             "apply_enabled": _apply_flags(),
-            "rules": [
-                "Only allowlisted actions can run; params must match the schema "
-                "exactly.",
-                "Security-group restores must exist in the golden snapshot taken on a "
-                "healthy stack.",
-                "Every action is dry-run under the write-only remediator role before "
-                "execution.",
-                "Approval is checked against the engineer's raw transcript, never the "
-                "model's claim.",
-                "One approval executes exactly once (Powertools idempotency on "
-                "approval_id).",
-                "Verification needs alarm OK after the fix, error metric zero, and the "
-                "post-condition.",
-                "Sleep Contracts are scoped to alarm + action + exact resources, "
-                "expire, and count uses.",
-                "APPLY_ENABLED=false stops every write path: triage contract branch, "
-                "voice approvals, Execute.",
-            ],
+            "rules": SAFETY_RULES,
         },
     )
 
