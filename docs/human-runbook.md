@@ -83,7 +83,7 @@ make check-reduction REGION=us-east-1     # prints the "[/ecs/beacon-demo] (redu
 make capture-run REGION=us-east-1         # saves the Lambda log, 300 demo log lines and the RCA email text into tests/fixtures/real/
 make fix-demo REGION=us-east-1
 ```
-(`check-reduction` and `capture-run` arrive with the agent's A1 commit; if they do not exist yet, run `aws logs tail /aws/lambda/beacon-beacon --since 10m --region us-east-1 | grep -i "reduced to top"` by hand.)
+(`check-reduction` greps the triage Lambda log for the "Cordon reduced" line.)
 
 ### §1.2 Strands smoke (after the agent's A1 commit, ~22:45-23:00)
 ```bash
@@ -100,9 +100,60 @@ Expected: one tool call printed, then a final answer, both from `us.amazon.nova-
 
 ---
 
-## §2 — Friday late / Saturday 08:00: remediation + console stacks
+## §2 — Friday late (or Saturday 08:00 if you ran out of evening): remediation + console stacks
 
-Written by the agent when the templates are committed (see `docs/PLAN.md` §6, rows H3 and H4). Check back here.
+Everything below is idempotent. Run from the repo root. `REGION`, `EMAIL`, `LOG_GROUP_PATTERNS`, `IMAGE_URI` are remembered in `.beacon.env` after the first run, so later commands only need what is shown.
+
+```bash
+# 1. Rebuild BOTH images at the current git SHA (the triage image rebuild only pushes the code layer now, ~3-5 min)
+make setup-image REGION=us-east-1          # -> IMAGE_URI in .beacon.env
+make setup-agent-image REGION=us-east-1    # -> AGENT_IMAGE_URI in .beacon.env   (run in a 2nd terminal, in parallel)
+
+# 2. Base stack update: new triage image, incident storage on, dashboard link later
+make deploy INCIDENTS_ENABLED=true TOKEN_BUDGET=6000 REGION=us-east-1
+#    (EMAIL / LOG_GROUP_PATTERNS / ENABLE_ALARM / ALARM_NAME_PREFIX come from .beacon.env; refused if the image tag is stale)
+
+# 3. Remediation stack: tables, remediator role, remediate + change-ledger Lambdas, Step Functions
+make deploy-remediation REGION=us-east-1
+#    Expected last line: "Done. Next: make snapshot-sg && make tag-remediable && make dry-run"
+
+# 4. Golden snapshot of the demo security groups (STACK MUST BE HEALTHY: run make fix-demo first if you broke it)
+make fix-demo REGION=us-east-1
+make snapshot-sg REGION=us-east-1
+#    Expected: "Wrote golden snapshot to /beacon/beacon/golden-sg: N rule(s) across 2 group(s)" and the JSON
+
+# 5. Tag the demo resources for the remediator's IAM condition (no-op if the demo template already tagged them)
+make tag-remediable REGION=us-east-1
+
+# 6. THE FRIDAY GATE: dry-run under the remediator role
+make dry-run REGION=us-east-1
+#    Expected: JSON with "ok": true and "code": "DryRunOperation" (or "InvalidPermission.Duplicate"), then "DRY RUN PASSED".
+#    If "code": "UnauthorizedOperation" -> paste the whole output to the agent (IAM statement fix); do not continue to 8.
+
+# 7. Console stack (stub page tonight; CloudFront creation takes 5-10 min, let it run)
+make set-passcode PASSCODE=<choose-a-word>       # remembered in .beacon.env
+make deploy-console REGION=us-east-1
+#    Expected: "Console: https://dXXXX.cloudfront.net" (opens to the placeholder page), Voice API + Dashboard URLs.
+#    Then, so SNS emails link to the console:
+make deploy REGION=us-east-1                     # DASHBOARD_URL is read from .beacon.env
+
+# 8. Measure CloudTrail -> EventBridge latency (the number goes into the writeup)
+make break-demo REGION=us-east-1; date; sleep 60; make fix-demo REGION=us-east-1
+watch -n 20 'make changes REGION=us-east-1'      # until RevokeSecurityGroupIngress and AuthorizeSecurityGroupIngress rows appear; note the seconds
+#    Write the measured delay into docs/QUESTIONS.md ("CloudTrail->ledger latency: NN s").
+#    Since break-demo fired a real incident: confirm the email arrived, then `make incidents` shows it with status awaiting_engineer.
+
+# 9. Health checks of the two Function URLs
+curl -s "$(aws cloudformation describe-stacks --stack-name beacon-console --region us-east-1 --query 'Stacks[0].Outputs[?OutputKey==`VoiceTurnUrl`].OutputValue' --output text)health"
+curl -s "$(aws cloudformation describe-stacks --stack-name beacon-console --region us-east-1 --query 'Stacks[0].Outputs[?OutputKey==`DashboardUrl`].OutputValue' --output text)health"
+#    Expected: {"ok":true,"service":"beacon-voice-turn"} and {"ok":true,"service":"beacon-dashboard"}
+```
+
+Before sleeping: `make fix-demo`, confirm the alarm is back to OK, and answer `docs/QUESTIONS.md`.
+
+## §3 — Saturday 08:00-10:30 (updates only; all stacks exist)
+
+Written by the agent overnight. Priority order and the 09:45 stop rule are in `docs/PLAN.md` §6 row H4.
 
 ---
 

@@ -1,7 +1,9 @@
 .PHONY: deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
        test lint check-image-tags smoke-strands deploy-remediation teardown-remediation \
-       snapshot-sg tag-remediable dry-run changes incidents lint-templates
+       snapshot-sg tag-remediable dry-run changes incidents lint-templates \
+       deploy-console teardown-console web-build set-passcode console-config \
+       check-reduction capture-run
 
 # Deploy variables persisted by earlier runs (IMAGE_URI, EMAIL, ...). Gitignored.
 -include .beacon.env
@@ -107,6 +109,14 @@ endif
 ifneq ($(DASHBOARD_URL),)
 	OVERRIDES += DashboardUrl=$(DASHBOARD_URL)
 endif
+
+# Console stack
+CONSOLE_STACK   ?= $(STACK_NAME)-console
+PASSCODE        ?=
+POLLY_VOICE_ID  ?= Kajal
+STT_LANGUAGE    ?= en-IN
+VOICE_ENGINE    ?= strands
+VOICE_BACKEND   ?= aws
 
 # Remediation stack
 REMEDIATION_STACK      ?= $(STACK_NAME)-remediation
@@ -338,7 +348,7 @@ fix-demo:
 # ---------- Remediation stack ----------
 
 lint-templates:
-	$(CFN_LINT) template.yaml remediation-template.yaml demo/demo-infra-template.yaml
+	$(CFN_LINT) template.yaml remediation-template.yaml console-template.yaml demo/demo-infra-template.yaml --ignore-checks W1011
 
 deploy-remediation:
 	@bash scripts/check_image_tag.sh AGENT_IMAGE_URI "$(AGENT_IMAGE_URI)"
@@ -396,6 +406,14 @@ dry-run:
 		--cli-binary-format raw-in-base64-out --payload "$$PAYLOAD" /dev/stdout | $(PYTHON) -c 'import json,sys; d=json.loads(sys.stdin.read().split("\n")[0]); print(json.dumps(d, indent=1)); sys.exit(0 if d.get("ok") else 1)' \
 		&& echo "DRY RUN PASSED" || (echo "DRY RUN FAILED (see error above)"; exit 1)
 
+# Proof that Cordon/Nova Embeddings ran on the last triage (greps the Lambda log).
+check-reduction:
+	@bash scripts/check_reduction.sh $(STACK_NAME) $(REGION)
+
+# Save the latest real run (Lambda log, demo logs, incident item, ledger) under tests/fixtures/real/.
+capture-run:
+	@PYTHON=$(PYTHON) bash scripts/capture_run.sh $(STACK_NAME) $(REGION)
+
 # Rows in the change ledger, newest first.
 changes:
 	@aws dynamodb scan --table-name beacon-changes-$(STACK_NAME) --region $(REGION) --output json | \
@@ -405,6 +423,61 @@ changes:
 incidents:
 	@aws dynamodb scan --table-name beacon-incidents-$(STACK_NAME) --region $(REGION) --output json | \
 	$(PYTHON) -c 'import json,sys; rows=sorted(json.load(sys.stdin)["Items"], key=lambda r: r["timestamp"]["S"], reverse=True); [print(r["timestamp"]["S"], r["incident_id"]["S"], r.get("status",{}).get("S","?"), r.get("alarm_name",{}).get("S","-")) for r in rows[:20]]; print(f"{len(rows)} row(s)")'
+
+# ---------- Console stack (S3 + CloudFront + voice/dashboard Lambdas) ----------
+
+set-passcode:
+	$(call check_param,PASSCODE)
+	$(call save_env,PASSCODE,$(PASSCODE))
+	@echo "Passcode saved to .beacon.env"
+
+# Builds web/dist if the Vite app exists; otherwise uses the placeholder page.
+web-build:
+	@if [ -f web/package.json ]; then cd web && npm ci --silent && npm run build --silent; else mkdir -p web/dist && cp web/placeholder/index.html web/dist/index.html; fi
+	@echo "web/dist ready"
+
+deploy-console: web-build
+	$(call check_param,PASSCODE)
+	@bash scripts/check_image_tag.sh AGENT_IMAGE_URI "$(AGENT_IMAGE_URI)"
+	$(CFN_LINT) console-template.yaml
+	aws cloudformation validate-template --template-body file://console-template.yaml --region $(REGION) > /dev/null
+	@REMEDIATE_ARN=$$(aws cloudformation describe-stacks --stack-name $(REMEDIATION_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`RemediateFunctionArn`].OutputValue' --output text) && \
+	echo "==> Deploying $(CONSOLE_STACK) (CloudFront creation takes 5-10 min the first time)..." && \
+	aws cloudformation deploy \
+		--template-file console-template.yaml \
+		--stack-name $(CONSOLE_STACK) \
+		--region $(REGION) \
+		--capabilities CAPABILITY_NAMED_IAM \
+		--parameter-overrides BaseStackName=$(STACK_NAME) AgentImageUri=$(AGENT_IMAGE_URI) \
+			LambdaArchitecture=$(LAMBDA_ARCH) RemediateFunctionArn=$$REMEDIATE_ARN Passcode=$(PASSCODE) \
+			PollyVoiceId=$(POLLY_VOICE_ID) SttLanguage=$(STT_LANGUAGE) VoiceEngine=$(VOICE_ENGINE) \
+			$(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),)
+	$(call save_env,PASSCODE,$(PASSCODE))
+	@BUCKET=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' --output text) && \
+	echo "==> Uploading web/dist to s3://$$BUCKET ..." && \
+	aws s3 sync web/dist "s3://$$BUCKET" --delete --exclude config.json --region $(REGION)
+	@ARCHIVED_INCIDENT_ID=$(ARCHIVED_INCIDENT_ID) bash scripts/console_config.sh $(CONSOLE_STACK) $(REGION) $(STT_LANGUAGE) $(VOICE_BACKEND)
+	@CONSOLE_URL=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`ConsoleUrl`].OutputValue' --output text) && \
+	touch .beacon.env && grep -v '^DASHBOARD_URL=' .beacon.env > .beacon.env.tmp || true; \
+	echo "DASHBOARD_URL=$$CONSOLE_URL" >> .beacon.env.tmp && mv .beacon.env.tmp .beacon.env && \
+	echo "Done. DASHBOARD_URL=$$CONSOLE_URL saved to .beacon.env (run 'make deploy' again so SNS emails link to it)."
+
+# Re-upload the site + config without touching the stack.
+console-config: web-build
+	@BUCKET=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' --output text) && \
+	aws s3 sync web/dist "s3://$$BUCKET" --delete --exclude config.json --region $(REGION)
+	@ARCHIVED_INCIDENT_ID=$(ARCHIVED_INCIDENT_ID) bash scripts/console_config.sh $(CONSOLE_STACK) $(REGION) $(STT_LANGUAGE) $(VOICE_BACKEND)
+
+teardown-console:
+	@BUCKET=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' --output text 2>/dev/null) && \
+	[ -n "$$BUCKET" ] && aws s3 rm "s3://$$BUCKET" --recursive --region $(REGION) || true
+	aws cloudformation delete-stack --stack-name $(CONSOLE_STACK) --region $(REGION)
+	@echo "Console stack deletion initiated (CloudFront disable + delete takes ~10 min)."
 
 # ---------- Development ----------
 

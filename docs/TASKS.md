@@ -1,0 +1,38 @@
+# Task queue (agent)
+
+Ordered by demo risk. Each task is self-contained: file list + definition of done. Tick when `bash scripts/gate.sh` is green and the commit is made. Human deploy steps live in `docs/human-runbook.md`.
+
+## A1 — Friday night (before the human's late deploys)
+- [x] A0 git baseline, Makefile image tags + guard, host arch, RDS version param, remediable tags
+- [x] `rca.py` parser + triage prompt (CHANGE CORRELATION, BEACON_JSON) + fixture
+- [x] store: status / rca_json / timeline / 30 d TTL / append_timeline / update_status / find_open_incident; handler stores incidents without Connect + dedup
+- [x] remediation registry (2 actions), `actions_sg`, `actions_ecs`, `remediate.py` dryrun step
+- [x] `Dockerfile.agent`, `agent` extra, `scripts/smoke_strands.py`, `make smoke-strands`
+- [x] `remediation-template.yaml` v0 + ASL test + `changes.ledger_handler` + make deploy-remediation / snapshot-sg / tag-remediable / dry-run / changes / incidents
+- [x] `console-template.yaml` v0 + stub `voice_turn` / `dashboard_api` (health, warm) + make deploy-console / console-config / set-passcode
+- [ ] runbook §2 (Friday 23:00 deploys), `make capture-run`, `make check-reduction`
+
+## A2 — overnight: the closed loop (must-tier first)
+- [ ] `approvals.py`: create_proposal / get_proposal (5-min expiry) / create / get / mark_used; explicit table name; tests (moto)
+- [ ] `remediation/verify.py`: verify_alarm(alarm, after_ts) + verify_metric(namespace, metric, dims) + postcondition -> VerifyResult{ok, checks[]}; tests
+- [ ] `remediate.py` steps: require_approval, execute (APPLY_ENABLED, executed_at, Powertools idempotency on approval_id), verify (attempts), resolve, escalate, all (inline runner); timeline + status writes; tests
+- [ ] `remediation/runner.py` run_loop(approval_id) inline fallback; test drives dryrun -> execute -> verify -> resolved with patched checks
+- [ ] `contracts.py`: put / match(alarm, action, params) with golden-snapshot membership / use (conditional) / revoke / list; tests
+- [ ] `diagnose.py`: sg_drift(golden) -> MissingRule[]; format_diagnostics(); tests
+- [ ] `changes.py`: recent(minutes, before=alarm_ts) from ledger (destructive verbs first, remediator tagged) + lookup_events fallback + format lines; tests
+- [ ] handler: `[diagnostics]` + `[changes]` sources (bypass Cordon), deterministic action override from diagnostics, contract match -> approvals.create(source=contract) -> contracts.use -> sfn.start_execution -> notify(variant=contract); `notifier.notify(variant, link)`; tests
+- [ ] `tests/test_template_safety.py`: voice role has no EC2/ECS write actions; remediator role has exactly the allowlisted writes with the tag condition + the security-group-rule statement; triage role has PutItem approvals / UpdateItem contracts / states:StartExecution / X-Ray
+- [ ] make targets: propose, approve, replay-approval, demo-alarm, demo-reset, demo-sleep, demo-rehearse, apply-on / apply-off (3 functions, env merge, .beacon.env), warm
+
+## A3 — overnight: the voice agent + console
+- [ ] `turn_context.py` (contextvar: incident_id, session_id, transcript, channel, passcode_ok, contract_readback_pending)
+- [ ] `voice_tools.py`: get_incident_brief, get_evidence(kind), propose_fix (invokes remediate dryrun), approve_fix(fix_id, phrase) transcript-verified, grant_sleep_contract(days, max_uses) read-back gated, check_recovery; TOOL_SCHEMAS; evidence store; tests with FakeAgent
+- [ ] `voice_turn.py`: POST /session (passcode -> STS creds for MicRole), POST /turn (Strands Agent, streaming=False, Polly mp3 + sentence speech marks, conversation persisted, EMF metrics), tool_only mode; `voice_loop.py` litellm fallback; tests
+- [ ] `dashboard_api.py`: /incidents, /incidents/{id}, /incidents/{id}/execution, /contracts, DELETE /contracts/{id}, /tally, /safety; redact(); tests
+- [ ] `prompts/voice_system.txt` rewrite (action-capable, [E#] citations, contract read-back rule, Hinglish-friendly)
+- [ ] `web/` Vite + React + TS: theme, polling hooks, Night Board (tally, feed, timeline, archived-run card), Talk (typed input, Polly playback, tool chips, fix card, evidence dock), replay loader; `npm run build` green
+- [ ] Transcribe streaming transport (`pcm-worklet.js`, `transcribe.ts`), Web Speech transport, speech-mark sentence sync
+- [ ] Contracts + Safety screens, moon badge, sparkline
+
+## A4+ — Saturday
+- [ ] fixes from H4/H6; `make local` (FastAPI + moto + recorded incident) for Build It; README rewrite; `docs/safety.md`, `docs/deploy-guide.md`, `docs/demo-script.md`, `docs/submission.md`, `docs/blog.md`, `docs/assemblyai.md`
