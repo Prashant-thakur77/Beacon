@@ -15,6 +15,22 @@ Parameters:
     NoEcho: true
     Description: Password for the demo RDS instance
 
+  PostgresVersion:
+    Type: String
+    Default: "16.10"
+    Description: >
+      RDS PostgreSQL engine version. Older minors are periodically deprecated for
+      new instances; check with: aws rds describe-db-engine-versions --engine postgres
+      --query 'DBEngineVersions[].EngineVersion' --output text
+
+  CpuArchitecture:
+    Type: String
+    Default: X86_64
+    AllowedValues: [X86_64, ARM64]
+    Description: >
+      Fargate CPU architecture. Must match the host that built the demo image
+      (make deploy-demo detects it: x86_64 laptop -> X86_64, Apple Silicon -> ARM64).
+
 Resources:
 
   # ---------- VPC ----------
@@ -92,6 +108,9 @@ Resources:
     Properties:
       GroupDescription: Beacon demo ECS tasks
       VpcId: !Ref DemoVPC
+      Tags:
+        - Key: beacon:remediable
+          Value: "true"
 
   RdsSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -103,6 +122,9 @@ Resources:
           FromPort: 5432
           ToPort: 5432
           SourceSecurityGroupId: !Ref EcsSecurityGroup
+      Tags:
+        - Key: beacon:remediable
+          Value: "true"
 
   # ---------- RDS ----------
 
@@ -120,7 +142,7 @@ Resources:
     Properties:
       DBInstanceIdentifier: beacon-demo-db
       Engine: postgres
-      EngineVersion: "16.4"
+      EngineVersion: !Ref PostgresVersion
       DBInstanceClass: db.t4g.micro
       AllocatedStorage: 20
       StorageType: gp3
@@ -170,7 +192,7 @@ Resources:
       NetworkMode: awsvpc
       RequiresCompatibilities: [FARGATE]
       RuntimePlatform:
-        CpuArchitecture: ARM64
+        CpuArchitecture: !Ref CpuArchitecture
         OperatingSystemFamily: LINUX
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
       ContainerDefinitions:
@@ -206,6 +228,9 @@ Resources:
       TaskDefinition: !Ref TaskDefinition
       DesiredCount: 1
       LaunchType: FARGATE
+      Tags:
+        - Key: beacon:remediable
+          Value: "true"
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
