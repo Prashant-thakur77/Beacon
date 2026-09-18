@@ -344,21 +344,6 @@ def approve_fix(fix_id: int, confirmation_phrase: str) -> dict[str, Any]:
         "action": proposal["action"],
         "params": proposal["params"],
     }
-    try:
-        execution_arn = _start_execution(payload)
-    except Exception as exc:
-        logger.exception("start_execution failed")
-        return {**refusal, "error": f"could not start the remediation loop: {exc}"}
-    store.update_status(
-        incident["incident_id"],
-        "remediating",
-        table_name=_incidents_table(),
-        extra={
-            "execution_arn": execution_arn,
-            "handled_by": "voice",
-            "execute_requested_at": record["granted_at"],
-        },
-    )
     store.append_timeline(
         incident["incident_id"],
         "approved",
@@ -370,6 +355,32 @@ def approve_fix(fix_id: int, confirmation_phrase: str) -> dict[str, Any]:
             "approval_id": record["approval_id"],
         },
     )
+    try:
+        execution_arn = _start_execution(payload)
+    except Exception as exc:
+        logger.exception("start_execution failed")
+        return {**refusal, "error": f"could not start the remediation loop: {exc}"}
+    latest = store.get_incident(incident["incident_id"], table_name=_incidents_table())
+    if latest.get("status") in ("resolved", "escalated"):
+        # the loop ran inline (local / REMEDIATION_MODE=inline) and already finished
+        extra: dict[str, Any] = {"execution_arn": execution_arn, "handled_by": "voice"}
+        store.update_status(
+            incident["incident_id"],
+            str(latest["status"]),
+            table_name=_incidents_table(),
+            extra=extra,
+        )
+    else:
+        store.update_status(
+            incident["incident_id"],
+            "remediating",
+            table_name=_incidents_table(),
+            extra={
+                "execution_arn": execution_arn,
+                "handled_by": "voice",
+                "execute_requested_at": record["granted_at"],
+            },
+        )
     _tool_event(
         "approve_fix",
         {"fix_id": fix_id},

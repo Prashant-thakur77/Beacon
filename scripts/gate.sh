@@ -7,5 +7,5 @@ $PY/ruff format --check src tests scripts
 $PY/ruff check src tests scripts
 $PY/mypy src/beacon/
 $PY/cfn-lint template.yaml remediation-template.yaml console-template.yaml demo/demo-infra-template.yaml --ignore-checks W1011
-$PY/python -m pytest -q
+$PY/python -m pytest -q -p no:warnings
 echo "GATE PASSED"
