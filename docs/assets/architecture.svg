@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 760" width="1400" height="760" font-family="Manrope, Inter, system-ui, sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8b93a7"/></marker><marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2ed47a"/></marker><marker id="al" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#b8a6ff"/></marker></defs>
+<rect width="1400" height="760" fill="#0b1020"/>
+<text x="30" y="40" fill="#e6e9f2" font-size="22" font-weight="800">Beacon Night Shift</text>
+<text x="250" y="40" fill="#8b93a7" font-size="14">alarm → root cause → your word → verified fix → Sleep Contract</text>
+<rect x="30" y="80" width="400" height="130" rx="14" fill="none" stroke="#8b93a7" stroke-dasharray="5 5" stroke-opacity="0.6"/>
+<text x="42" y="72" fill="#8b93a7" font-size="11.5" font-weight="700" letter-spacing="1.5">THE PATIENT (demo stack)</text>
+<rect x="45" y="95" width="170" height="100" rx="10" fill="#121a33" stroke="#22305a" stroke-width="1.5"/>
+<text x="59" y="119" fill="#e6e9f2" font-size="15" font-weight="700">ECS Fargate app</text>
+<text x="59" y="139" fill="#8b93a7" font-size="12.5">webapp → tcp/5432 → RDS</text>
+<text x="59" y="156" fill="#8b93a7" font-size="12.5">logs → CloudWatch Logs</text>
+<rect x="240" y="95" width="175" height="100" rx="10" fill="#121a33" stroke="#ffb020" stroke-width="1.5"/>
+<text x="254" y="119" fill="#e6e9f2" font-size="15" font-weight="700">CloudWatch</text>
+<text x="254" y="139" fill="#8b93a7" font-size="12.5">metric filter ErrorCount</text>
+<text x="254" y="156" fill="#8b93a7" font-size="12.5">alarm → EventBridge</text>
+<path d="M215 145 L240 145" stroke="#8b93a7" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<rect x="460" y="80" width="480" height="130" rx="14" fill="none" stroke="#ffb020" stroke-dasharray="5 5" stroke-opacity="0.6"/>
+<text x="472" y="72" fill="#ffb020" font-size="11.5" font-weight="700" letter-spacing="1.5">TRIAGE LAMBDA (torch image)</text>
+<rect x="475" y="95" width="220" height="100" rx="10" fill="#121a33" stroke="#ffb020" stroke-width="1.5"/>
+<text x="489" y="119" fill="#e6e9f2" font-size="15" font-weight="700">Bedrock: Nova 2 Lite</text>
+<text x="489" y="139" fill="#8b93a7" font-size="12.5">root cause + BEACON_JSON</text>
+<text x="489" y="156" fill="#8b93a7" font-size="12.5">Cordon on Nova 2 Embeddings</text>
+<text x="489" y="173" fill="#6aa9ff" font-size="11.5" font-family="JetBrains Mono, ui-monospace, monospace">us.amazon.nova-2-lite-v1:0</text>
+<rect x="710" y="95" width="215" height="100" rx="10" fill="#121a33" stroke="#6aa9ff" stroke-width="1.5"/>
+<text x="724" y="119" fill="#e6e9f2" font-size="15" font-weight="700">Deterministic sources</text>
+<text x="724" y="139" fill="#8b93a7" font-size="12.5">[diagnostics] SG drift vs golden snapshot</text>
+<text x="724" y="156" fill="#8b93a7" font-size="12.5">[changes] CloudTrail via EventBridge</text>
+<text x="724" y="173" fill="#8b93a7" font-size="12.5">exact ids override the model</text>
+<path d="M415 145 L475 145" stroke="#ffb020" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<text x="445.0" y="139.0" fill="#ffb020" font-size="11" text-anchor="middle">alarm</text>
+<rect x="970" y="95" width="200" height="100" rx="10" fill="#121a33" stroke="#22305a" stroke-width="1.5"/>
+<text x="984" y="119" fill="#e6e9f2" font-size="15" font-weight="700">DynamoDB</text>
+<text x="984" y="139" fill="#8b93a7" font-size="12.5">incidents · approvals</text>
+<text x="984" y="156" fill="#8b93a7" font-size="12.5">contracts · changes</text>
+<path d="M925 145 L970 145" stroke="#8b93a7" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<text x="947.5" y="139.0" fill="#8b93a7" font-size="11" text-anchor="middle">incident</text>
+<rect x="1195" y="95" width="180" height="100" rx="10" fill="#121a33" stroke="#22305a" stroke-width="1.5"/>
+<text x="1209" y="119" fill="#e6e9f2" font-size="15" font-weight="700">SNS</text>
+<text x="1209" y="139" fill="#8b93a7" font-size="12.5">page · resolved</text>
+<text x="1209" y="156" fill="#8b93a7" font-size="12.5">“you were not woken”</text>
+<path d="M1170 145 L1195 145" stroke="#8b93a7" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<rect x="30" y="260" width="660" height="200" rx="14" fill="none" stroke="#8b93a7" stroke-dasharray="5 5" stroke-opacity="0.6"/>
+<text x="42" y="252" fill="#8b93a7" font-size="11.5" font-weight="700" letter-spacing="1.5">THE CONVERSATION (browser, no telephony)</text>
+<rect x="45" y="275" width="200" height="170" rx="10" fill="#121a33" stroke="#b8a6ff" stroke-width="1.5"/>
+<text x="59" y="299" fill="#e6e9f2" font-size="15" font-weight="700">Night Board</text>
+<text x="59" y="319" fill="#8b93a7" font-size="12.5">S3 + CloudFront (HTTPS)</text>
+<text x="59" y="336" fill="#8b93a7" font-size="12.5">push-to-talk mic</text>
+<text x="59" y="353" fill="#8b93a7" font-size="12.5">every sentence pinned</text>
+<text x="59" y="370" fill="#8b93a7" font-size="12.5">to an evidence card</text>
+<rect x="265" y="275" width="200" height="170" rx="10" fill="#121a33" stroke="#22305a" stroke-width="1.5"/>
+<text x="279" y="299" fill="#e6e9f2" font-size="15" font-weight="700">Amazon Transcribe</text>
+<text x="279" y="319" fill="#8b93a7" font-size="12.5">streaming STT in the browser</text>
+<text x="279" y="336" fill="#8b93a7" font-size="12.5">15-min STS creds scoped to</text>
+<text x="279" y="353" fill="#8b93a7" font-size="12.5">one action (mic role)</text>
+<rect x="485" y="275" width="190" height="170" rx="10" fill="#121a33" stroke="#22305a" stroke-width="1.5"/>
+<text x="499" y="299" fill="#e6e9f2" font-size="15" font-weight="700">Amazon Polly</text>
+<text x="499" y="319" fill="#8b93a7" font-size="12.5">Beacon’s voice</text>
+<text x="499" y="336" fill="#8b93a7" font-size="12.5">sentence speech marks</text>
+<text x="499" y="353" fill="#8b93a7" font-size="12.5">light the transcript in sync</text>
+<rect x="720" y="260" width="655" height="200" rx="14" fill="none" stroke="#2ed47a" stroke-dasharray="5 5" stroke-opacity="0.6"/>
+<text x="732" y="252" fill="#2ed47a" font-size="11.5" font-weight="700" letter-spacing="1.5">VOICE-TURN LAMBDA (read-only role)</text>
+<rect x="735" y="275" width="300" height="170" rx="10" fill="#121a33" stroke="#2ed47a" stroke-width="1.5"/>
+<text x="749" y="299" fill="#e6e9f2" font-size="15" font-weight="700">Strands Agent on Nova 2 Lite</text>
+<text x="749" y="319" fill="#8b93a7" font-size="12.5">six tools, JSON schemas shared across backends</text>
+<text x="749" y="336" fill="#8b93a7" font-size="12.5">get_incident_brief · get_evidence</text>
+<text x="749" y="353" fill="#8b93a7" font-size="12.5">propose_fix · approve_fix</text>
+<text x="749" y="370" fill="#8b93a7" font-size="12.5">grant_sleep_contract · check_recovery</text>
+<rect x="1055" y="275" width="305" height="170" rx="10" fill="#121a33" stroke="#ff5c5c" stroke-width="1.5"/>
+<text x="1069" y="299" fill="#e6e9f2" font-size="15" font-weight="700">TurnContext (the safety rule)</text>
+<text x="1069" y="319" fill="#8b93a7" font-size="12.5">consent decided on the RAW transcript,</text>
+<text x="1069" y="336" fill="#8b93a7" font-size="12.5">never on the model’s tool argument</text>
+<text x="1069" y="353" fill="#8b93a7" font-size="12.5">“approve fix one” · read-back, then</text>
+<text x="1069" y="370" fill="#8b93a7" font-size="12.5">“grant contract for seven days”</text>
+<path d="M245 330 L265 330" stroke="#8b93a7" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<text x="255.0" y="324.0" fill="#8b93a7" font-size="11" text-anchor="middle">speech</text>
+<path d="M465 330 L485 330" stroke="#8b93a7" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<path d="M675 360 L700 360 L700 330 L735 330" stroke="#8b93a7" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<text x="700" y="320" fill="#8b93a7" font-size="11" text-anchor="middle">text</text>
+<path d="M1070 195 L1070 240 L880 240 L880 275" stroke="#8b93a7" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<text x="990" y="232" fill="#8b93a7" font-size="11" text-anchor="middle">incident + evidence</text>
+<rect x="30" y="520" width="1345" height="210" rx="14" fill="none" stroke="#2ed47a" stroke-dasharray="5 5" stroke-opacity="0.6"/>
+<text x="42" y="512" fill="#2ed47a" font-size="11.5" font-weight="700" letter-spacing="1.5">THE LOOP (remediate Lambda, write-only role scoped by aws:ResourceTag/beacon:remediable)</text>
+<rect x="45" y="540" width="205" height="90" rx="10" fill="#121a33" stroke="#22305a" stroke-width="1.5"/>
+<text x="59" y="564" fill="#e6e9f2" font-size="15" font-weight="700">DryRun</text>
+<text x="59" y="584" fill="#8b93a7" font-size="12.5">EC2 DryRun=True under</text>
+<text x="59" y="601" fill="#8b93a7" font-size="12.5">the executing role</text>
+<path d="M250 585 L265 585" stroke="#2ed47a" stroke-width="1.6" fill="none" marker-end="url(#ag)"/>
+<rect x="265" y="540" width="205" height="90" rx="10" fill="#121a33" stroke="#22305a" stroke-width="1.5"/>
+<text x="279" y="564" fill="#e6e9f2" font-size="15" font-weight="700">RequireApproval</text>
+<text x="279" y="584" fill="#8b93a7" font-size="12.5">approval record must</text>
+<text x="279" y="601" fill="#8b93a7" font-size="12.5">match action + params</text>
+<path d="M470 585 L485 585" stroke="#2ed47a" stroke-width="1.6" fill="none" marker-end="url(#ag)"/>
+<rect x="485" y="540" width="205" height="90" rx="10" fill="#121a33" stroke="#2ed47a" stroke-width="1.5"/>
+<text x="499" y="564" fill="#e6e9f2" font-size="15" font-weight="700">Execute</text>
+<text x="499" y="584" fill="#8b93a7" font-size="12.5">exactly once</text>
+<text x="499" y="601" fill="#8b93a7" font-size="12.5">(idempotent replay)</text>
+<path d="M690 585 L705 585" stroke="#2ed47a" stroke-width="1.6" fill="none" marker-end="url(#ag)"/>
+<rect x="705" y="540" width="205" height="90" rx="10" fill="#121a33" stroke="#22305a" stroke-width="1.5"/>
+<text x="719" y="564" fill="#e6e9f2" font-size="15" font-weight="700">Wait 30 s</text>
+<text x="719" y="584" fill="#8b93a7" font-size="12.5">CloudWatch needs an</text>
+<text x="719" y="601" fill="#8b93a7" font-size="12.5">evaluation period</text>
+<path d="M910 585 L925 585" stroke="#2ed47a" stroke-width="1.6" fill="none" marker-end="url(#ag)"/>
+<rect x="925" y="540" width="205" height="90" rx="10" fill="#121a33" stroke="#22305a" stroke-width="1.5"/>
+<text x="939" y="564" fill="#e6e9f2" font-size="15" font-weight="700">Verify ×6</text>
+<text x="939" y="584" fill="#8b93a7" font-size="12.5">alarm OK after the fix</text>
+<text x="939" y="601" fill="#8b93a7" font-size="12.5">metric 0 · rule present</text>
+<path d="M1130 585 L1145 585" stroke="#2ed47a" stroke-width="1.6" fill="none" marker-end="url(#ag)"/>
+<rect x="1145" y="540" width="205" height="90" rx="10" fill="#121a33" stroke="#2ed47a" stroke-width="1.5"/>
+<text x="1159" y="564" fill="#e6e9f2" font-size="15" font-weight="700">Resolve / Escalate</text>
+<text x="1159" y="584" fill="#8b93a7" font-size="12.5">“recovered” only when</text>
+<text x="1159" y="601" fill="#8b93a7" font-size="12.5">proven, else page a human</text>
+<text x="45" y="665" fill="#8b93a7" font-size="12.5">AWS Step Functions (Standard) · Powertools for AWS Lambda · X-Ray</text>
+<text x="45" y="690" fill="#b8a6ff" font-size="13" font-weight="700">Sleep Contract: the same loop starts from the triage Lambda with source=contract — no page, an email in the morning. Scoped to alarm + action + exact resources; counted; expires; your quote as the record.</text>
+<text x="45" y="712" fill="#8b93a7" font-size="12">Kill switch: APPLY_ENABLED=false on triage, voice and remediate stops every write path. tests/test_template_safety.py proves the two-role split from the CloudFormation.</text>
+<path d="M885 445 L885 500 L150 500 L150 540" stroke="#2ed47a" stroke-width="1.6" fill="none" marker-end="url(#ag)"/>
+<text x="520" y="494" fill="#2ed47a" font-size="11" text-anchor="middle">approve_fix → StartExecution</text>
+<path d="M1170 120 L1385 120 L1385 585 L1352 585" stroke="#b8a6ff" stroke-width="1.6" fill="none" marker-end="url(#al)"/>
+<text x="1385" y="360" fill="#b8a6ff" font-size="11" text-anchor="middle" transform="rotate(90 1385 360)">contract match → the same loop, no page</text>
+</svg>
