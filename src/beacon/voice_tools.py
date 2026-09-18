@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, Any
 
 import boto3
 
-from beacon import approvals, contracts, store
+from beacon import approvals, contracts, observability, store
 from beacon.remediation import registry
 from beacon.remediation.base import ParamError
 from beacon.turn_context import current
@@ -91,6 +91,7 @@ def _rca(incident: dict[str, Any]) -> dict[str, Any]:
     return rca if isinstance(rca, dict) else {}
 
 
+@observability.span("lambda.remediate_dryrun")
 def _invoke_remediate(payload: dict[str, Any]) -> dict[str, Any]:
     """Synchronous invoke of beacon-remediate (the only role that may dry-run)."""
     arn = os.environ.get("REMEDIATE_FUNCTION_ARN", "")
@@ -134,6 +135,7 @@ def _tool_event(
 # ---------------------------------------------------------------------------
 
 
+@observability.span("tool:get_incident_brief")
 def get_incident_brief() -> dict[str, Any]:
     """The incident in one call: status, summary, spoken summary, cause, fix."""
     incident = _incident()
@@ -164,6 +166,7 @@ def get_incident_brief() -> dict[str, Any]:
     return out
 
 
+@observability.span("tool:get_evidence")
 def get_evidence(kind: str) -> dict[str, Any]:
     """Evidence of one kind: logs, metrics, changes, diagnostics, or rca."""
     incident = _incident()
@@ -208,6 +211,7 @@ def get_evidence(kind: str) -> dict[str, Any]:
     return {"kind": kind, "evidence": [card], "data": payload}
 
 
+@observability.span("tool:propose_fix")
 def propose_fix() -> dict[str, Any]:
     """Propose the one allowlisted fix, dry-run under the remediator role."""
     incident = _incident()
@@ -296,6 +300,7 @@ def propose_fix() -> dict[str, Any]:
     }
 
 
+@observability.span("tool:approve_fix")
 def approve_fix(fix_id: int, confirmation_phrase: str) -> dict[str, Any]:
     """Execute proposal *fix_id* if the engineer really said the phrase."""
     ctx = current()
@@ -424,6 +429,7 @@ def _read_back(
     )
 
 
+@observability.span("tool:grant_sleep_contract")
 def grant_sleep_contract(days: int = 7, max_uses: int = 3) -> dict[str, Any]:
     """Grant a scoped, expiring standing approval; read-back first, then the phrase."""
     ctx = current()
@@ -527,6 +533,7 @@ def grant_sleep_contract(days: int = 7, max_uses: int = 3) -> dict[str, Any]:
     }
 
 
+@observability.span("tool:check_recovery")
 def check_recovery() -> dict[str, Any]:
     """Where the remediation loop is: status, last verify attempt, timings."""
     incident = _incident()
