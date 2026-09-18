@@ -151,6 +151,8 @@ curl -s "$(aws cloudformation describe-stacks --stack-name beacon-console --regi
 
 Before sleeping: `make fix-demo`, confirm the alarm is back to OK, and answer `docs/QUESTIONS.md`.
 
+**Before recording (Sunday):** `make preflight` must be all green. After the real runs: `make capture-run && make build-replay && make console-config` so the archived-run card on the live URL is a genuine incident. `make dashboard` once, for the CloudWatch shot.
+
 ## §3 — Saturday 08:00-10:30: prove the loop from the CLI (no UI needed)
 
 Strict priority order. **At 09:45 stop wherever you are, paste the state into chat, pack.** All stacks exist since Friday, so every step is an update.
