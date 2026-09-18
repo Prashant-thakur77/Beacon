@@ -32,9 +32,11 @@ export async function loadConfig(): Promise<Config> {
     /* no config: local dev or replay */
   }
   const env = import.meta.env as Record<string, string | undefined>;
+  const lang = params.get("lang");
   cached = {
     ...DEFAULTS,
     ...fetched,
+    ...(lang ? { sttLanguage: lang } : {}),
     voiceUrl: fetched.voiceUrl || env.VITE_VOICE_URL || "",
     dashboardUrl: fetched.dashboardUrl || env.VITE_DASHBOARD_URL || "",
     replay: params.get("replay") === "1" || env.VITE_REPLAY === "1",

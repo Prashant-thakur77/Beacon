@@ -117,6 +117,7 @@ export function Talk({
   replayTurns,
   onIncident,
   unlocked,
+  sttLanguage = "en-IN",
 }: {
   api: Api | null;
   incident: Incident;
@@ -124,6 +125,7 @@ export function Talk({
   replayTurns?: TurnResponse[];
   onIncident: (i: Incident) => void;
   unlocked: boolean;
+  sttLanguage?: string;
 }) {
   const [state, setState] = useState<State>("idle");
   const [partial, setPartial] = useState("");
@@ -208,7 +210,7 @@ export function Talk({
           replayIdx.current += 1;
           await new Promise((r) => setTimeout(r, 400));
         } else if (api) {
-          resp = await api.turn({ incident_id: incident.incident_id, session_id: sessionId, ...body });
+          resp = await api.turn({ incident_id: incident.incident_id, session_id: sessionId, lang: sttLanguage, ...body });
         } else throw new Error("no API configured");
       } catch (e) {
         setState("error");
@@ -269,8 +271,8 @@ export function Talk({
     setPartial("");
     listenStart.current = performance.now();
     let t: SttTransport;
-    if (activeStt === "transcribe" && api) t = new TranscribeTransport(() => api.session());
-    else if (activeStt === "webspeech" || (activeStt === "transcribe" && !api)) t = new WebSpeechTransport("en-IN");
+    if (activeStt === "transcribe" && api) t = new TranscribeTransport(() => api.session(), sttLanguage);
+    else if (activeStt === "webspeech" || (activeStt === "transcribe" && !api)) t = new WebSpeechTransport(sttLanguage);
     else return;
     transport.current = t;
     setState("listening");

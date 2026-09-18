@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { makeApi, type Api } from "./api";
 import { loadConfig, type Config } from "./config";
-import { ArchivedRunCard, IncidentCard, TallyStrip } from "./components/NightBoard";
+import { ArchivedRunCard, IncidentCard, JudgeCard, TallyStrip } from "./components/NightBoard";
 import { Contracts } from "./components/Contracts";
 import { Safety } from "./components/Safety";
 import { Talk } from "./components/Talk";
@@ -158,6 +158,7 @@ export default function App() {
               </form>
             ) : null}
             {incidentsQ.error && !replay ? <div className="err">Dashboard API: {incidentsQ.error}</div> : null}
+            {!passcode || new URLSearchParams(window.location.search).get("judge") === "1" ? <JudgeCard hasPasscode={!!passcode} /> : null}
             <div className="feed">
               {incidents.length === 0 ? (
                 <div className="panel">
@@ -191,6 +192,7 @@ export default function App() {
                 replayTurns={replay ? replay.turns[current.incident_id] ?? [] : undefined}
                 onIncident={onIncident}
                 unlocked={!!passcode}
+                sttLanguage={config?.sttLanguage}
               />
             </section>
           ) : null}

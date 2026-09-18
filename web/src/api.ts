@@ -43,7 +43,7 @@ export function makeApi(config: Config, passcode: () => string) {
         { method: "POST", body: "{}" },
         passcode(),
       ),
-    turn: (body: { incident_id: string; session_id: string; text?: string; channel?: string; mode?: "chat" | "brief" | "event"; event?: string }) =>
+    turn: (body: { incident_id: string; session_id: string; text?: string; channel?: string; mode?: "chat" | "brief" | "event"; event?: string; lang?: string }) =>
       request<TurnResponse>(`${voice}/turn`, { method: "POST", body: JSON.stringify(body) }, passcode()),
   };
 }

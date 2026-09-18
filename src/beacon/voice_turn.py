@@ -206,11 +206,16 @@ def _record_turn_usage(incident_id: str, result: Any) -> None:
 
 def _turn_prompt(body: dict[str, Any]) -> str:
     mode = body.get("mode", "chat")
+    hint = ""
+    if str(body.get("lang", "")).lower().startswith("hi"):
+        hint = (
+            " Answer in Hinglish (Hindi in Latin script with English technical terms)."
+        )
     if mode == "brief":
         return (
             "The engineer just opened the incident. Brief them: call "
             "get_incident_brief, then in two or three sentences say what is wrong, "
-            "the likely cause, and that you can propose a fix if they ask."
+            "the likely cause, and that you can propose a fix if they ask." + hint
         )
     if mode == "event":
         event = str(body.get("event", ""))
@@ -226,8 +231,8 @@ def _turn_prompt(body: dict[str, Any]) -> str:
                 "and tell the engineer honestly what did not pass and that a human "
                 "is needed."
             )
-        return f"System event: {event}. Tell the engineer briefly."
-    return str(body.get("text", "")).strip()
+        return f"System event: {event}. Tell the engineer briefly." + hint
+    return str(body.get("text", "")).strip() + hint
 
 
 # ---------------------------------------------------------------------------
