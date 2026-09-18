@@ -29,6 +29,11 @@ Parameters:
     Type: String
     Description: SNS topic of the base stack (resolved/escalated notifications)
 
+  RemediableEcsServices:
+    Type: String
+    Default: ""
+    Description: cluster/service pairs Beacon may force-redeploy (same value as the base stack)
+
   ApplyEnabled:
     Type: String
     Default: "true"
@@ -189,7 +194,6 @@ Resources:
                   - dynamodb:Scan
                 Resource:
                   - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-incidents-${BaseStackName}"
-                  - !Ref BeaconApprovalsTable
                   - !GetAtt BeaconApprovalsTable.Arn
                   - !GetAtt BeaconContractsTable.Arn
                   - !GetAtt BeaconIdempotencyTable.Arn
@@ -222,6 +226,7 @@ Resources:
         Variables:
           APPLY_ENABLED: !Ref ApplyEnabled
           GOLDEN_SG_PARAM: !Sub "/beacon/${BaseStackName}/golden-sg"
+          REMEDIABLE_ECS_SERVICES: !Ref RemediableEcsServices
           INCIDENTS_TABLE_NAME: !Sub "beacon-incidents-${BaseStackName}"
           APPROVALS_TABLE_NAME: !Ref BeaconApprovalsTable
           CONTRACTS_TABLE_NAME: !Ref BeaconContractsTable

@@ -122,8 +122,10 @@ make fix-demo REGION=us-east-1
 make snapshot-sg REGION=us-east-1
 #    Expected: "Wrote golden snapshot to /beacon/beacon/golden-sg: N rule(s) across 2 group(s)" and the JSON
 
-# 5. Tag the demo resources for the remediator's IAM condition (no-op if the demo template already tagged them)
+# 5. Tag the demo resources for the remediator's IAM condition (no-op if the demo template already tagged them),
+#    and record the demo ECS service as remediable (the second allowlisted action needs exact ids)
 make tag-remediable REGION=us-east-1
+make remediable-ecs REGION=us-east-1            # writes REMEDIABLE_ECS_SERVICES to .beacon.env; later deploys pass it
 
 # 6. THE FRIDAY GATE: dry-run under the remediator role
 make dry-run REGION=us-east-1
@@ -195,6 +197,16 @@ watch -n 15 'make incidents REGION=us-east-1'   # new row: status auto_remediati
 Local mic smoke before touching CloudFront (Saturday 14:00, per the plan): `make local LOCAL_PORT=8765` (port 8000 is taken on this machine), open `http://localhost:8765/?stt=webspeech`, passcode `local`, hold the mic and speak. This proves the worklet + playback path on the laptop; the Transcribe path itself needs the live URL (it needs the STS creds from `/session`).
 
 If Transcribe answers `BadRequestException ... language` for `en-IN`, redeploy with `make deploy-console STT_LANGUAGE=en-US` (the console reads it from `/config.json`, no rebuild).
+
+**Optional cycle 3 (only if cycles 1 and 2 are green by 18:30): the second allowlisted action.**
+```bash
+make demo-reset REGION=us-east-1
+make break-demo-deploy REGION=us-east-1         # wedges the running task (sticky; SSM flag cleared after 15 s)
+# real alarm in ~2-3 min; incident shows no SG drift; "can you fix it" -> Beacon proposes ecs.force_redeploy on beacon-demo/beacon-demo-webapp
+make propose REGION=us-east-1 && make approve REGION=us-east-1 FIX=1
+# Verify takes longer here: a Fargate task replacement is ~1-2 min, then an alarm evaluation period. Escalation = retake with make fix-demo-deploy.
+```
+Note: the demo image must be rebuilt for the wedge flag (`make deploy-demo` again after pulling the app change; it now installs boto3 and reads `/beacon/demo/wedge`).
 
 If anything fails: paste the verbatim output. Most likely culprits, in order: `UnauthorizedOperation` in `make dry-run` (IAM statement), Step Functions execution `FAILED` at `RequireApproval` (approval table name env), Verify escalating with `ErrorCount` still > 0 (the app needs ~60 s of 200s after the rule returns; a retake with `make demo-reset` fixes it).
 

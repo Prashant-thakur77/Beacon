@@ -134,6 +134,13 @@ Parameters:
     Default: ""
     Description: Console URL included in notifications (set after make deploy-console)
 
+  RemediableEcsServices:
+    Type: String
+    Default: ""
+    Description: >
+      cluster/service pairs (comma-separated) Beacon may force-redeploy. Diagnostics
+      report their health with exact ids; ecs.force_redeploy is refused for any other service.
+
   # --- Voice (set by voice stack, not by user) ---
 
   ConnectEnabled:
@@ -304,6 +311,7 @@ Resources:
           CHANGES_TABLE_NAME: !Sub "beacon-changes-${AWS::StackName}"
           STATE_MACHINE_ARN: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:beacon-remediate-${AWS::StackName}"
           GOLDEN_SG_PARAM: !Sub "/beacon/${AWS::StackName}/golden-sg"
+          REMEDIABLE_ECS_SERVICES: !Ref RemediableEcsServices
           CONNECT_CONFIG_PARAM: !Sub "/beacon/${AWS::StackName}/connect-config"
           LITELLM_LOCAL_MODEL_COST_MAP: "True"
 

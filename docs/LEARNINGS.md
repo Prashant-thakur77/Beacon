@@ -20,6 +20,9 @@ Dated, specific, in the order they happened. The "Learning" criterion and the la
 - **00:55 — IAM's "Invalid principal" race.** A trust policy naming a role created seconds earlier can fail on first deploy. The mic role now trusts the account root with an `aws:PrincipalArn` condition on the voice role: equivalent, and never races.
 - **01:10 — Powertools EMF emits metric values as arrays.** `{"TurnLatencyMs": [812.0]}` is valid EMF; the first test asserted a scalar and was wrong.
 
+- **02:10 — `!Ref` on a DynamoDB table is its name, not its ARN.** One such line inside an IAM `Resource` list would have failed the remediation stack on first create with a message about ARN format; cfn-lint did not flag it. A template test now asserts every IAM resource is an ARN or `*`.
+- **02:20 — A second allowlisted action needs its own data allowlist.** The golden snapshot protects security-group restores; for `ecs.force_redeploy` the equivalent is `REMEDIABLE_ECS_SERVICES` (filled from the demo stack outputs). A model proposal that names any other service is dropped before it can be proposed, not just refused at dry-run.
+
 ## Sat 19 Sep — workshop (fill in at 11:00–14:00)
 
 - Nova 2 Lite tool use through Strands: recommended temperature / quirks →

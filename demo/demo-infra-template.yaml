@@ -183,6 +183,33 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
 
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DemoWedgeFlagRead
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/beacon/demo/*"
+
+  WedgeFlag:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /beacon/demo/wedge
+      Type: String
+      Value: "false"
+      Description: Set to true to wedge the running demo task (make break-demo-deploy)
+
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -195,6 +222,7 @@ Resources:
         CpuArchitecture: !Ref CpuArchitecture
         OperatingSystemFamily: LINUX
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
         - Name: webapp
           Image: !Ref DemoImageUri
@@ -212,6 +240,8 @@ Resources:
               Value: demo
             - Name: DB_PASSWORD
               Value: !Ref DBPassword
+            - Name: WEDGE_PARAM
+              Value: !Ref WedgeFlag
           LogConfiguration:
             LogDriver: awslogs
             Options:

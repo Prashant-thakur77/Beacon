@@ -1,7 +1,7 @@
 .PHONY: deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
        test lint check-image-tags smoke-strands deploy-remediation teardown-remediation \
-       snapshot-sg tag-remediable dry-run changes incidents lint-templates \
+       snapshot-sg tag-remediable dry-run changes incidents lint-templates remediable-ecs break-demo-deploy fix-demo-deploy \
        deploy-console teardown-console web-build set-passcode console-config \
        check-reduction capture-run propose approve replay-approval demo-alarm demo-reset \
        demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix preflight dashboard build-replay
@@ -112,6 +112,10 @@ endif
 ifneq ($(DASHBOARD_URL),)
 	OVERRIDES += DashboardUrl=$(DASHBOARD_URL)
 endif
+ifneq ($(REMEDIABLE_ECS_SERVICES),)
+	OVERRIDES += RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES)
+endif
+REMEDIABLE_ECS_SERVICES ?=
 
 # Console stack
 CONSOLE_STACK   ?= $(STACK_NAME)-console
@@ -369,13 +373,31 @@ deploy-remediation:
 		--capabilities CAPABILITY_NAMED_IAM \
 		--parameter-overrides BaseStackName=$(STACK_NAME) AgentImageUri=$(AGENT_IMAGE_URI) \
 			SnsTopicArn=$$SNS_ARN CreateIncidentsTable=$(CREATE_INCIDENTS_TABLE) \
-			LambdaArchitecture=$(LAMBDA_ARCH) $(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),)
+			LambdaArchitecture=$(LAMBDA_ARCH) $(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),) \
+			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),)
 	$(call save_env,AGENT_IMAGE_URI,$(AGENT_IMAGE_URI))
 	@echo "Done. Next: make snapshot-sg && make tag-remediable && make dry-run"
 
 teardown-remediation:
 	aws cloudformation delete-stack --stack-name $(REMEDIATION_STACK) --region $(REGION)
 	@echo "Remediation stack deletion initiated."
+
+# Record the demo ECS service as remediable (cluster/service) in .beacon.env; deploys pass it to all stacks.
+remediable-ecs:
+	@CLUSTER=$$(aws cloudformation describe-stacks --stack-name $(DEMO_INFRA_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`DemoEcsCluster`].OutputValue' --output text) && \
+	SERVICE=$$(aws cloudformation describe-stacks --stack-name $(DEMO_INFRA_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`DemoServiceName`].OutputValue' --output text) && \
+	touch .beacon.env && grep -v '^REMEDIABLE_ECS_SERVICES=' .beacon.env > .beacon.env.tmp || true; \
+	echo "REMEDIABLE_ECS_SERVICES=$$CLUSTER/$$SERVICE" >> .beacon.env.tmp && mv .beacon.env.tmp .beacon.env && \
+	echo "REMEDIABLE_ECS_SERVICES=$$CLUSTER/$$SERVICE saved; redeploy (make deploy, deploy-remediation, deploy-console) to apply"
+
+# Second failure mode: wedge the running task (restart-only). Beacon should propose ecs.force_redeploy.
+break-demo-deploy:
+	@REGION=$(REGION) bash demo/trigger.sh wedge
+
+fix-demo-deploy:
+	@REGION=$(REGION) bash demo/trigger.sh unwedge
 
 # Golden snapshot of the demo security groups (run on a HEALTHY stack).
 snapshot-sg:
@@ -462,7 +484,8 @@ deploy-console: web-build
 		--parameter-overrides BaseStackName=$(STACK_NAME) AgentImageUri=$(AGENT_IMAGE_URI) \
 			LambdaArchitecture=$(LAMBDA_ARCH) RemediateFunctionArn=$$REMEDIATE_ARN Passcode=$(PASSCODE) \
 			PollyVoiceId=$(POLLY_VOICE_ID) SttLanguage=$(STT_LANGUAGE) VoiceEngine=$(VOICE_ENGINE) \
-			$(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),)
+			$(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),) \
+			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),)
 	$(call save_env,PASSCODE,$(PASSCODE))
 	@BUCKET=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
 		--query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' --output text) && \

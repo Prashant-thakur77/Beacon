@@ -43,7 +43,7 @@ Ordered by demo risk. Each task is self-contained: file list + definition of don
 - [x] 6 judge card on the board (`?judge=1` or no passcode)
 - [x] 7 `?lang=hi-IN` (Transcribe language + Hinglish answer hint)
 - [x] 8 `make build-replay` from real captures — **needs `make capture-run` after a real run**
-- [ ] 9 second allowlisted action demo (`ecs.force_redeploy`) — only if cycles 1+2 are green by Sat 18:30
+- [x] 9 second allowlisted action: `make break-demo-deploy` (sticky wedge via SSM flag), ECS health diagnostics with exact ids, `REMEDIABLE_ECS_SERVICES` data allowlist, model-proposal validation — **demo it only if cycles 1+2 are green by Sat 18:30**
 - [ ] 10 AgentCore Memory — only with a mentor's yes
 
 ## A4+ — Saturday

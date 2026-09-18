@@ -281,3 +281,73 @@ def test_triage_records_token_usage_on_the_incident(
     )["Item"]
     usage = {k: d.deserialize(v) for k, v in item.items()}["usage"]
     assert usage["input_tokens"] == 15000 and usage["output_tokens"] == 900
+
+
+_FIXTURE_SG_PARAMS = (
+    '"action_params": {"group_id": "sg-0abc123", "ip_protocol": "tcp", '
+    '"from_port": 5432, "to_port": 5432, "source_group_id": "sg-0def456"}'
+)
+
+
+@patch("litellm.completion")
+def test_model_proposed_ecs_redeploy_is_kept_when_configured(
+    mock_completion: MagicMock, env: Any, monkeypatch: Any, nova_response: str
+) -> None:
+    """No SG drift + the model names a configured service -> the action survives."""
+    monkeypatch.setenv("REMEDIABLE_ECS_SERVICES", "beacon-demo/beacon-demo-webapp")
+    # heal the SG so diagnostics find no drift
+    boto3.client("ec2", region_name="us-east-1").authorize_security_group_ingress(
+        GroupId=env["params"]["group_id"],
+        IpPermissions=[actions_sg.ip_permission(env["params"])],
+    )
+    text = nova_response.replace(
+        '"suggested_action": "sg.restore_ingress"',
+        '"suggested_action": "ecs.force_redeploy"',
+    ).replace(
+        _FIXTURE_SG_PARAMS,
+        '"action_params": {"cluster": "beacon-demo", "service": "beacon-demo-webapp"}',
+    )
+    env["mock_resp"].choices = [MagicMock(message=MagicMock(content=text))]
+    result = _run(env, mock_completion)
+    from boto3.dynamodb.types import TypeDeserializer
+
+    d = TypeDeserializer()
+    item = env["ddb"].get_item(
+        TableName=INCIDENTS, Key={"incident_id": {"S": result["incident_id"]}}
+    )["Item"]
+    incident = {k: d.deserialize(v) for k, v in item.items()}
+    bj = incident["rca_json"]["beacon_json"]
+    assert bj["suggested_action"] == "ecs.force_redeploy"
+    assert bj["action_params"] == {
+        "cluster": "beacon-demo",
+        "service": "beacon-demo-webapp",
+    }
+    assert bj.get("action_source") == "model"
+
+
+@patch("litellm.completion")
+def test_model_proposed_action_with_unconfigured_service_is_dropped(
+    mock_completion: MagicMock, env: Any, monkeypatch: Any, nova_response: str
+) -> None:
+    monkeypatch.setenv("REMEDIABLE_ECS_SERVICES", "beacon-demo/beacon-demo-webapp")
+    boto3.client("ec2", region_name="us-east-1").authorize_security_group_ingress(
+        GroupId=env["params"]["group_id"],
+        IpPermissions=[actions_sg.ip_permission(env["params"])],
+    )
+    text = nova_response.replace(
+        '"suggested_action": "sg.restore_ingress"',
+        '"suggested_action": "ecs.force_redeploy"',
+    ).replace(
+        _FIXTURE_SG_PARAMS,
+        '"action_params": {"cluster": "prod", "service": "payments"}',
+    )
+    env["mock_resp"].choices = [MagicMock(message=MagicMock(content=text))]
+    result = _run(env, mock_completion)
+    from boto3.dynamodb.types import TypeDeserializer
+
+    d = TypeDeserializer()
+    item = env["ddb"].get_item(
+        TableName=INCIDENTS, Key={"incident_id": {"S": result["incident_id"]}}
+    )["Item"]
+    bj = {k: d.deserialize(v) for k, v in item.items()}["rca_json"]["beacon_json"]
+    assert bj["suggested_action"] is None and bj.get("action_source") == "rejected"

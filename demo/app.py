@@ -40,6 +40,39 @@ ENDPOINTS = [
 db_healthy = True
 consecutive_failures = 0
 
+# A "wedged" process: once the SSM flag /beacon/demo/wedge is seen true, this
+# task stays wedged even after the flag is cleared. Only a new task recovers.
+# It models the class of outage a restart fixes (stuck pool, leaked handles).
+WEDGE_PARAM = os.environ.get("WEDGE_PARAM", "")
+wedged = False
+
+
+def _poll_wedge():
+    """Background: read the wedge flag every 5 s; sticky once seen."""
+    global wedged
+    if not WEDGE_PARAM:
+        return
+    try:
+        import boto3
+
+        ssm = boto3.client("ssm")
+    except Exception:
+        logger.warning("wedge polling disabled (boto3/ssm unavailable)")
+        return
+    while True:
+        try:
+            value = ssm.get_parameter(Name=WEDGE_PARAM)["Parameter"]["Value"]
+            if value.strip().lower() == "true" and not wedged:
+                wedged = True
+                logger.error(
+                    "ConnectionPool WEDGED: pool_state=stuck active=100/100 "
+                    "idle=0 reclaim_failed=true service=orders-service "
+                    "region=us-east-1 (restart required)"
+                )
+        except Exception:
+            pass
+        time.sleep(5)
+
 
 def _get_connection():
     import psycopg2
@@ -89,6 +122,8 @@ def _simulate_traffic():
     start = time.monotonic()
 
     try:
+        if wedged:
+            raise RuntimeError("connection pool wedged: no connections can be reclaimed")
         conn = _get_connection()
         cur = conn.cursor()
 
@@ -215,6 +250,7 @@ def main():
 
     health_thread = Thread(target=_run_health_server, daemon=True)
     health_thread.start()
+    Thread(target=_poll_wedge, daemon=True).start()
     logger.info("Health check server listening on :8080")
 
     time.sleep(3)

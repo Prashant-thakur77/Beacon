@@ -7,6 +7,7 @@ handler uses to override the model's suggested action with exact ids.
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -118,13 +119,86 @@ def suggested_fix(missing: list[MissingRule]) -> tuple[str, dict[str, Any]] | No
     return None
 
 
-def run(golden: dict[str, Any], *, ec2_client: Any | None = None) -> dict[str, Any]:
+def ecs_health(*, ecs_client: Any | None = None) -> list[dict[str, Any]]:
+    """Status of the ECS services Beacon may redeploy (``REMEDIABLE_ECS_SERVICES``).
+
+    Configured as ``cluster/service[,cluster/service...]``; the base stack fills
+    it from the demo stack outputs.  Gives the model exact ids for
+    ``ecs.force_redeploy`` so it never has to guess names.
+    """
+    raw = os.environ.get("REMEDIABLE_ECS_SERVICES", "")
+    targets = [t.strip() for t in raw.split(",") if "/" in t]
+    if not targets:
+        return []
+    client = ecs_client if ecs_client is not None else boto3.client("ecs")
+    out: list[dict[str, Any]] = []
+    for target in targets:
+        cluster, service = target.split("/", 1)
+        try:
+            resp = client.describe_services(cluster=cluster, services=[service])
+        except Exception:
+            out.append({"cluster": cluster, "service": service, "status": "unknown"})
+            continue
+        for svc in resp.get("services", []):
+            deployments = [
+                {
+                    "status": d.get("status"),
+                    "rollout": d.get("rolloutState"),
+                    "running": d.get("runningCount"),
+                    "created": str(d.get("createdAt", "")),
+                }
+                for d in svc.get("deployments", [])
+            ]
+            out.append(
+                {
+                    "cluster": cluster,
+                    "service": service,
+                    "status": svc.get("status"),
+                    "desired": svc.get("desiredCount"),
+                    "running": svc.get("runningCount"),
+                    "pending": svc.get("pendingCount"),
+                    "deployments": deployments,
+                    "action": "ecs.force_redeploy",
+                    "action_params": {"cluster": cluster, "service": service},
+                }
+            )
+    return out
+
+
+def format_ecs(services: list[dict[str, Any]]) -> str:
+    if not services:
+        return ""
+    lines = ["Remediable ECS services (restart-able with ecs.force_redeploy):"]
+    for s in services:
+        deploys = s.get("deployments") or []
+        latest = deploys[0] if deploys else {}
+        lines.append(
+            f"- {s['cluster']}/{s['service']}: {s.get('status')} running "
+            f"{s.get('running')}/{s.get('desired')} desired, latest deployment "
+            f"{latest.get('rollout') or '-'} since "
+            f"{str(latest.get('created', ''))[:19]}"
+        )
+    return "\n".join(lines)
+
+
+def run(
+    golden: dict[str, Any],
+    *,
+    ec2_client: Any | None = None,
+    ecs_client: Any | None = None,
+) -> dict[str, Any]:
     """Everything the handler needs: text for the prompt + structured result."""
     missing = sg_drift(golden, ec2_client=ec2_client)
     fix = suggested_fix(missing)
+    services = ecs_health(ecs_client=ecs_client)
+    text = format_diagnostics(missing, golden)
+    ecs_text = format_ecs(services)
+    if ecs_text:
+        text = f"{text}\n{ecs_text}"
     return {
         "missing_rules": [asdict(m) for m in missing],
+        "ecs_services": services,
         "suggested_action": fix[0] if fix else None,
         "action_params": fix[1] if fix else None,
-        "text": format_diagnostics(missing, golden),
+        "text": text,
     }
