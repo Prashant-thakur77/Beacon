@@ -16,15 +16,27 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Runtime deps of the slim agent image (Dockerfile.agent): voice turn,
+# remediation, change ledger, dashboard. Kept separate so the torch-based
+# triage image does not need them.
+agent = [
+    "strands-agents",
+    "aws-lambda-powertools[tracer]",
+    "pydantic",
+    "litellm",
+    "pyyaml",
+]
 dev = [
     "pytest",
-    "moto[logs,sns,dynamodb,cloudwatch]",
+    "moto[logs,sns,dynamodb,cloudwatch,ec2,ecs,ssm,stepfunctions,events,sts]",
     "pytest-mock",
     "mypy",
-    "boto3-stubs[logs,sns,bedrock-runtime,dynamodb,connect,cloudwatch]",
+    "boto3-stubs[logs,sns,bedrock-runtime,dynamodb,connect,cloudwatch,ec2,ecs,ssm,stepfunctions,sts,polly,lambda]",
     "types-tqdm",
+    "types-PyYAML",
     "ruff>=0.15",
     "pre-commit",
+    "cfn-lint",
 ]
 
 [tool.setuptools.packages.find]
@@ -36,7 +48,10 @@ packages = ["beacon"]
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["cordon.*", "genji", "genji.*", "litellm", "litellm.*"]
+module = [
+    "cordon.*", "genji", "genji.*", "litellm", "litellm.*",
+    "strands", "strands.*", "aws_lambda_powertools", "aws_lambda_powertools.*",
+]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

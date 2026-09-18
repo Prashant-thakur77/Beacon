@@ -1,6 +1,6 @@
 .PHONY: deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
-       test lint check-image-tags
+       test lint check-image-tags smoke-strands
 
 # Deploy variables persisted by earlier runs (IMAGE_URI, EMAIL, ...). Gitignored.
 -include .beacon.env
@@ -319,6 +319,13 @@ fix-demo:
 	@REGION=$(REGION) bash demo/trigger.sh fix
 
 # ---------- Development ----------
+
+PYTHON ?= .venv/bin/python
+
+# One Strands turn with one tool on Nova 2 Lite against your real account.
+# Needs AWS credentials + Bedrock model access. Decides VOICE_ENGINE (see PLAN.md).
+smoke-strands:
+	$(PYTHON) scripts/smoke_strands.py
 
 test:
 	pytest -v
