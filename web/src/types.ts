@@ -76,6 +76,18 @@ export interface Tally {
   humans_woken: number;
   handled_by_contract: number;
   median_minutes_to_recovery: number | null;
+  cost_inr_total?: number;
+  cost_inr_per_incident?: number;
+  night_incidents_not_woken?: number;
+  sleep_protected_hours?: number;
+}
+
+export interface MetricSeries {
+  alarm_name: string;
+  metric: { namespace: string; metric_name: string };
+  points: Array<{ t: string; v: number }>;
+  executed_at?: string | null;
+  resolved_at?: string | null;
 }
 
 export interface TurnResponse {

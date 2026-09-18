@@ -15,6 +15,12 @@ export function StatusPill({ status }: { status: string }) {
   return <span className={`pill ${s.cls}${s.pulse ? " pulse" : ""}`}>{s.label}</span>;
 }
 
+function inr(v: number | undefined): string {
+  if (v == null) return "–";
+  if (v >= 1) return `₹${v.toFixed(2)}`;
+  return `₹${v.toFixed(3)}`;
+}
+
 export function TallyStrip({ tally }: { tally: Tally | null }) {
   const median = tally?.median_minutes_to_recovery;
   return (
@@ -30,6 +36,14 @@ export function TallyStrip({ tally }: { tally: Tally | null }) {
       <div className="tile moon">
         <div className="n">{tally ? tally.humans_woken : "–"}</div>
         <div className="l">humans woken</div>
+      </div>
+      <div className="tile">
+        <div className="n">{tally ? inr(tally.cost_inr_per_incident) : "–"}</div>
+        <div className="l">model cost per incident</div>
+      </div>
+      <div className="tile moon">
+        <div className="n">{tally?.sleep_protected_hours != null ? `${tally.sleep_protected_hours} h` : "–"}</div>
+        <div className="l">sleep protected · night IST</div>
       </div>
     </div>
   );

@@ -251,7 +251,12 @@
    ],
    "proposals": [],
    "turn_count": 0,
-   "contract_readback_pending": null
+   "contract_readback_pending": null,
+   "usage": {
+    "input_tokens": 31000,
+    "output_tokens": 1400,
+    "embedding_tokens": 9000
+   }
   },
   {
    "incident_id": "7c1e9d2a-4f0b-4b8e-9a51-2d3f6e8c0a11",
@@ -558,7 +563,12 @@
     }
    ],
    "contract_id": "c3f1a2b4-9d8e-4a6c-b5f0-1e2d3c4b5a69",
-   "turn_count": 6
+   "turn_count": 6,
+   "usage": {
+    "input_tokens": 31000,
+    "output_tokens": 1400,
+    "embedding_tokens": 9000
+   }
   }
  ],
  "turns": {
@@ -2718,7 +2728,11 @@
   "escalated": 0,
   "humans_woken": 1,
   "handled_by_contract": 1,
-  "median_minutes_to_recovery": 2.2
+  "median_minutes_to_recovery": 2.2,
+  "cost_inr_total": 0.4116,
+  "cost_inr_per_incident": 0.2058,
+  "night_incidents_not_woken": 1,
+  "sleep_protected_hours": 1.0
  },
  "safety": {
   "allowlist": [

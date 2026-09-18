@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Api } from "../api";
 import { formatTime } from "../hooks";
-import type { Evidence, Incident, Message, Proposal, TurnResponse } from "../types";
+import type { Evidence, Incident, Message, MetricSeries, Proposal, TurnResponse } from "../types";
+import { RecoverySparkline } from "./Sparkline";
 import { Player, speakFallback } from "../voice/player";
 import type { SttChoice, SttTransport } from "../voice/stt";
 import { TranscribeTransport } from "../voice/transcribe";
@@ -47,7 +48,7 @@ function EvidenceCard({ ev, hot }: { ev: Evidence; hot: boolean }) {
   );
 }
 
-function FixCard({ incident, proposal }: { incident: Incident; proposal: Proposal | null }) {
+function FixCard({ incident, proposal, series }: { incident: Incident; proposal: Proposal | null; series: MetricSeries | null }) {
   const status = incident.status;
   if (status === "resolved") {
     const verifies = (incident.timeline ?? []).filter((e) => e.event === "verify_attempt");
@@ -60,6 +61,7 @@ function FixCard({ incident, proposal }: { incident: Incident; proposal: Proposa
           <span className="pill green">{okCount}/3 checks</span>
         </div>
         <div className="small dim">alarm OK after the fix · error count zero · rule present</div>
+        <RecoverySparkline series={series} />
       </div>
     );
   }
@@ -78,6 +80,7 @@ function FixCard({ incident, proposal }: { incident: Incident; proposal: Proposa
           Executing <span className="pill amber pulse">Step Functions loop</span>
         </div>
         <div className="small dim">dry run → require approval → execute → wait 30 s → verify (up to 6×)</div>
+        <RecoverySparkline series={series} />
       </div>
     );
   }
@@ -141,6 +144,34 @@ export function Talk({
   const listenStart = useRef(0);
 
   const proposal = incident.proposals?.length ? incident.proposals[incident.proposals.length - 1] : null;
+  const [series, setSeries] = useState<MetricSeries | null>(null);
+
+  // the alarm's metric, refreshed while the fix is being applied/verified and once after
+  useEffect(() => {
+    if (replayTurns) {
+      // replay: derive a plausible series from the timeline (alarm at start, zero after the fix)
+      const tl = incident.timeline ?? [];
+      const exec = incident.executed_at ?? tl.find((e) => e.event === "executed")?.t ?? null;
+      const t0 = new Date(tl[0]?.t ?? incident.timestamp).getTime() - 4 * 60_000;
+      const pts = Array.from({ length: 10 }, (_, i) => {
+        const t = new Date(t0 + i * 60_000);
+        const before = exec ? t.getTime() < new Date(exec).getTime() : i < 5;
+        return { t: t.toISOString(), v: before ? [0, 4, 6, 7, 5, 6][Math.min(i, 5)] : i - 5 === 0 ? 2 : 0 };
+      });
+      setSeries({ alarm_name: incident.alarm_name ?? "", metric: { namespace: "BeaconDemoInfra", metric_name: "ErrorCount" }, points: pts, executed_at: exec });
+      return;
+    }
+    if (!api) return;
+    let alive = true;
+    const pull = () => api.metric(incident.incident_id).then((m) => alive && setSeries(m)).catch(() => undefined);
+    void pull();
+    const active = incident.status === "remediating" || incident.status === "auto_remediating";
+    const id = active ? window.setInterval(pull, 10000) : null;
+    return () => {
+      alive = false;
+      if (id) window.clearInterval(id);
+    };
+  }, [api, incident.incident_id, incident.status, replayTurns]);
 
   const speak = useCallback(
     (msgIndex: number, resp: TurnResponse) => {
@@ -386,7 +417,7 @@ export function Talk({
         </div>
       </div>
 
-      <FixCard incident={incident} proposal={proposal} />
+      <FixCard incident={incident} proposal={proposal} series={series} />
 
       {incident.contract_readback_pending ? (
         <div className="fix lilac">

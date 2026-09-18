@@ -182,6 +182,42 @@ def update_status(
     )
 
 
+def add_usage(
+    incident_id: str,
+    usage: dict[str, int],
+    *,
+    table_name: str,
+    dynamodb_client: DynamoDBClient | None = None,
+) -> None:
+    """Atomically add token counts to ``usage.<key>`` on the incident."""
+    parts = {k: int(v) for k, v in usage.items() if v}
+    if not parts:
+        return
+    names = {"#u": "usage"}
+    values: dict[str, Any] = {":zero": {"N": "0"}, ":empty": {"M": {}}}
+    sets = []
+    for i, (key, value) in enumerate(parts.items()):
+        names[f"#k{i}"] = key
+        values[f":v{i}"] = {"N": str(value)}
+        sets.append(f"#u.#k{i} = if_not_exists(#u.#k{i}, :zero) + :v{i}")
+    client = _client(dynamodb_client)
+    key_expr = {"incident_id": {"S": incident_id}}
+    client.update_item(
+        TableName=table_name,
+        Key=key_expr,
+        UpdateExpression="SET #u = if_not_exists(#u, :empty)",
+        ExpressionAttributeNames={"#u": "usage"},
+        ExpressionAttributeValues={":empty": {"M": {}}},
+    )
+    client.update_item(
+        TableName=table_name,
+        Key=key_expr,
+        UpdateExpression="SET " + ", ".join(sets),
+        ExpressionAttributeNames=names,
+        ExpressionAttributeValues={k: v for k, v in values.items() if k != ":empty"},
+    )
+
+
 def find_open_incident(
     alarm_name: str,
     *,

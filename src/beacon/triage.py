@@ -46,7 +46,26 @@ def triage(
         max_tokens=config.max_output_tokens,
         temperature=0.3,
     )
+    _record_usage(response)
     return str(response.choices[0].message.content)
+
+
+last_usage: dict[str, int] = {}
+
+
+def _record_usage(response: Any) -> None:
+    """Keep the last call's token counts so the handler can store them."""
+    usage = getattr(response, "usage", None)
+    try:
+        last_usage.clear()
+        last_usage.update(
+            {
+                "input_tokens": int(getattr(usage, "prompt_tokens", 0) or 0),
+                "output_tokens": int(getattr(usage, "completion_tokens", 0) or 0),
+            }
+        )
+    except (TypeError, ValueError):
+        last_usage.clear()
 
 
 def get_system_prompt() -> str:

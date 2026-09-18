@@ -178,6 +178,25 @@ def _extract_reply(agent: Any, result: Any, history_len: int) -> str:
     return str(result).strip()
 
 
+def _record_turn_usage(incident_id: str, result: Any) -> None:
+    """Strands AgentResult.metrics.accumulated_usage -> incident usage counters."""
+    metrics = getattr(result, "metrics", None)
+    usage = getattr(metrics, "accumulated_usage", None) or {}
+    try:
+        counts = {
+            "input_tokens": int(usage.get("inputTokens", 0) or 0),
+            "output_tokens": int(usage.get("outputTokens", 0) or 0),
+        }
+    except (AttributeError, TypeError, ValueError):
+        return
+    if not any(counts.values()):
+        return
+    try:
+        store.add_usage(incident_id, counts, table_name=_incidents_table())
+    except Exception:
+        logger.exception("usage write failed")
+
+
 def _turn_prompt(body: dict[str, Any]) -> str:
     mode = body.get("mode", "chat")
     if mode == "brief":
@@ -285,6 +304,7 @@ def turn() -> Response[str]:
                 {"error": f"the agent failed: {exc}", "tool_events": ctx.tool_events},
             )
         reply_text = _extract_reply(agent, result, history_len)
+    _record_turn_usage(incident_id, result)
 
     spoken, cited = strip_citations(reply_text)
     tts: dict[str, Any] = {
