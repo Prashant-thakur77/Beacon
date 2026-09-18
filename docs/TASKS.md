@@ -30,9 +30,14 @@ Ordered by demo risk. Each task is self-contained: file list + definition of don
 - [x] `voice_turn.py`: POST /session (passcode -> STS creds for MicRole), POST /turn (Strands Agent, streaming=False, Polly mp3 + sentence speech marks, conversation persisted, EMF metrics), tool_only mode; `voice_loop.py` litellm fallback; tests
 - [x] `dashboard_api.py`: /incidents, /incidents/{id}, /incidents/{id}/execution, /contracts, DELETE /contracts/{id}, /tally, /safety; redact(); tests
 - [x] `prompts/voice_system.txt` rewrite (action-capable, [E#] citations, contract read-back rule, Hinglish-friendly)
-- [ ] `web/` Vite + React + TS: theme, polling hooks, Night Board (tally, feed, timeline, archived-run card), Talk (typed input, Polly playback, tool chips, fix card, evidence dock), replay loader; `npm run build` green
-- [ ] Transcribe streaming transport (`pcm-worklet.js`, `transcribe.ts`), Web Speech transport, speech-mark sentence sync
-- [ ] Contracts + Safety screens, moon badge, sparkline
+- [x] `web/` Vite + React + TS: theme, polling hooks, Night Board (tally, feed, timeline, archived-run card), Talk (typed input, Polly playback, tool chips, fix card, evidence dock), replay loader; `npm run build` green
+- [x] Transcribe streaming transport (`pcm-worklet.js`, `transcribe.ts`), Web Speech transport, speech-mark sentence sync
+- [x] Contracts + Safety screens, moon badge, sparkline
 
 ## A4+ — Saturday
-- [ ] fixes from H4/H6; `make local` (FastAPI + moto + recorded incident) for Build It; README rewrite; `docs/safety.md`, `docs/deploy-guide.md`, `docs/demo-script.md`, `docs/submission.md`, `docs/blog.md`, `docs/assemblyai.md`
+- [x] `make local` (FastAPI + moto + scripted agent) for Build It — found and fixed two status-race bugs
+- [x] README rewrite; `docs/safety.md`, `docs/demo-script.md`, `docs/submission.md`, `docs/blog.md`; CI updated
+- [ ] fixes from H4/H6 (human deploy feedback) — **needs the human's AWS runs**
+- [ ] `tests/fixtures/real/` + refreshed `web/public/replay/incident-001.json` from a real run (`make capture-run`)
+- [ ] `docs/assemblyai.md` + branch `assemblyai` scaffold (`web/src/voice/transport.ts` interface, `/tools/<name>` route) — after the First Commit submission
+- [ ] cover image `docs/assets/cover.svg`, architecture SVG for the video overlay
