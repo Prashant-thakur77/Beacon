@@ -31,6 +31,7 @@ class BeaconConfig:
     incidents_table_name: str = ""
     incidents_enabled: bool = False
     dashboard_url: str = ""
+    apply_enabled: bool = True
 
     @classmethod
     def from_env(cls) -> BeaconConfig:
@@ -67,6 +68,7 @@ class BeaconConfig:
             incidents_table_name=os.environ.get("INCIDENTS_TABLE_NAME", ""),
             incidents_enabled=os.environ.get("INCIDENTS_ENABLED", "").lower() == "true",
             dashboard_url=os.environ.get("DASHBOARD_URL", ""),
+            apply_enabled=os.environ.get("APPLY_ENABLED", "true").lower() != "false",
         )
 
     @property
