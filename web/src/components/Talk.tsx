@@ -350,11 +350,11 @@ export function Talk({
               <div className={`state ${state}`}>{stateLabel[state]}</div>
               <div className="partial">{partial || (state === "listening" ? "…" : unlocked || replayTurns ? "hold the mic and speak, or type below" : "enter the passcode on the left to talk")}</div>
               <div className="row small">
-                <label className="dim">STT</label>
+                <label className="faint small">mic</label>
                 <select className="input" style={{ width: "auto", padding: "4px 8px" }} value={activeStt} onChange={(e) => setActiveStt(e.target.value as SttChoice)} id="stt-select">
-                  <option value="transcribe">Amazon Transcribe (streaming)</option>
-                  <option value="webspeech">Browser speech</option>
-                  <option value="typed">Typed only</option>
+                  <option value="transcribe">Transcribe</option>
+                  <option value="webspeech">Browser</option>
+                  <option value="typed">Typed</option>
                 </select>
               </div>
             </div>
@@ -365,12 +365,16 @@ export function Talk({
             {messages.map((m, mi) =>
               m.role === "user" ? (
                 <div key={mi} className="bubble user">
-                  <div className="who">you · {m.channel} · {formatTime(m.at)}</div>
+                  <div className="who">
+                    you<span className="when">{m.channel} · {formatTime(m.at)}</span>
+                  </div>
                   <div>“{m.text}”</div>
                 </div>
               ) : (
                 <div key={mi} className="bubble beacon">
-                  <div className="who">Beacon · {formatTime(m.at)}</div>
+                  <div className="who">
+                    Beacon<span className="when">{formatTime(m.at)}</span>
+                  </div>
                   <div>
                     {splitSentences(m.text).map((s, si) => (
                       <Sentence key={si} text={s} hot={hotSentence?.msg === mi && hotSentence.idx === si} onChip={jumpToEvidence} />
@@ -414,7 +418,7 @@ export function Talk({
           <div className="latency">
             {latency.stt != null ? <span>stt {latency.stt} ms</span> : null}
             {latency.agent != null ? <span>agent {latency.agent} ms</span> : null}
-            <span>voice: {replayTurns ? "replay" : "Polly + Nova 2 Lite via Strands"}</span>
+            <span>{replayTurns ? "replay" : "Nova 2 Lite · Strands · Polly"}</span>
           </div>
         </div>
       </div>

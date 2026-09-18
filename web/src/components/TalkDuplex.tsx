@@ -167,7 +167,7 @@ export function TalkDuplex({
       <div className="panel">
         <div className="panel-h">
           <h2>Talk to Beacon</h2>
-          <span className="meta">{backend === "assemblyai" ? "AssemblyAI Voice Agent · Universal-3 Pro" : "AWS cascade"}</span>
+          <span className="meta">{backend === "assemblyai" ? "AssemblyAI · Universal-3 Pro" : "AWS cascade"}</span>
         </div>
         <div className="panel-b stack">
           <div className="mic-wrap">
@@ -194,14 +194,16 @@ export function TalkDuplex({
             {messages.map((m, mi) =>
               m.role === "user" ? (
                 <div key={mi} className="bubble user">
-                  <div className="who">you · {m.channel} · {formatTime(m.at)}</div>
+                  <div className="who">
+                    you<span className="when">{m.channel} · {formatTime(m.at)}</span>
+                  </div>
                   <div>“{m.text}”</div>
                 </div>
               ) : (
                 <div key={mi} className={`bubble beacon${(m as Message & { interrupted?: boolean }).interrupted ? " interrupted" : ""}`}>
                   <div className="who">
-                    Beacon · {formatTime(m.at)}
-                    {(m as Message & { interrupted?: boolean }).interrupted ? <span className="pill amber" style={{ marginLeft: 8 }}>interrupted</span> : null}
+                    Beacon<span className="when">{formatTime(m.at)}</span>
+                    {(m as Message & { interrupted?: boolean }).interrupted ? <span className="pill amber">interrupted</span> : null}
                   </div>
                   <div>
                     {splitSentences(m.text).map((s, si) => (

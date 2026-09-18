@@ -118,13 +118,11 @@ export function ArchivedRunCard({ onReplay }: { onReplay: () => void }) {
 }
 
 /** For a judge opening the URL cold, weeks later: what this is and how to see it work in 90 seconds. */
-export function JudgeCard({ hasPasscode }: { hasPasscode: boolean }) {
+export function JudgeCard({ hasPasscode, open }: { hasPasscode: boolean; open: boolean }) {
   return (
-    <div className="panel">
-      <div className="panel-h">
-        <h2>How to judge this in 90 seconds</h2>
-      </div>
-      <div className="panel-b stack small">
+    <details className="judge" open={open}>
+      <summary>How to judge this in 90 seconds</summary>
+      <div className="stack small" style={{ paddingTop: 12 }}>
         <div>
           <b>What it is.</b> An on-call agent for AWS. An alarm fires → Beacon finds the root cause on Bedrock and the CloudTrail change behind it → you talk to it
           in this browser → it proposes one allowlisted fix, dry-runs it, and applies it only when you say <span className="mono">approve fix one</span> → a Step
@@ -146,6 +144,6 @@ export function JudgeCard({ hasPasscode }: { hasPasscode: boolean }) {
           Reads are public and redacted (no account ids). Writes need the passcode and are limited to the two allowlisted actions on tagged demo resources.
         </div>
       </div>
-    </div>
+    </details>
   );
 }

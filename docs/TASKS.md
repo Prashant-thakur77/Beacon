@@ -45,6 +45,7 @@ Ordered by demo risk. Each task is self-contained: file list + definition of don
 - [x] 8 `make build-replay` from real captures — **needs `make capture-run` after a real run**
 - [x] 9 second allowlisted action: `make break-demo-deploy` (sticky wedge via SSM flag), ECS health diagnostics with exact ids, `REMEDIABLE_ECS_SERVICES` data allowlist, model-proposal validation — **demo it only if cycles 1+2 are green by Sat 18:30**
 - [ ] 10 AgentCore Memory — only with a mentor's yes
+- [x] AssemblyAI phase (branch `assemblyai`, merged with main): transport selection, AWS cascade wrapper, PCM playback + barge-in, TalkDuplex, key plumbing — day-1 spike validates the protocol against `assemblyai.ts`
 
 ## A4+ — Saturday
 - [x] `make local` (FastAPI + moto + scripted agent) for Build It — found and fixed two status-race bugs
