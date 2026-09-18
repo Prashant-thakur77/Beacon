@@ -106,3 +106,30 @@ def test_verify_all_combines_three_checks(cw: Any) -> None:
     )
     assert failed.ok is False and failed.checks[-1].ok is False
     assert failed.to_dict()["checks"][2]["name"] == "postcondition"
+
+
+def test_metric_check_ignores_old_errors_when_the_recent_window_is_quiet(
+    cw: Any,
+) -> None:
+    """A metric filter without a default value emits nothing after recovery; an
+    error four minutes ago with silence since must count as recovered."""
+    metric = {
+        "namespace": "BeaconDemoInfra",
+        "metric_name": "ErrorCount",
+        "dimensions": DIMS,
+        "period": 60,
+    }
+    cw.put_metric_data(
+        Namespace="BeaconDemoInfra",
+        MetricData=[
+            {
+                "MetricName": "ErrorCount",
+                "Dimensions": DIMS,
+                "Value": 5,
+                "Unit": "Count",
+                "Timestamp": datetime.now(tz=UTC) - timedelta(minutes=4),
+            }
+        ],
+    )
+    quiet = verify.verify_metric(metric, cloudwatch_client=cw, lookback_minutes=10)
+    assert quiet.ok is True and "no datapoints" in quiet.detail

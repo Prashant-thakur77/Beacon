@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import re
+import time
 from functools import cache
 from importlib.resources import files
 from typing import Any, cast
@@ -30,7 +31,7 @@ from aws_lambda_powertools.event_handler import (
     Response,
 )
 
-from beacon import store, voice_tools
+from beacon import observability, store, voice_tools
 from beacon.turn_context import TurnContext, turn_context
 
 logger = logging.getLogger(__name__)
@@ -91,6 +92,7 @@ def strip_citations(text: str) -> tuple[str, list[str]]:
 # ---------------------------------------------------------------------------
 
 
+@observability.span("polly.synthesize")
 def _synthesize(text: str) -> dict[str, Any]:
     """Polly mp3 + sentence speech marks; falls back through voices/engines."""
     polly: Any = boto3.client("polly")
@@ -165,6 +167,11 @@ def _build_agent(*, history: list[dict[str, Any]]) -> Any:
     )
 
 
+@observability.span("bedrock.agent_turn")
+def _run_agent(agent: Any, text: str) -> Any:
+    return agent(text)
+
+
 def _extract_reply(agent: Any, result: Any, history_len: int) -> str:
     """Final assistant text from the run (falls back to str(result))."""
     for message in reversed(agent.messages[history_len:]):
@@ -180,13 +187,37 @@ def _extract_reply(agent: Any, result: Any, history_len: int) -> str:
     return str(result).strip()
 
 
+def _record_turn_usage(incident_id: str, result: Any) -> None:
+    """Strands AgentResult.metrics.accumulated_usage -> incident usage counters."""
+    metrics = getattr(result, "metrics", None)
+    usage = getattr(metrics, "accumulated_usage", None) or {}
+    try:
+        counts = {
+            "input_tokens": int(usage.get("inputTokens", 0) or 0),
+            "output_tokens": int(usage.get("outputTokens", 0) or 0),
+        }
+    except (AttributeError, TypeError, ValueError):
+        return
+    if not any(counts.values()):
+        return
+    try:
+        store.add_usage(incident_id, counts, table_name=_incidents_table())
+    except Exception:
+        logger.exception("usage write failed")
+
+
 def _turn_prompt(body: dict[str, Any]) -> str:
     mode = body.get("mode", "chat")
+    hint = ""
+    if str(body.get("lang", "")).lower().startswith("hi"):
+        hint = (
+            " Answer in Hinglish (Hindi in Latin script with English technical terms)."
+        )
     if mode == "brief":
         return (
             "The engineer just opened the incident. Brief them: call "
             "get_incident_brief, then in two or three sentences say what is wrong, "
-            "the likely cause, and that you can propose a fix if they ask."
+            "the likely cause, and that you can propose a fix if they ask." + hint
         )
     if mode == "event":
         event = str(body.get("event", ""))
@@ -202,8 +233,8 @@ def _turn_prompt(body: dict[str, Any]) -> str:
                 "and tell the engineer honestly what did not pass and that a human "
                 "is needed."
             )
-        return f"System event: {event}. Tell the engineer briefly."
-    return str(body.get("text", "")).strip()
+        return f"System event: {event}. Tell the engineer briefly." + hint
+    return str(body.get("text", "")).strip() + hint
 
 
 # ---------------------------------------------------------------------------
@@ -241,8 +272,44 @@ def session() -> Response[str]:
     )
 
 
+def _emit_turn_metrics(
+    *,
+    started: float,
+    agent_ms: float,
+    tts_ms: float,
+    tool_events: list[dict[str, Any]],
+    channel: str,
+) -> None:
+    approvals = sum(
+        1
+        for t in tool_events
+        if t.get("name") == "approve_fix" and "approved via" in str(t.get("summary"))
+    )
+    grants = sum(
+        1
+        for t in tool_events
+        if t.get("name") == "grant_sleep_contract"
+        and "granted:" in str(t.get("summary"))
+    )
+    observability.metric(
+        "TurnLatencyMs", (time.perf_counter() - started) * 1000, unit="Milliseconds"
+    )
+    observability.metric("AgentLatencyMs", agent_ms, unit="Milliseconds")
+    observability.metric("TtsLatencyMs", tts_ms, unit="Milliseconds")
+    observability.metric("ToolCalls", len(tool_events), unit="Count")
+    observability.metric("Approvals", approvals, unit="Count")
+    observability.metric("ContractsGranted", grants, unit="Count")
+    observability.metric(f"Turns{channel.capitalize()}", 1, unit="Count")
+
+
 @app.post("/turn")
 def turn() -> Response[str]:
+    with observability.metrics_scope(service=SERVICE):
+        return _turn()
+
+
+def _turn() -> Response[str]:
+    started = time.perf_counter()
     headers = dict(app.current_event.headers)
     if not _passcode_ok(headers):
         return _json(401, {"error": "passcode required"})
@@ -278,17 +345,21 @@ def turn() -> Response[str]:
     with turn_context(ctx):
         agent = _build_agent(history=history)
         history_len = len(agent.messages)
+        agent_started = time.perf_counter()
         try:
-            result = agent(text)
+            result = _run_agent(agent, text)
         except Exception as exc:
             logger.exception("agent turn failed")
             return _json(
                 502,
                 {"error": f"the agent failed: {exc}", "tool_events": ctx.tool_events},
             )
+        agent_ms = (time.perf_counter() - agent_started) * 1000
         reply_text = _extract_reply(agent, result, history_len)
+    _record_turn_usage(incident_id, result)
 
     spoken, cited = strip_citations(reply_text)
+    tts_started = time.perf_counter()
     tts: dict[str, Any] = {
         "audio_b64": None,
         "speech_marks": [],
@@ -299,6 +370,14 @@ def turn() -> Response[str]:
         tts.update(_synthesize(spoken))
     except Exception as exc:
         tts["tts_error"] = str(exc)
+
+    _emit_turn_metrics(
+        started=started,
+        agent_ms=agent_ms,
+        tts_ms=(time.perf_counter() - tts_started) * 1000,
+        tool_events=ctx.tool_events,
+        channel=channel,
+    )
 
     new_messages = [m for m in agent.messages[history_len:] if isinstance(m, dict)]
     conversation = (history + new_messages)[-_MAX_HISTORY:]

@@ -19,7 +19,7 @@ from typing import Any
 
 import boto3
 
-from beacon import approvals, store
+from beacon import approvals, observability, store
 from beacon.remediation import registry
 from beacon.remediation.base import ParamError
 from beacon.remediation.verify import verify_all
@@ -404,6 +404,33 @@ _STEPS = {
 }
 
 
+def _emit_outcome_metrics(
+    step: str, event: dict[str, Any], result: dict[str, Any]
+) -> None:
+    """One EMF line per step; Resolve/Escalate carry the loop's headline numbers."""
+    observability.metric(f"Step{step.title().replace('_', '')}", 1, unit="Count")
+    if step == "verify":
+        observability.metric(
+            "VerifyAttempts", float(result.get("attempts", 0)), unit="Count"
+        )
+    if step == "resolve":
+        inp = _loop_input(event)
+        executed = ((inp.get("execute") or {}).get("Payload") or {}).get("executed_at")
+        if executed:
+            try:
+                since = datetime.now(tz=UTC) - datetime.fromisoformat(str(executed))
+                observability.metric(
+                    "RemediationSeconds", since.total_seconds(), unit="Seconds"
+                )
+            except ValueError:
+                pass
+        woken = 0.0 if result.get("handled_by") == "contract" else 1.0
+        observability.metric("HumansWoken", woken, unit="Count")
+        observability.metric("Resolved", 1, unit="Count")
+    if step == "escalate":
+        observability.metric("Escalated", 1, unit="Count")
+
+
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     step = str(event.get("step", ""))
     fn = _STEPS.get(step)
@@ -415,4 +442,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         event.get("action"),
         event.get("incident_id"),
     )
-    return fn(event)
+    with observability.metrics_scope(
+        service="beacon-remediate", action=str(event.get("action", ""))
+    ):
+        result = fn(event)
+        _emit_outcome_metrics(step, event, result)
+    return result

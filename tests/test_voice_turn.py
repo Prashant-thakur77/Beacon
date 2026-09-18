@@ -299,6 +299,30 @@ def test_strip_citations_and_collect_ids() -> None:
     assert ids == ["E1", "E3", "E2"]
 
 
+def test_turn_accumulates_token_usage_on_the_incident(env: Any, mocker: Any) -> None:
+    class Metered(FakeAgent):
+        def __call__(self, text: str) -> Any:
+            reply = super().__call__(text)
+
+            class R:
+                metrics = type(
+                    "M",
+                    (),
+                    {"accumulated_usage": {"inputTokens": 1200, "outputTokens": 90}},
+                )()
+
+                def __str__(self) -> str:
+                    return reply
+
+            return R()
+
+    mocker.patch("beacon.voice_turn._build_agent", return_value=Metered([], "One."))
+    _post("/turn", {"incident_id": env["incident_id"], "session_id": "s1", "text": "a"})
+    _post("/turn", {"incident_id": env["incident_id"], "session_id": "s1", "text": "b"})
+    usage = store.get_incident(env["incident_id"], table_name=INCIDENTS)["usage"]
+    assert usage["input_tokens"] == 2400 and usage["output_tokens"] == 180
+
+
 # ------------------------------------------------ AssemblyAI phase routes
 
 

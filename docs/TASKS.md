@@ -34,10 +34,25 @@ Ordered by demo risk. Each task is self-contained: file list + definition of don
 - [x] Transcribe streaming transport (`pcm-worklet.js`, `transcribe.ts`), Web Speech transport, speech-mark sentence sync
 - [x] Contracts + Safety screens, moon badge, sparkline
 
+## PLAN v2 items (sandbox-buildable, done overnight)
+- [x] 1 `make preflight`
+- [x] 2 ₹ per incident + sleep protected on the tally (usage from litellm + Strands); IST night hours
+- [x] 3 recovery sparkline on the fix card (`/incidents/{id}/metric`)
+- [x] 4 Powertools EMF metrics + X-Ray spans; `make dashboard`
+- [x] 5 `docs/LEARNINGS.md` seeded with dated entries (workshop + recording sections to fill)
+- [x] 6 judge card on the board (`?judge=1` or no passcode)
+- [x] 7 `?lang=hi-IN` (Transcribe language + Hinglish answer hint)
+- [x] 8 `make build-replay` from real captures — **needs `make capture-run` after a real run**
+- [x] 9 second allowlisted action: `make break-demo-deploy` (sticky wedge via SSM flag), ECS health diagnostics with exact ids, `REMEDIABLE_ECS_SERVICES` data allowlist, model-proposal validation — **demo it only if cycles 1+2 are green by Sat 18:30**
+- [ ] 10 AgentCore Memory — only with a mentor's yes
+
 ## A4+ — Saturday
 - [x] `make local` (FastAPI + moto + scripted agent) for Build It — found and fixed two status-race bugs
 - [x] README rewrite; `docs/safety.md`, `docs/demo-script.md`, `docs/submission.md`, `docs/blog.md`; CI updated
 - [ ] fixes from H4/H6 (human deploy feedback) — **needs the human's AWS runs**
 - [ ] `tests/fixtures/real/` + refreshed `web/public/replay/incident-001.json` from a real run (`make capture-run`)
-- [ ] `docs/assemblyai.md` + branch `assemblyai` scaffold (`web/src/voice/transport.ts` interface, `/tools/<name>` route) — after the First Commit submission
-- [ ] cover image `docs/assets/cover.svg`, architecture SVG for the video overlay
+- [x] `docs/assemblyai.md` + branch `assemblyai` scaffold (transport interface, AssemblyAI transport, `/tools/<name>` + `/assemblyai/token`, tools.json export) — on branch `assemblyai`, not merged
+- [x] architecture SVG (`docs/assets/architecture.svg`) for README + video overlay
+- [x] Step Functions definition walked against the real handler (`tests/test_asl_walk.py`)
+- [x] image tags track the last commit touching image inputs (docs commits no longer invalidate built images)
+- [ ] cover image `docs/assets/cover.png` (AssemblyAI submission; from a real Night Board screenshot)

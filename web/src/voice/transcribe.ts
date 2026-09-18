@@ -21,6 +21,7 @@ export class TranscribeTransport implements SttTransport {
 
   constructor(
     private readonly getSession: () => Promise<{ credentials: Creds; region: string; sttLanguage: string }>,
+    private readonly languageOverride?: string,
   ) {}
 
   async start(h: SttHandlers): Promise<void> {
@@ -58,7 +59,7 @@ export class TranscribeTransport implements SttTransport {
     })();
 
     const command = new StartStreamTranscriptionCommand({
-      LanguageCode: session.sttLanguage as "en-IN",
+      LanguageCode: (this.languageOverride || session.sttLanguage) as "en-IN",
       MediaEncoding: "pcm",
       MediaSampleRateHertz: 16000,
       EnablePartialResultsStabilization: true,

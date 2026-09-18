@@ -26,6 +26,10 @@ Retakes: `make demo-reset` between takes. If waiting for the real alarm blows th
 | 2:15–2:42 | Safety montage, ~4 s each: `registry.py` (two actions); IAM policy JSON with `aws:ResourceTag/beacon:remediable` and the separate `security-group-rule` statement; DynamoDB approval item with `transcript_quote`; `make replay-approval` output `idempotent_replay: true`; the `/safety` page with the per-function kill switch; `tests/test_template_safety.py` green. | "Control is the point. Two allowlisted actions. A write-only role scoped by tag. Dry run first, under that role. One approval executes exactly once. Every approval carries my own words. Contracts are scoped to resources and expire on their own. One switch stops every write path. And if verification fails, a human is paged." | IAM, DynamoDB, terminal, console |
 | 2:42–3:00 | Tally: **2 incidents · 2.2 min median recovery · 0 humans woken** on the second. Cards: repo URL, live URL, services list. Three "what I learned" bullets. | "Built solo in a weekend on AWS. Beacon: fewer pages, faster recovery, and your sleep back. Link in the description." | services list, live URL |
 
+## Optional 12-second insert (only if cycle 3 ran green): the allowlist generalises
+
+Terminal `make break-demo-deploy`; Fix Card shows `ecs.force_redeploy` on `beacon-demo/beacon-demo-webapp` with *dry run PASSED (service ACTIVE)*; "approve fix one"; ECS console shows a new deployment rolling; alarm OK. Voiceover: "A different failure, a different allowlisted action, the same guardrails: exact ids from diagnostics, a role that can only touch tagged services, and a verified recovery."
+
 ## Exact phrases (say them exactly)
 
 - "what changed?"

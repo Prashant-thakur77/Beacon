@@ -215,3 +215,68 @@ def test_redact_helper() -> None:
     assert out["actor"] == "role/beacon-remediator-x"
     assert "123456789012" not in json.dumps(out)
     assert out["nested"][0]["arn"] == "user/p"
+
+
+def test_tally_reports_cost_in_rupees_and_sleep_protected(env: Any) -> None:
+    from beacon import store
+
+    # a night incident (IST) handled under contract with token usage recorded
+    store.update_status(
+        env["b"],
+        "resolved",
+        table_name=INCIDENTS,
+        extra={
+            "usage": {
+                "input_tokens": 12000,
+                "output_tokens": 1500,
+                "embedding_tokens": 8000,
+            },
+            "timestamp": "2026-09-18T21:30:00+00:00",  # 03:00 IST
+        },
+    )
+    store.update_status(
+        env["a"],
+        "resolved",
+        table_name=INCIDENTS,
+        extra={"usage": {"input_tokens": 6000, "output_tokens": 800}},
+    )
+    out = _get("/tally")["body"]
+    assert out["cost_inr_total"] > 0
+    assert out["cost_inr_per_incident"] == pytest.approx(
+        out["cost_inr_total"] / 2, rel=1e-6
+    )
+    assert out["sleep_protected_hours"] >= 1
+    assert out["night_incidents_not_woken"] == 1
+
+
+def test_metric_route_returns_datapoints_and_execute_marker(
+    env: Any, mocker: Any
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from beacon import store
+
+    now = datetime.now(tz=UTC)
+    store.update_status(
+        env["a"],
+        "resolved",
+        table_name=INCIDENTS,
+        extra={
+            "executed_at": (now - timedelta(minutes=3)).isoformat(),
+            "alarm_name": "beacon-demo-infra-errors",
+        },
+    )
+    mocker.patch(
+        "beacon.dashboard_api._alarm_metric_series",
+        return_value=[
+            {"t": (now - timedelta(minutes=5)).isoformat(), "v": 4},
+            {"t": (now - timedelta(minutes=4)).isoformat(), "v": 6},
+            {"t": (now - timedelta(minutes=2)).isoformat(), "v": 1},
+            {"t": (now - timedelta(minutes=1)).isoformat(), "v": 0},
+        ],
+    )
+    out = _get(f"/incidents/{env['a']}/metric")
+    assert out["status"] == 200
+    assert [p["v"] for p in out["body"]["points"]] == [4, 6, 1, 0]
+    assert out["body"]["executed_at"]
+    assert out["body"]["metric"]["metric_name"] == "ErrorCount"

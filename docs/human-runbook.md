@@ -6,9 +6,9 @@ Plan of record: `docs/PLAN.md`. Open questions the agent could not answer: `docs
 
 ---
 
-## §0 — Tonight, right now (Fri 18 Sep, ~22:00 IST). Account prep, all console/CLI, no code needed
+## §0 — Account prep (all console/CLI, no code). Everything the sandbox could build is committed; start here whenever you sit down.
 
-Do these in this order. Steps 1-7 need nothing from the agent.
+Do these in this order. Budget: ~45 min of clicking plus the two long-running builds in step 8 (which run unattended).
 
 1. **Install AWS CLI v2** (not on this machine yet):
    ```bash
@@ -37,7 +37,7 @@ Do these in this order. Steps 1-7 need nothing from the agent.
 
 7. **Tell the agent**: your account id, `uname -m` (this machine is x86_64), and whether model access is granted. Put them in `docs/QUESTIONS.md` under "Answers".
 
-8. **Wait for the agent's "A0 committed" message** (Makefile + demo template fixes: git-SHA image tags, x86/ARM handling, tag guard). First confirm the RDS engine version the template defaults to is still creatable (AWS deprecates minors; the upstream's 16.4 already was):
+8. First confirm the RDS engine version the template defaults to is still creatable (AWS deprecates minors; the upstream's 16.4 already was):
    ```bash
    aws rds describe-db-engine-versions --engine postgres --engine-version 16.10 --region us-east-1 --query 'DBEngineVersions[0].EngineVersion' --output text
    ```
@@ -51,18 +51,18 @@ Do these in this order. Steps 1-7 need nothing from the agent.
    make setup-image REGION=us-east-1
    ```
    Expected A: `Demo infrastructure deployed.` and `aws logs tail /ecs/beacon-demo --since 2m --region us-east-1` shows `200` lines within ~3 min of the service starting.
-   Expected B: the last lines print `IMAGE_URI=<acct>.dkr.ecr.us-east-1.amazonaws.com/beacon:<git-sha>` and the value is written to `.beacon.env`.
+   Expected B: the last lines print `IMAGE_URI=<acct>.dkr.ecr.us-east-1.amazonaws.com/beacon:<tag>` and the value is written to `.beacon.env`. (The tag is the short SHA of the last commit that touched `src/beacon`/Dockerfiles/pyproject; docs commits do not change it.)
 
    If `make deploy-demo` fails with the ECS task in `STOPPED` and reason `exec format error`, tell the agent: the `CpuArchitecture` parameter did not take. Do not retry blindly.
 
 ---
 
-## §1 — Baseline deploy (tonight, after §0 step 8 finishes)
+## §1 — Baseline deploy (after §0 step 8 finishes)
 
 ```bash
 make deploy EMAIL=<your email> LOG_GROUP_PATTERNS=/ecs/beacon-demo ENABLE_ALARM=true ALARM_NAME_PREFIX=beacon-demo TOKEN_BUDGET=6000 REGION=us-east-1
 ```
-`IMAGE_URI` is read from `.beacon.env` (written by `make setup-image`). The target refuses to run if the image tag is `:latest` or does not match the current git HEAD; if it refuses, run `make setup-image` again (only the code layer is pushed, ~3-5 min).
+`IMAGE_URI` is read from `.beacon.env` (written by `make setup-image`). The target refuses to run if the image tag is `:latest` or does not match the current source tag; if it refuses, run `make setup-image` again (only the code layer is pushed, ~3-5 min).
 
 Expected: `Done. Check your email to confirm the SNS subscription.` → click **Confirm subscription** in the email from AWS Notifications. Then:
 ```bash
@@ -85,7 +85,7 @@ make fix-demo REGION=us-east-1
 ```
 (`check-reduction` greps the triage Lambda log for the "Cordon reduced" line.)
 
-### §1.2 Strands smoke (after the agent's A1 commit, ~22:45-23:00)
+### §1.2 Strands smoke (the Nova tool-use gate)
 ```bash
 make smoke-strands
 ```
@@ -96,16 +96,16 @@ Expected: one tool call printed, then a final answer, both from `us.amazon.nova-
 - [ ] one real RCA email received, `make fix-demo` run, alarm back to `OK`
 - [ ] `tests/fixtures/real/` has the captured run
 - [ ] `docs/QUESTIONS.md` answered
-- [ ] §2 (Friday 23:00 deploys of the remediation + console stubs) done if the agent's commit landed; otherwise it is the first thing Saturday 08:00
+- [ ] §2 (remediation + console stacks) done if there was time; otherwise it is the first thing Saturday 08:00
 
 ---
 
-## §2 — Friday late (or Saturday 08:00 if you ran out of evening): remediation + console stacks
+## §2 — Remediation + console stacks (Friday late, or first thing Saturday)
 
 Everything below is idempotent. Run from the repo root. `REGION`, `EMAIL`, `LOG_GROUP_PATTERNS`, `IMAGE_URI` are remembered in `.beacon.env` after the first run, so later commands only need what is shown.
 
 ```bash
-# 1. Rebuild BOTH images at the current git SHA (the triage image rebuild only pushes the code layer now, ~3-5 min)
+# 1. Build BOTH images at the current source tag (if §0 already built the triage image at this tag, setup-image is a fast no-op push)
 make setup-image REGION=us-east-1          # -> IMAGE_URI in .beacon.env
 make setup-agent-image REGION=us-east-1    # -> AGENT_IMAGE_URI in .beacon.env   (run in a 2nd terminal, in parallel)
 
@@ -122,8 +122,10 @@ make fix-demo REGION=us-east-1
 make snapshot-sg REGION=us-east-1
 #    Expected: "Wrote golden snapshot to /beacon/beacon/golden-sg: N rule(s) across 2 group(s)" and the JSON
 
-# 5. Tag the demo resources for the remediator's IAM condition (no-op if the demo template already tagged them)
+# 5. Tag the demo resources for the remediator's IAM condition (no-op if the demo template already tagged them),
+#    and record the demo ECS service as remediable (the second allowlisted action needs exact ids)
 make tag-remediable REGION=us-east-1
+make remediable-ecs REGION=us-east-1            # writes REMEDIABLE_ECS_SERVICES to .beacon.env; later deploys pass it
 
 # 6. THE FRIDAY GATE: dry-run under the remediator role
 make dry-run REGION=us-east-1
@@ -150,6 +152,8 @@ curl -s "$(aws cloudformation describe-stacks --stack-name beacon-console --regi
 ```
 
 Before sleeping: `make fix-demo`, confirm the alarm is back to OK, and answer `docs/QUESTIONS.md`.
+
+**Before recording (Sunday):** `make preflight` must be all green. After the real runs: `make capture-run && make build-replay && make console-config` so the archived-run card on the live URL is a genuine incident. `make dashboard` once, for the CloudWatch shot.
 
 ## §3 — Saturday 08:00-10:30: prove the loop from the CLI (no UI needed)
 
@@ -189,6 +193,20 @@ PYTHON=.venv/bin/python bash scripts/voice_tool.sh beacon us-east-1 "$INC" grant
 make demo-sleep REGION=us-east-1                # real re-break; wait for the real alarm
 watch -n 15 'make incidents REGION=us-east-1'   # new row: status auto_remediating -> resolved, and the email subject says "(not woken)"
 ```
+
+Local mic smoke before touching CloudFront (Saturday 14:00, per the plan): `make local LOCAL_PORT=8765` (port 8000 is taken on this machine), open `http://localhost:8765/?stt=webspeech`, passcode `local`, hold the mic and speak. This proves the worklet + playback path on the laptop; the Transcribe path itself needs the live URL (it needs the STS creds from `/session`).
+
+If Transcribe answers `BadRequestException ... language` for `en-IN`, redeploy with `make deploy-console STT_LANGUAGE=en-US` (the console reads it from `/config.json`, no rebuild).
+
+**Optional cycle 3 (only if cycles 1 and 2 are green by 18:30): the second allowlisted action.**
+```bash
+make demo-reset REGION=us-east-1
+make break-demo-deploy REGION=us-east-1         # wedges the running task (sticky; SSM flag cleared after 15 s)
+# real alarm in ~2-3 min; incident shows no SG drift; "can you fix it" -> Beacon proposes ecs.force_redeploy on beacon-demo/beacon-demo-webapp
+make propose REGION=us-east-1 && make approve REGION=us-east-1 FIX=1
+# Verify takes longer here: a Fargate task replacement is ~1-2 min, then an alarm evaluation period. Escalation = retake with make fix-demo-deploy.
+```
+Note: the demo image must be rebuilt for the wedge flag (`make deploy-demo` again after pulling the app change; it now installs boto3 and reads `/beacon/demo/wedge`).
 
 If anything fails: paste the verbatim output. Most likely culprits, in order: `UnauthorizedOperation` in `make dry-run` (IAM statement), Step Functions execution `FAILED` at `RequireApproval` (approval table name env), Verify escalating with `ErrorCount` still > 0 (the app needs ~60 s of 200s after the rule returns; a retake with `make demo-reset` fixes it).
 
