@@ -143,3 +143,15 @@ class TestHandlerIntegration:
             result = handler(subscription_event, None)
 
         assert result["statusCode"] == 200
+
+
+class TestIsHealthy:
+    def test_tolerates_markdown_bold_status(self) -> None:
+        from beacon.handler import _is_healthy
+
+        assert _is_healthy("**STATUS:** Healthy\n**SUMMARY:** Normal operation.")
+
+    def test_false_for_non_healthy(self) -> None:
+        from beacon.handler import _is_healthy
+
+        assert not _is_healthy("STATUS: High\nSUMMARY: broken")

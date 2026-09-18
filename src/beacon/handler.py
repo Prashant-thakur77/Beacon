@@ -8,6 +8,7 @@ os.environ.setdefault("TQDM_DISABLE", "1")  # noqa: E402
 
 from typing import Any  # noqa: E402
 
+from beacon import rca
 from beacon.analyzer import analyze_logs
 from beacon.budget import SourcePlan, compute_available_tokens, plan_token_budget
 from beacon.config import BeaconConfig
@@ -139,9 +140,5 @@ def _start_voice_pipeline(
 
 
 def _is_healthy(analysis: str) -> bool:
-    """Return True if the analysis contains a ``STATUS: Healthy`` line."""
-    for line in analysis.splitlines():
-        stripped = line.strip().upper()
-        if stripped.startswith("STATUS:") and "HEALTHY" in stripped:
-            return True
-    return False
+    """Return True if the parsed RCA ``STATUS`` is ``Healthy``."""
+    return rca.is_healthy(analysis)
