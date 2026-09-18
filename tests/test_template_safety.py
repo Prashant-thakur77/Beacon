@@ -297,3 +297,40 @@ def test_no_role_anywhere_has_wildcard_write(
                     assert action != "*" and not action.endswith(":*"), (
                         f"{name} grants {action}"
                     )
+
+
+def test_every_iam_resource_is_an_arn_or_wildcard(
+    console: dict[str, Any], remediation: dict[str, Any], base: dict[str, Any]
+) -> None:
+    """`!Ref` on a DynamoDB table is its NAME; IAM refuses non-ARN resources at
+    role creation, which surfaces as CREATE_FAILED on the first deploy."""
+    for template in (console, remediation, base):
+        for name, res in template["Resources"].items():
+            if res.get("Type") not in ("AWS::IAM::Role", "AWS::IAM::Policy"):
+                continue
+            docs = [p["PolicyDocument"] for p in res["Properties"].get("Policies", [])]
+            if "PolicyDocument" in res["Properties"]:
+                docs.append(res["Properties"]["PolicyDocument"])
+            for doc in docs:
+                for stmt in doc["Statement"]:
+                    resources = stmt.get("Resource", [])
+                    resources = (
+                        [resources] if not isinstance(resources, list) else resources
+                    )
+                    for r in resources:
+                        if isinstance(r, dict) and "Fn::Ref" in r:
+                            ref = r["Fn::Ref"]
+                            assert (
+                                ref.endswith(("Arn", "Topic", "FunctionArn"))
+                                or "Arn" in ref
+                                or "Topic" in ref
+                            ), f"{name}: Resource !Ref {ref} is not an ARN"
+                        elif isinstance(r, dict) and "Fn::Sub" in r:
+                            sub = str(r["Fn::Sub"])
+                            assert (
+                                sub.startswith("arn:")
+                                or sub.startswith("${")
+                                and ".Arn}" in sub
+                            ), f"{name}: {r}"
+                        elif isinstance(r, str):
+                            assert r == "*" or r.startswith("arn:"), f"{name}: {r}"

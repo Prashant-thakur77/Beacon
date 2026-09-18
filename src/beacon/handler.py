@@ -318,9 +318,9 @@ def _run_diagnostics(
     from beacon import diagnose
     from beacon.remediation import actions_sg
 
-    golden = actions_sg.load_golden_snapshot()
-    if not golden:
-        timeline.append(_event("diagnostics_skipped", reason="no golden snapshot"))
+    golden = actions_sg.load_golden_snapshot() or {}
+    if not golden and not os.environ.get("REMEDIABLE_ECS_SERVICES"):
+        timeline.append(_event("diagnostics_skipped", reason="nothing configured"))
         return None
     try:
         result = diagnose.run(golden)
@@ -364,15 +364,47 @@ def _recent_changes(
 def _apply_deterministic_action(
     parsed: rca.RcaJson, diagnostics: dict[str, Any] | None
 ) -> None:
-    """Exact ids from diagnostics beat whatever the model guessed."""
-    if not diagnostics or not diagnostics.get("suggested_action"):
+    """Exact ids from diagnostics beat whatever the model guessed.
+
+    When diagnostics found nothing deterministic, the model's own proposal
+    survives only if it names an allowlisted action on a configured resource
+    (schema-valid params, ECS service in REMEDIABLE_ECS_SERVICES, SG rule in
+    the golden snapshot); otherwise it is dropped, never executed.
+    """
+    from beacon.remediation import actions_ecs, actions_sg, registry
+    from beacon.remediation.base import ParamError
+
+    if diagnostics and diagnostics.get("suggested_action"):
+        parsed.beacon_json["suggested_action"] = diagnostics["suggested_action"]
+        parsed.beacon_json["action_params"] = diagnostics["action_params"]
+        parsed.beacon_json["action_source"] = "diagnostics"
+        parsed.beacon_json.setdefault(
+            "fingerprint", diagnostics["suggested_action"].replace(".", "-")
+        )
         return
-    parsed.beacon_json["suggested_action"] = diagnostics["suggested_action"]
-    parsed.beacon_json["action_params"] = diagnostics["action_params"]
-    parsed.beacon_json["action_source"] = "diagnostics"
-    parsed.beacon_json.setdefault(
-        "fingerprint", diagnostics["suggested_action"].replace(".", "-")
-    )
+    action = parsed.beacon_json.get("suggested_action")
+    params = parsed.beacon_json.get("action_params")
+    if not action:
+        return
+    ok = False
+    try:
+        valid = registry.validate_params(
+            str(action), params if isinstance(params, dict) else {}
+        )
+        if action == "ecs.force_redeploy":
+            ok = actions_ecs.is_configured(valid)
+        elif action == "sg.restore_ingress":
+            golden = actions_sg.load_golden_snapshot() or {}
+            ok = actions_sg.in_golden_snapshot(valid, golden)
+    except ParamError:
+        ok = False
+    if ok:
+        parsed.beacon_json["action_source"] = "model"
+    else:
+        logger.warning("model proposed %s on unconfigured resources; dropped", action)
+        parsed.beacon_json["suggested_action"] = None
+        parsed.beacon_json["action_params"] = None
+        parsed.beacon_json["action_source"] = "rejected"
 
 
 def _matching_contract(

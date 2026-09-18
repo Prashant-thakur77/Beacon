@@ -91,3 +91,57 @@ def test_run_returns_section_and_structured_data(env: Any) -> None:
     assert result["suggested_action"] == "sg.restore_ingress"
     assert result["action_params"] == p
     assert "MISSING" in result["text"]
+
+
+@pytest.fixture()
+def ecs_env(monkeypatch: Any) -> Any:
+    with mock_aws():
+        ecs = boto3.client("ecs", region_name="us-east-1")
+        ecs.create_cluster(clusterName="beacon-demo")
+        ecs.register_task_definition(
+            family="webapp",
+            containerDefinitions=[{"name": "webapp", "image": "x", "memory": 128}],
+        )
+        ecs.create_service(
+            cluster="beacon-demo",
+            serviceName="beacon-demo-webapp",
+            taskDefinition="webapp",
+            desiredCount=1,
+        )
+        monkeypatch.setenv("REMEDIABLE_ECS_SERVICES", "beacon-demo/beacon-demo-webapp")
+        yield ecs
+
+
+def test_ecs_health_lists_remediable_services_with_exact_ids(ecs_env: Any) -> None:
+    services = diagnose.ecs_health(ecs_client=ecs_env)
+    assert len(services) == 1
+    svc = services[0]
+    assert svc["cluster"] == "beacon-demo" and svc["service"] == "beacon-demo-webapp"
+    assert svc["status"] == "ACTIVE" and svc["desired"] == 1
+    assert "deployments" in svc and svc["action"] == "ecs.force_redeploy"
+    assert svc["action_params"] == {
+        "cluster": "beacon-demo",
+        "service": "beacon-demo-webapp",
+    }
+
+
+def test_ecs_health_is_empty_without_configuration(monkeypatch: Any) -> None:
+    monkeypatch.delenv("REMEDIABLE_ECS_SERVICES", raising=False)
+    assert diagnose.ecs_health() == []
+
+
+def test_run_includes_ecs_section_and_keeps_sg_fix_priority(
+    env: Any, ecs_env: Any
+) -> None:
+    p = env["params"]
+    result = diagnose.run(env["golden"], ec2_client=env["ec2"], ecs_client=ecs_env)
+    assert "Remediable ECS services" in result["text"]
+    assert "beacon-demo/beacon-demo-webapp" in result["text"]
+    assert result["ecs_services"][0]["service"] == "beacon-demo-webapp"
+    # no drift: no deterministic fix; the model still gets exact ECS ids
+    assert result["suggested_action"] is None
+    env["ec2"].revoke_security_group_ingress(
+        GroupId=p["group_id"], IpPermissions=[actions_sg.ip_permission(p)]
+    )
+    result = diagnose.run(env["golden"], ec2_client=env["ec2"], ecs_client=ecs_env)
+    assert result["suggested_action"] == "sg.restore_ingress"

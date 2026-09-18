@@ -28,6 +28,11 @@ Parameters:
     MinLength: 4
     Description: Shared passcode required on /session and /turn (stops strangers burning credits)
 
+  RemediableEcsServices:
+    Type: String
+    Default: ""
+    Description: cluster/service pairs Beacon may force-redeploy (same value as the base stack)
+
   ApplyEnabled:
     Type: String
     Default: "true"
@@ -296,6 +301,7 @@ Resources:
           CONTRACTS_TABLE_NAME: !Sub "beacon-contracts-${BaseStackName}"
           CHANGES_TABLE_NAME: !Sub "beacon-changes-${BaseStackName}"
           GOLDEN_SG_PARAM: !Sub "/beacon/${BaseStackName}/golden-sg"
+          REMEDIABLE_ECS_SERVICES: !Ref RemediableEcsServices
           SESSION_CAP_TURNS: "30"
           POWERTOOLS_SERVICE_NAME: beacon-voice-turn
           POWERTOOLS_METRICS_NAMESPACE: Beacon
