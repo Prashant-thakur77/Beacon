@@ -109,13 +109,13 @@ Everything below is idempotent. Run from the repo root. `REGION`, `EMAIL`, `LOG_
 make setup-image REGION=us-east-1          # -> IMAGE_URI in .beacon.env
 make setup-agent-image REGION=us-east-1    # -> AGENT_IMAGE_URI in .beacon.env   (run in a 2nd terminal, in parallel)
 
-# 2. Base stack update: new triage image, incident storage on, dashboard link later
-make deploy INCIDENTS_ENABLED=true TOKEN_BUDGET=6000 REGION=us-east-1
-#    (EMAIL / LOG_GROUP_PATTERNS / ENABLE_ALARM / ALARM_NAME_PREFIX come from .beacon.env; refused if the image tag is stale)
-
-# 3. Remediation stack: tables, remediator role, remediate + change-ledger Lambdas, Step Functions
+# 2. Remediation stack FIRST (it creates the incidents table the base Lambda writes to)
 make deploy-remediation REGION=us-east-1
 #    Expected last line: "Done. Next: make snapshot-sg && make tag-remediable && make dry-run"
+
+# 3. Base stack update: new triage image, incident storage on (dashboard link is added in step 7)
+make deploy INCIDENTS_ENABLED=true TOKEN_BUDGET=6000 REGION=us-east-1
+#    (EMAIL / LOG_GROUP_PATTERNS / ENABLE_ALARM / ALARM_NAME_PREFIX come from .beacon.env; refused if the image tag is stale)
 
 # 4. Golden snapshot of the demo security groups (STACK MUST BE HEALTHY: run make fix-demo first if you broke it)
 make fix-demo REGION=us-east-1

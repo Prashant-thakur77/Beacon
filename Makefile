@@ -189,6 +189,8 @@ deploy: check-image-tags
 	$(if $(TOKEN_BUDGET),$(call save_env,TOKEN_BUDGET,$(TOKEN_BUDGET)))
 	$(if $(ENABLE_ALARM),$(call save_env,ENABLE_ALARM,$(ENABLE_ALARM)))
 	$(if $(ALARM_NAME_PREFIX),$(call save_env,ALARM_NAME_PREFIX,$(ALARM_NAME_PREFIX)))
+	$(if $(INCIDENTS_ENABLED),$(call save_env,INCIDENTS_ENABLED,$(INCIDENTS_ENABLED)))
+	$(if $(APPLY_ENABLED),$(call save_env,APPLY_ENABLED,$(APPLY_ENABLED)))
 	@echo "Done. Check your email to confirm the SNS subscription."
 
 deploy-voice:
