@@ -4,7 +4,7 @@
        snapshot-sg tag-remediable dry-run changes incidents lint-templates \
        deploy-console teardown-console web-build set-passcode console-config \
        check-reduction capture-run propose approve replay-approval demo-alarm demo-reset \
-       demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix preflight dashboard
+       demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix preflight dashboard build-replay
 
 # Deploy variables persisted by earlier runs (IMAGE_URI, EMAIL, ...). Gitignored.
 -include .beacon.env
@@ -418,6 +418,11 @@ check-reduction:
 # Save the latest real run (Lambda log, demo logs, incident item, ledger) under tests/fixtures/real/.
 capture-run:
 	@PYTHON=$(PYTHON) bash scripts/capture_run.sh $(STACK_NAME) $(REGION)
+
+# Turn captured real runs (make capture-run) into the console's replay bundle, then publish it.
+build-replay:
+	$(PYTHON) scripts/build_replay.py
+	@echo "Next: make console-config   (uploads web/dist incl. the new replay bundle)"
 
 # Rows in the change ledger, newest first.
 changes:
