@@ -115,6 +115,25 @@ Parameters:
     AllowedValues: [x86_64, arm64]
     Description: Must match the host that built the container image (make deploy detects it)
 
+  # --- Incidents / remediation (tables live in the remediation stack) ---
+
+  IncidentsEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Store incidents in DynamoDB (beacon-incidents-<stack>) without needing Connect
+
+  ApplyEnabled:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Kill switch for the Sleep Contract auto-remediation path in this function
+
+  DashboardUrl:
+    Type: String
+    Default: ""
+    Description: Console URL included in notifications (set after make deploy-console)
+
   # --- Voice (set by voice stack, not by user) ---
 
   ConnectEnabled:
@@ -203,7 +222,25 @@ Resources:
                 Action:
                   - dynamodb:PutItem
                   - dynamodb:UpdateItem
-                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-incidents-*"
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-incidents-*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-approvals-*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-contracts-*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-changes-*"
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:beacon-remediate-${AWS::StackName}"
+              - Effect: Allow
+                Action: cloudtrail:LookupEvents
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - xray:PutTraceSegments
+                  - xray:PutTelemetryRecords
+                Resource: "*"
               - Effect: Allow
                 Action:
                   - connect:StartOutboundVoiceContact
@@ -259,7 +296,16 @@ Resources:
           CONNECT_ENABLED: !Ref ConnectEnabled
           ONCALL_PHONE: !Ref OncallPhone
           INCIDENTS_TABLE_NAME: !Sub "beacon-incidents-${AWS::StackName}"
+          INCIDENTS_ENABLED: !Ref IncidentsEnabled
+          APPLY_ENABLED: !Ref ApplyEnabled
+          DASHBOARD_URL: !Ref DashboardUrl
+          APPROVALS_TABLE_NAME: !Sub "beacon-approvals-${AWS::StackName}"
+          CONTRACTS_TABLE_NAME: !Sub "beacon-contracts-${AWS::StackName}"
+          CHANGES_TABLE_NAME: !Sub "beacon-changes-${AWS::StackName}"
+          STATE_MACHINE_ARN: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:beacon-remediate-${AWS::StackName}"
+          GOLDEN_SG_PARAM: !Sub "/beacon/${AWS::StackName}/golden-sg"
           CONNECT_CONFIG_PARAM: !Sub "/beacon/${AWS::StackName}/connect-config"
+          LITELLM_LOCAL_MODEL_COST_MAP: "True"
 
   # --- Schedule Trigger ---
 

@@ -1,0 +1,497 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Beacon remediation stack: incident/approval/contract/change tables, the
+  write-only remediator Lambda (allowlisted actions, tag-scoped IAM), the
+  CloudTrail change ledger, and the Step Functions verify loop.
+
+Parameters:
+  BaseStackName:
+    Type: String
+    Default: beacon
+    Description: Name of the base Beacon stack (table and function names derive from it)
+
+  AgentImageUri:
+    Type: String
+    Description: ECR URI of the slim agent image (Dockerfile.agent, git-SHA tag)
+
+  LambdaArchitecture:
+    Type: String
+    Default: x86_64
+    AllowedValues: [x86_64, arm64]
+
+  CreateIncidentsTable:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Set false if the voice stack already created beacon-incidents-<BaseStackName>
+
+  SnsTopicArn:
+    Type: String
+    Description: SNS topic of the base stack (resolved/escalated notifications)
+
+  ApplyEnabled:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Kill switch. When false the Execute step refuses to run any action.
+
+Conditions:
+  CreateIncidents: !Equals [!Ref CreateIncidentsTable, "true"]
+
+Resources:
+
+  # ---------- Tables ----------
+
+  BeaconIncidentsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreateIncidents
+    Properties:
+      TableName: !Sub "beacon-incidents-${BaseStackName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: incident_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: incident_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  BeaconApprovalsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "beacon-approvals-${BaseStackName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: approval_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: approval_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  BeaconContractsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "beacon-contracts-${BaseStackName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: contract_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: contract_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expires_at_epoch
+        Enabled: true
+
+  BeaconChangesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "beacon-changes-${BaseStackName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  BeaconIdempotencyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "beacon-idempotency-${BaseStackName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiration
+        Enabled: true
+
+  # ---------- Remediator (the only role with write actions) ----------
+
+  BeaconRemediatorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "beacon-remediator-${BaseStackName}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BeaconAllowlistedWrites
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # sg.restore_ingress is authorised against BOTH the security group
+              # (taggable, so scoped by tag) and the rule being created (not yet
+              # tagged, so it must be allowed without a tag condition).
+              - Sid: RestoreIngressOnTaggedGroups
+                Effect: Allow
+                Action: ec2:AuthorizeSecurityGroupIngress
+                Resource: !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/beacon:remediable: "true"
+              - Sid: RestoreIngressRuleResource
+                Effect: Allow
+                Action: ec2:AuthorizeSecurityGroupIngress
+                Resource: !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group-rule/*"
+              - Sid: ForceRedeployTaggedServices
+                Effect: Allow
+                Action: ecs:UpdateService
+                Resource: !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:service/*/*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/beacon:remediable: "true"
+        - PolicyName: BeaconRemediatorReads
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeSecurityGroupRules
+                  - ecs:DescribeServices
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:GetMetricData
+                Resource: "*"
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/beacon/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/beacon-incidents-${BaseStackName}"
+                  - !Ref BeaconApprovalsTable
+                  - !GetAtt BeaconApprovalsTable.Arn
+                  - !GetAtt BeaconContractsTable.Arn
+                  - !GetAtt BeaconIdempotencyTable.Arn
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref SnsTopicArn
+              - Effect: Allow
+                Action:
+                  - xray:PutTraceSegments
+                  - xray:PutTelemetryRecords
+                Resource: "*"
+
+  BeaconRemediateFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "beacon-remediate-${BaseStackName}"
+      PackageType: Image
+      Architectures:
+        - !Ref LambdaArchitecture
+      Code:
+        ImageUri: !Ref AgentImageUri
+      ImageConfig:
+        Command: ["beacon.remediate.handler"]
+      Role: !GetAtt BeaconRemediatorRole.Arn
+      MemorySize: 1024
+      Timeout: 300
+      TracingConfig:
+        Mode: Active
+      Environment:
+        Variables:
+          APPLY_ENABLED: !Ref ApplyEnabled
+          GOLDEN_SG_PARAM: !Sub "/beacon/${BaseStackName}/golden-sg"
+          INCIDENTS_TABLE_NAME: !Sub "beacon-incidents-${BaseStackName}"
+          APPROVALS_TABLE_NAME: !Ref BeaconApprovalsTable
+          CONTRACTS_TABLE_NAME: !Ref BeaconContractsTable
+          IDEMPOTENCY_TABLE_NAME: !Ref BeaconIdempotencyTable
+          SNS_TOPIC_ARN: !Ref SnsTopicArn
+          POWERTOOLS_SERVICE_NAME: beacon-remediate
+          LITELLM_LOCAL_MODEL_COST_MAP: "True"
+
+  # ---------- Change ledger (CloudTrail -> EventBridge -> DynamoDB) ----------
+
+  BeaconChangesRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BeaconChangesWrite
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !GetAtt BeaconChangesTable.Arn
+
+  BeaconChangesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "beacon-changes-${BaseStackName}"
+      PackageType: Image
+      Architectures:
+        - !Ref LambdaArchitecture
+      Code:
+        ImageUri: !Ref AgentImageUri
+      ImageConfig:
+        Command: ["beacon.changes.ledger_handler"]
+      Role: !GetAtt BeaconChangesRole.Arn
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          CHANGES_TABLE_NAME: !Ref BeaconChangesTable
+          POWERTOOLS_SERVICE_NAME: beacon-changes
+          LITELLM_LOCAL_MODEL_COST_MAP: "True"
+
+  BeaconChangesRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Write API calls from CloudTrail into the Beacon change ledger
+      State: ENABLED
+      EventPattern:
+        detail-type:
+          - AWS API Call via CloudTrail
+        source:
+          - aws.ec2
+          - aws.ecs
+          - aws.rds
+          - aws.lambda
+          - aws.iam
+        detail:
+          eventName:
+            - prefix: Revoke
+            - prefix: Authorize
+            - prefix: Modify
+            - prefix: Update
+            - prefix: Delete
+            - prefix: Put
+            - prefix: Create
+            - prefix: Register
+            - prefix: Deregister
+      Targets:
+        - Arn: !GetAtt BeaconChangesFunction.Arn
+          Id: BeaconChangesTarget
+
+  BeaconChangesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BeaconChangesFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt BeaconChangesRule.Arn
+
+  # ---------- Closed loop ----------
+
+  BeaconStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BeaconInvokeRemediate
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !GetAtt BeaconRemediateFunction.Arn
+                  - !Sub "${BeaconRemediateFunction.Arn}:*"
+
+  BeaconRemediateStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: !Sub "beacon-remediate-${BaseStackName}"
+      RoleArn: !GetAtt BeaconStateMachineRole.Arn
+      StateMachineType: STANDARD
+      DefinitionString: !Sub
+        - |
+          {
+            "Comment": "Beacon remediation loop: dry-run, require approval, execute, verify (alarm OK after execute + metric zero + postcondition), resolve or escalate",
+            "StartAt": "DryRun",
+            "States": {
+              "DryRun": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Parameters": {
+                  "FunctionName": "${RemediateFunctionArn}",
+                  "Payload": {
+                    "step": "dryrun",
+                    "approval_id.$": "$.approval_id",
+                    "incident_id.$": "$.incident_id",
+                    "action.$": "$.action",
+                    "params.$": "$.params"
+                  }
+                },
+                "ResultSelector": { "Payload.$": "$.Payload" },
+                "ResultPath": "$.dryrun",
+                "Retry": [ { "ErrorEquals": ["Lambda.ServiceException", "Lambda.TooManyRequestsException", "Lambda.SdkClientException"], "IntervalSeconds": 2, "MaxAttempts": 3, "BackoffRate": 2.0 } ],
+                "Next": "DryRunOk"
+              },
+              "DryRunOk": {
+                "Type": "Choice",
+                "Choices": [ { "Variable": "$.dryrun.Payload.ok", "BooleanEquals": true, "Next": "RequireApproval" } ],
+                "Default": "Escalate"
+              },
+              "RequireApproval": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Parameters": {
+                  "FunctionName": "${RemediateFunctionArn}",
+                  "Payload": {
+                    "step": "require_approval",
+                    "approval_id.$": "$.approval_id",
+                    "incident_id.$": "$.incident_id",
+                    "action.$": "$.action",
+                    "params.$": "$.params"
+                  }
+                },
+                "ResultSelector": { "Payload.$": "$.Payload" },
+                "ResultPath": "$.approval",
+                "Next": "ApprovalOk"
+              },
+              "ApprovalOk": {
+                "Type": "Choice",
+                "Choices": [ { "Variable": "$.approval.Payload.ok", "BooleanEquals": true, "Next": "Execute" } ],
+                "Default": "Escalate"
+              },
+              "Execute": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Parameters": {
+                  "FunctionName": "${RemediateFunctionArn}",
+                  "Payload": {
+                    "step": "execute",
+                    "approval_id.$": "$.approval_id",
+                    "incident_id.$": "$.incident_id",
+                    "action.$": "$.action",
+                    "params.$": "$.params"
+                  }
+                },
+                "ResultSelector": { "Payload.$": "$.Payload" },
+                "ResultPath": "$.execute",
+                "Retry": [ { "ErrorEquals": ["Lambda.ServiceException", "Lambda.TooManyRequestsException", "Lambda.SdkClientException"], "IntervalSeconds": 2, "MaxAttempts": 3, "BackoffRate": 2.0 } ],
+                "Next": "ExecuteOk"
+              },
+              "ExecuteOk": {
+                "Type": "Choice",
+                "Choices": [ { "Variable": "$.execute.Payload.ok", "BooleanEquals": true, "Next": "InitVerify" } ],
+                "Default": "Escalate"
+              },
+              "InitVerify": {
+                "Type": "Pass",
+                "Result": { "Payload": { "ok": false, "attempts": 0 } },
+                "ResultPath": "$.verify",
+                "Next": "Wait30"
+              },
+              "Wait30": { "Type": "Wait", "Seconds": 30, "Next": "Verify" },
+              "Verify": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Parameters": {
+                  "FunctionName": "${RemediateFunctionArn}",
+                  "Payload": {
+                    "step": "verify",
+                    "approval_id.$": "$.approval_id",
+                    "incident_id.$": "$.incident_id",
+                    "action.$": "$.action",
+                    "params.$": "$.params",
+                    "executed_at.$": "$.execute.Payload.executed_at",
+                    "attempts.$": "$.verify.Payload.attempts"
+                  }
+                },
+                "ResultSelector": { "Payload.$": "$.Payload" },
+                "ResultPath": "$.verify",
+                "Next": "Verified"
+              },
+              "Verified": {
+                "Type": "Choice",
+                "Choices": [
+                  { "Variable": "$.verify.Payload.ok", "BooleanEquals": true, "Next": "Resolve" },
+                  { "Variable": "$.verify.Payload.attempts", "NumericLessThan": 6, "Next": "Wait30" }
+                ],
+                "Default": "Escalate"
+              },
+              "Resolve": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Parameters": {
+                  "FunctionName": "${RemediateFunctionArn}",
+                  "Payload": { "step": "resolve", "input.$": "$" }
+                },
+                "ResultSelector": { "Payload.$": "$.Payload" },
+                "ResultPath": "$.resolve",
+                "End": true
+              },
+              "Escalate": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Parameters": {
+                  "FunctionName": "${RemediateFunctionArn}",
+                  "Payload": { "step": "escalate", "input.$": "$" }
+                },
+                "ResultSelector": { "Payload.$": "$.Payload" },
+                "ResultPath": "$.escalate",
+                "End": true
+              }
+            }
+          }
+        - RemediateFunctionArn: !GetAtt BeaconRemediateFunction.Arn
+
+Outputs:
+  IncidentsTableName:
+    Value: !Sub "beacon-incidents-${BaseStackName}"
+  ApprovalsTableName:
+    Value: !Ref BeaconApprovalsTable
+  ContractsTableName:
+    Value: !Ref BeaconContractsTable
+  ChangesTableName:
+    Value: !Ref BeaconChangesTable
+  IdempotencyTableName:
+    Value: !Ref BeaconIdempotencyTable
+  RemediateFunctionArn:
+    Value: !GetAtt BeaconRemediateFunction.Arn
+  RemediateFunctionName:
+    Value: !Ref BeaconRemediateFunction
+  ChangesFunctionArn:
+    Value: !GetAtt BeaconChangesFunction.Arn
+  StateMachineArn:
+    Value: !Ref BeaconRemediateStateMachine
+  RemediatorRoleArn:
+    Value: !GetAtt BeaconRemediatorRole.Arn
