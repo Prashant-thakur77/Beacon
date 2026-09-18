@@ -196,7 +196,11 @@ def test_mic_role_only_allows_transcribe_streaming(console: dict[str, Any]) -> N
         "transcribe:StartStreamTranscriptionWebSocket",
     }
     trust = role["Properties"]["AssumeRolePolicyDocument"]["Statement"][0]
-    assert "beacon-voice-turn-" in _sub_text(trust["Principal"]["AWS"])
+    # Trust the account root but only for the voice role's ARN: equivalent to
+    # naming the role, without the IAM "Invalid principal" race on first deploy.
+    assert _sub_text(trust["Principal"]["AWS"]).endswith(":root")
+    cond = trust["Condition"]["ArnEquals"]["aws:PrincipalArn"]
+    assert "beacon-voice-turn-" in _sub_text(cond)
 
 
 def test_dashboard_role_is_read_only_except_contract_revoke(
