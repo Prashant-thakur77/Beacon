@@ -1,0 +1,2767 @@
+{
+ "recorded_at": "2026-09-18T21:42:11+00:00",
+ "incidents": [
+  {
+   "incident_id": "a94d2c7b-1e5f-4c33-8d0a-6b7e9f1c2d44",
+   "alarm_name": "beacon-demo-infra-errors",
+   "status": "resolved",
+   "timestamp": "2026-09-18T22:07:11+00:00",
+   "woken": false,
+   "handled_by": "contract",
+   "resolved_at": "2026-09-18T22:08:34+00:00",
+   "executed_at": "2026-09-18T22:07:31+00:00",
+   "execution_arn": "arn:aws:states:us-east-1:************:execution:beacon-remediate-beacon:9e4a...77d3",
+   "trigger_type": "alarm",
+   "alarm_reason": "Threshold Crossed: 1 datapoint [4.0] was greater than or equal to the threshold (3.0).",
+   "rca_json": {
+    "status": "High",
+    "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+    "affected_components": [
+     "beacon-demo-webapp",
+     "beacon-demo-db",
+     "payments-service",
+     "orders-service"
+    ],
+    "evidence": [
+     "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+     "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+     "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+    ],
+    "next_steps": [
+     "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+     "Confirm the error rate returns to zero after the rule is back",
+     "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+    ],
+    "change_correlation": "RevokeSecurityGroupIngress on sg-0f3a9c21e7b4d5a10 by user/prashant at 21:40:38, 25 seconds before the first error.",
+    "spoken_summary": "Your demo web service in U S east 1 can no longer reach its database. The security group rule that lets the E C S tasks talk to R D S on port 5432 was removed about twenty-five seconds before the errors began. Restoring that rule should bring the service back.",
+    "beacon_json": {
+     "fingerprint": "rds-sg-ingress-revoked",
+     "suggested_action": "sg.restore_ingress",
+     "action_params": {
+      "group_id": "sg-0f3a9c21e7b4d5a10",
+      "ip_protocol": "tcp",
+      "from_port": 5432,
+      "to_port": 5432,
+      "source_group_id": "sg-08b1e77c04d92f6e3"
+     },
+     "confidence": 0.92,
+     "correlated_change": "RevokeSecurityGroupIngress by user/prashant at 21:40:38",
+     "action_source": "diagnostics"
+    }
+   },
+   "diagnostics": {
+    "missing_rules": [
+     {
+      "group_id": "sg-0f3a9c21e7b4d5a10",
+      "ip_protocol": "tcp",
+      "from_port": 5432,
+      "to_port": 5432,
+      "source_group_id": "sg-08b1e77c04d92f6e3",
+      "cidr": null
+     }
+    ],
+    "suggested_action": "sg.restore_ingress",
+    "action_params": {
+     "group_id": "sg-0f3a9c21e7b4d5a10",
+     "ip_protocol": "tcp",
+     "from_port": 5432,
+     "to_port": 5432,
+     "source_group_id": "sg-08b1e77c04d92f6e3"
+    },
+    "text": "Security group drift vs golden snapshot: 1 of 1 golden rule MISSING.\n- MISSING ingress rule: tcp 5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10"
+   },
+   "changes": [
+    {
+     "event_name": "RevokeSecurityGroupIngress",
+     "event_source": "ec2.amazonaws.com",
+     "event_time": "2026-09-18T22:06:52+00:00",
+     "actor": "user/prashant",
+     "actor_short": "user/prashant",
+     "by_beacon": false,
+     "user_agent": "aws-cli/2.17.32",
+     "source_ip": "49.37.xx.xx",
+     "resource_ids": [
+      "sg-0f3a9c21e7b4d5a10"
+     ],
+     "source": "ledger"
+    },
+    {
+     "event_name": "AuthorizeSecurityGroupIngress",
+     "event_source": "ec2.amazonaws.com",
+     "event_time": "2026-09-18T21:43:38+00:00",
+     "actor": "beacon remediation",
+     "actor_short": "beacon remediation",
+     "by_beacon": true,
+     "user_agent": "Boto3/1.42 (beacon-remediate)",
+     "source_ip": "49.37.xx.xx",
+     "resource_ids": [
+      "sg-0f3a9c21e7b4d5a10"
+     ],
+     "source": "ledger"
+    }
+   ],
+   "timeline": [
+    {
+     "t": "2026-09-18T22:07:11+00:00",
+     "event": "alarm_received",
+     "detail": {
+      "trigger_type": "alarm",
+      "alarm_name": "beacon-demo-infra-errors"
+     }
+    },
+    {
+     "t": "2026-09-18T22:07:13+00:00",
+     "event": "logs_fetched",
+     "detail": {
+      "groups": 1,
+      "lines": 588
+     }
+    },
+    {
+     "t": "2026-09-18T22:07:19+00:00",
+     "event": "reduced",
+     "detail": {
+      "log_group": "/ecs/beacon-demo",
+      "percentile": 0.41,
+      "model": "bedrock/amazon.nova-2-multimodal-embeddings-v1:0"
+     }
+    },
+    {
+     "t": "2026-09-18T22:07:20+00:00",
+     "event": "diagnostics_ran",
+     "detail": {
+      "missing_rules": 1,
+      "suggested_action": "sg.restore_ingress"
+     }
+    },
+    {
+     "t": "2026-09-18T22:07:20+00:00",
+     "event": "changes_checked",
+     "detail": {
+      "count": 2,
+      "top": "RevokeSecurityGroupIngress",
+      "source": "ledger"
+     }
+    },
+    {
+     "t": "2026-09-18T22:07:27+00:00",
+     "event": "rca_ready",
+     "detail": {
+      "status": "High",
+      "model": "us.amazon.nova-2-lite-v1:0",
+      "suggested_action": "sg.restore_ingress"
+     }
+    },
+    {
+     "t": "2026-09-18T22:07:27+00:00",
+     "event": "contract_matched",
+     "detail": {
+      "contract_id": "c3f1a2b4-9d8e-4a6c-b5f0-1e2d3c4b5a69",
+      "uses_left": 2
+     }
+    },
+    {
+     "t": "2026-09-18T22:07:28+00:00",
+     "event": "remediation_started",
+     "detail": {
+      "source": "contract"
+     }
+    },
+    {
+     "t": "2026-09-18T22:07:30+00:00",
+     "event": "executing",
+     "detail": {
+      "action": "sg.restore_ingress",
+      "params": {
+       "group_id": "sg-0f3a9c21e7b4d5a10",
+       "ip_protocol": "tcp",
+       "from_port": 5432,
+       "to_port": 5432,
+       "source_group_id": "sg-08b1e77c04d92f6e3"
+      }
+     }
+    },
+    {
+     "t": "2026-09-18T22:07:31+00:00",
+     "event": "executed",
+     "detail": {
+      "code": "Authorized",
+      "detail": "rule added",
+      "executed_at": "2026-09-18T22:07:31+00:00"
+     }
+    },
+    {
+     "t": "2026-09-18T22:08:02+00:00",
+     "event": "verify_attempt",
+     "detail": {
+      "attempt": 1,
+      "ok": false,
+      "checks": [
+       {
+        "name": "alarm_ok_after_fix",
+        "ok": false,
+        "detail": "alarm state is ALARM"
+       },
+       {
+        "name": "metric_zero",
+        "ok": true,
+        "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+       },
+       {
+        "name": "postcondition",
+        "ok": true,
+        "detail": "post-condition holds"
+       }
+      ]
+     }
+    },
+    {
+     "t": "2026-09-18T22:08:33+00:00",
+     "event": "verify_attempt",
+     "detail": {
+      "attempt": 2,
+      "ok": true,
+      "checks": [
+       {
+        "name": "alarm_ok_after_fix",
+        "ok": true,
+        "detail": "alarm OK since 2026-09-18T22:08:26+00:00 (fix at 2026-09-18T22:07:31+00:00)"
+       },
+       {
+        "name": "metric_zero",
+        "ok": true,
+        "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+       },
+       {
+        "name": "postcondition",
+        "ok": true,
+        "detail": "post-condition holds"
+       }
+      ]
+     }
+    },
+    {
+     "t": "2026-09-18T22:08:34+00:00",
+     "event": "resolved",
+     "detail": {
+      "handled_by": "contract",
+      "attempts": 2
+     }
+    }
+   ],
+   "proposals": [],
+   "turn_count": 0,
+   "contract_readback_pending": null
+  },
+  {
+   "incident_id": "7c1e9d2a-4f0b-4b8e-9a51-2d3f6e8c0a11",
+   "alarm_name": "beacon-demo-infra-errors",
+   "status": "resolved",
+   "timestamp": "2026-09-18T21:42:11+00:00",
+   "woken": true,
+   "handled_by": "voice",
+   "resolved_at": "2026-09-18T21:45:12+00:00",
+   "executed_at": "2026-09-18T21:43:38+00:00",
+   "execution_arn": "arn:aws:states:us-east-1:************:execution:beacon-remediate-beacon:5b2f...c0a1",
+   "trigger_type": "alarm",
+   "alarm_reason": "Threshold Crossed: 1 datapoint [4.0] was greater than or equal to the threshold (3.0).",
+   "rca_json": {
+    "status": "High",
+    "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+    "affected_components": [
+     "beacon-demo-webapp",
+     "beacon-demo-db",
+     "payments-service",
+     "orders-service"
+    ],
+    "evidence": [
+     "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+     "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+     "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+    ],
+    "next_steps": [
+     "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+     "Confirm the error rate returns to zero after the rule is back",
+     "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+    ],
+    "change_correlation": "RevokeSecurityGroupIngress on sg-0f3a9c21e7b4d5a10 by user/prashant at 21:40:38, 25 seconds before the first error.",
+    "spoken_summary": "Your demo web service in U S east 1 can no longer reach its database. The security group rule that lets the E C S tasks talk to R D S on port 5432 was removed about twenty-five seconds before the errors began. Restoring that rule should bring the service back.",
+    "beacon_json": {
+     "fingerprint": "rds-sg-ingress-revoked",
+     "suggested_action": "sg.restore_ingress",
+     "action_params": {
+      "group_id": "sg-0f3a9c21e7b4d5a10",
+      "ip_protocol": "tcp",
+      "from_port": 5432,
+      "to_port": 5432,
+      "source_group_id": "sg-08b1e77c04d92f6e3"
+     },
+     "confidence": 0.92,
+     "correlated_change": "RevokeSecurityGroupIngress by user/prashant at 21:40:38",
+     "action_source": "diagnostics"
+    }
+   },
+   "diagnostics": {
+    "missing_rules": [
+     {
+      "group_id": "sg-0f3a9c21e7b4d5a10",
+      "ip_protocol": "tcp",
+      "from_port": 5432,
+      "to_port": 5432,
+      "source_group_id": "sg-08b1e77c04d92f6e3",
+      "cidr": null
+     }
+    ],
+    "suggested_action": "sg.restore_ingress",
+    "action_params": {
+     "group_id": "sg-0f3a9c21e7b4d5a10",
+     "ip_protocol": "tcp",
+     "from_port": 5432,
+     "to_port": 5432,
+     "source_group_id": "sg-08b1e77c04d92f6e3"
+    },
+    "text": "Security group drift vs golden snapshot: 1 of 1 golden rule MISSING.\n- MISSING ingress rule: tcp 5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10"
+   },
+   "changes": [
+    {
+     "event_name": "RevokeSecurityGroupIngress",
+     "event_source": "ec2.amazonaws.com",
+     "event_time": "2026-09-18T21:40:38+00:00",
+     "actor": "user/prashant",
+     "actor_short": "user/prashant",
+     "by_beacon": false,
+     "user_agent": "aws-cli/2.17.32",
+     "source_ip": "49.37.xx.xx",
+     "resource_ids": [
+      "sg-0f3a9c21e7b4d5a10"
+     ],
+     "source": "ledger"
+    }
+   ],
+   "timeline": [
+    {
+     "t": "2026-09-18T21:42:11+00:00",
+     "event": "alarm_received",
+     "detail": {
+      "trigger_type": "alarm",
+      "alarm_name": "beacon-demo-infra-errors"
+     }
+    },
+    {
+     "t": "2026-09-18T21:42:13+00:00",
+     "event": "logs_fetched",
+     "detail": {
+      "groups": 1,
+      "lines": 612
+     }
+    },
+    {
+     "t": "2026-09-18T21:42:20+00:00",
+     "event": "reduced",
+     "detail": {
+      "log_group": "/ecs/beacon-demo",
+      "percentile": 0.38,
+      "model": "bedrock/amazon.nova-2-multimodal-embeddings-v1:0"
+     }
+    },
+    {
+     "t": "2026-09-18T21:42:21+00:00",
+     "event": "diagnostics_ran",
+     "detail": {
+      "missing_rules": 1,
+      "suggested_action": "sg.restore_ingress"
+     }
+    },
+    {
+     "t": "2026-09-18T21:42:21+00:00",
+     "event": "changes_checked",
+     "detail": {
+      "count": 1,
+      "top": "RevokeSecurityGroupIngress",
+      "source": "ledger"
+     }
+    },
+    {
+     "t": "2026-09-18T21:42:28+00:00",
+     "event": "rca_ready",
+     "detail": {
+      "status": "High",
+      "model": "us.amazon.nova-2-lite-v1:0",
+      "suggested_action": "sg.restore_ingress"
+     }
+    },
+    {
+     "t": "2026-09-18T21:42:29+00:00",
+     "event": "sns_sent"
+    },
+    {
+     "t": "2026-09-18T21:43:12+00:00",
+     "event": "fix_proposed",
+     "detail": {
+      "fix_id": 1,
+      "action": "sg.restore_ingress",
+      "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+      "dry_run": {
+       "ok": true,
+       "code": "DryRunOperation",
+       "detail": "Request would have succeeded, but DryRun flag is set.",
+       "role": "role/beacon-remediator-beacon"
+      }
+     }
+    },
+    {
+     "t": "2026-09-18T21:43:35+00:00",
+     "event": "approved",
+     "detail": {
+      "fix_id": 1,
+      "channel": "transcribe",
+      "transcript_quote": "okay approve fix one",
+      "approval_id": "e2b7...9f1c"
+     }
+    },
+    {
+     "t": "2026-09-18T21:43:37+00:00",
+     "event": "executing",
+     "detail": {
+      "action": "sg.restore_ingress",
+      "params": {
+       "group_id": "sg-0f3a9c21e7b4d5a10",
+       "ip_protocol": "tcp",
+       "from_port": 5432,
+       "to_port": 5432,
+       "source_group_id": "sg-08b1e77c04d92f6e3"
+      }
+     }
+    },
+    {
+     "t": "2026-09-18T21:43:38+00:00",
+     "event": "executed",
+     "detail": {
+      "code": "Authorized",
+      "detail": "rule added",
+      "executed_at": "2026-09-18T21:43:38+00:00"
+     }
+    },
+    {
+     "t": "2026-09-18T21:44:09+00:00",
+     "event": "verify_attempt",
+     "detail": {
+      "attempt": 1,
+      "ok": false,
+      "checks": [
+       {
+        "name": "alarm_ok_after_fix",
+        "ok": false,
+        "detail": "alarm state is ALARM"
+       },
+       {
+        "name": "metric_zero",
+        "ok": false,
+        "detail": "BeaconDemoInfra/ErrorCount latest value is 2 at 21:43:00"
+       },
+       {
+        "name": "postcondition",
+        "ok": true,
+        "detail": "post-condition holds"
+       }
+      ]
+     }
+    },
+    {
+     "t": "2026-09-18T21:44:40+00:00",
+     "event": "verify_attempt",
+     "detail": {
+      "attempt": 2,
+      "ok": false,
+      "checks": [
+       {
+        "name": "alarm_ok_after_fix",
+        "ok": false,
+        "detail": "alarm state is ALARM"
+       },
+       {
+        "name": "metric_zero",
+        "ok": true,
+        "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+       },
+       {
+        "name": "postcondition",
+        "ok": true,
+        "detail": "post-condition holds"
+       }
+      ]
+     }
+    },
+    {
+     "t": "2026-09-18T21:45:11+00:00",
+     "event": "verify_attempt",
+     "detail": {
+      "attempt": 3,
+      "ok": true,
+      "checks": [
+       {
+        "name": "alarm_ok_after_fix",
+        "ok": true,
+        "detail": "alarm OK since 2026-09-18T21:45:02+00:00 (fix at 2026-09-18T21:43:38+00:00)"
+       },
+       {
+        "name": "metric_zero",
+        "ok": true,
+        "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+       },
+       {
+        "name": "postcondition",
+        "ok": true,
+        "detail": "post-condition holds"
+       }
+      ]
+     }
+    },
+    {
+     "t": "2026-09-18T21:45:12+00:00",
+     "event": "resolved",
+     "detail": {
+      "handled_by": "voice",
+      "attempts": 3
+     }
+    },
+    {
+     "t": "2026-09-18T21:46:07+00:00",
+     "event": "contract_granted",
+     "detail": {
+      "contract_id": "c3f1a2b4-9d8e-4a6c-b5f0-1e2d3c4b5a69",
+      "days": 7,
+      "max_uses": 3,
+      "transcript_quote": "grant contract for seven days"
+     }
+    }
+   ],
+   "proposals": [
+    {
+     "fix_id": 1,
+     "action": "sg.restore_ingress",
+     "params": {
+      "group_id": "sg-0f3a9c21e7b4d5a10",
+      "ip_protocol": "tcp",
+      "from_port": 5432,
+      "to_port": 5432,
+      "source_group_id": "sg-08b1e77c04d92f6e3"
+     },
+     "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+     "dry_run": {
+      "ok": true,
+      "code": "DryRunOperation",
+      "detail": "Request would have succeeded, but DryRun flag is set.",
+      "role": "role/beacon-remediator-beacon"
+     },
+     "expires_at": "2026-09-18T21:48:12+00:00"
+    }
+   ],
+   "contract_id": "c3f1a2b4-9d8e-4a6c-b5f0-1e2d3c4b5a69",
+   "turn_count": 6
+  }
+ ],
+ "turns": {
+  "7c1e9d2a-4f0b-4b8e-9a51-2d3f6e8c0a11": [
+   {
+    "reply_text": "Your demo web service in U S east 1 has lost its database. Every request that touches Postgres is timing out, and the health check is failing [E1]. The likely cause is a security group change made twenty-five seconds before the first error. I can propose a fix if you want one.",
+    "spoken_text": "Your demo web service in U S east 1 has lost its database. Every request that touches Postgres is timing out, and the health check is failing. The likely cause is a security group change made twenty-five seconds before the first error. I can propose a fix if you want one.",
+    "cited": [
+     "E1"
+    ],
+    "audio_b64": null,
+    "speech_marks": [],
+    "voice": null,
+    "tts_error": "replay: browser voice",
+    "tool_events": [
+     {
+      "name": "get_incident_brief",
+      "args": {},
+      "summary": "briefed on beacon-demo-infra-errors",
+      "evidence_id": "E1"
+     }
+    ],
+    "evidence": [
+     {
+      "id": "E1",
+      "kind": "rca",
+      "title": "RCA (High)",
+      "payload": {
+       "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+       "evidence": [
+        "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+        "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+        "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+       ],
+       "next_steps": [
+        "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+        "Confirm the error rate returns to zero after the rule is back",
+        "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+       ]
+      }
+     }
+    ],
+    "incident": {
+     "incident_id": "7c1e9d2a-4f0b-4b8e-9a51-2d3f6e8c0a11",
+     "alarm_name": "beacon-demo-infra-errors",
+     "status": "awaiting_engineer",
+     "timestamp": "2026-09-18T21:42:11+00:00",
+     "woken": true,
+     "handled_by": "voice",
+     "resolved_at": null,
+     "executed_at": null,
+     "execution_arn": null,
+     "trigger_type": "alarm",
+     "alarm_reason": "Threshold Crossed: 1 datapoint [4.0] was greater than or equal to the threshold (3.0).",
+     "rca_json": {
+      "status": "High",
+      "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+      "affected_components": [
+       "beacon-demo-webapp",
+       "beacon-demo-db",
+       "payments-service",
+       "orders-service"
+      ],
+      "evidence": [
+       "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+       "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+       "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+      ],
+      "next_steps": [
+       "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+       "Confirm the error rate returns to zero after the rule is back",
+       "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+      ],
+      "change_correlation": "RevokeSecurityGroupIngress on sg-0f3a9c21e7b4d5a10 by user/prashant at 21:40:38, 25 seconds before the first error.",
+      "spoken_summary": "Your demo web service in U S east 1 can no longer reach its database. The security group rule that lets the E C S tasks talk to R D S on port 5432 was removed about twenty-five seconds before the errors began. Restoring that rule should bring the service back.",
+      "beacon_json": {
+       "fingerprint": "rds-sg-ingress-revoked",
+       "suggested_action": "sg.restore_ingress",
+       "action_params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "confidence": 0.92,
+       "correlated_change": "RevokeSecurityGroupIngress by user/prashant at 21:40:38",
+       "action_source": "diagnostics"
+      }
+     },
+     "diagnostics": {
+      "missing_rules": [
+       {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3",
+        "cidr": null
+       }
+      ],
+      "suggested_action": "sg.restore_ingress",
+      "action_params": {
+       "group_id": "sg-0f3a9c21e7b4d5a10",
+       "ip_protocol": "tcp",
+       "from_port": 5432,
+       "to_port": 5432,
+       "source_group_id": "sg-08b1e77c04d92f6e3"
+      },
+      "text": "Security group drift vs golden snapshot: 1 of 1 golden rule MISSING.\n- MISSING ingress rule: tcp 5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10"
+     },
+     "changes": [
+      {
+       "event_name": "RevokeSecurityGroupIngress",
+       "event_source": "ec2.amazonaws.com",
+       "event_time": "2026-09-18T21:40:38+00:00",
+       "actor": "user/prashant",
+       "actor_short": "user/prashant",
+       "by_beacon": false,
+       "user_agent": "aws-cli/2.17.32",
+       "source_ip": "49.37.xx.xx",
+       "resource_ids": [
+        "sg-0f3a9c21e7b4d5a10"
+       ],
+       "source": "ledger"
+      }
+     ],
+     "timeline": [
+      {
+       "t": "2026-09-18T21:42:11+00:00",
+       "event": "alarm_received",
+       "detail": {
+        "trigger_type": "alarm",
+        "alarm_name": "beacon-demo-infra-errors"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:13+00:00",
+       "event": "logs_fetched",
+       "detail": {
+        "groups": 1,
+        "lines": 612
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:20+00:00",
+       "event": "reduced",
+       "detail": {
+        "log_group": "/ecs/beacon-demo",
+        "percentile": 0.38,
+        "model": "bedrock/amazon.nova-2-multimodal-embeddings-v1:0"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "diagnostics_ran",
+       "detail": {
+        "missing_rules": 1,
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "changes_checked",
+       "detail": {
+        "count": 1,
+        "top": "RevokeSecurityGroupIngress",
+        "source": "ledger"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:28+00:00",
+       "event": "rca_ready",
+       "detail": {
+        "status": "High",
+        "model": "us.amazon.nova-2-lite-v1:0",
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:29+00:00",
+       "event": "sns_sent"
+      }
+     ],
+     "proposals": [],
+     "contract_id": null,
+     "turn_count": 6
+    },
+    "turn": 1
+   },
+   {
+    "reply_text": "One write call landed just before the alarm: RevokeSecurityGroupIngress on the R D S security group, by user prashant from the A W S C L I, at 21:40:38 [E2]. That removed the tcp 5432 rule from the E C S tasks, which is exactly the rule the golden snapshot says should be there [E3]. That is the cause.",
+    "spoken_text": "One write call landed just before the alarm: RevokeSecurityGroupIngress on the R D S security group, by user prashant from the A W S C L I, at 21:40:38. That removed the tcp 5432 rule from the E C S tasks, which is exactly the rule the golden snapshot says should be there. That is the cause.",
+    "cited": [
+     "E2",
+     "E3"
+    ],
+    "audio_b64": null,
+    "speech_marks": [],
+    "voice": null,
+    "tts_error": "replay: browser voice",
+    "tool_events": [
+     {
+      "name": "get_evidence",
+      "args": {
+       "kind": "changes"
+      },
+      "summary": "Recent changes (CloudTrail): E2",
+      "evidence_id": "E2"
+     },
+     {
+      "name": "get_evidence",
+      "args": {
+       "kind": "diagnostics"
+      },
+      "summary": "Security group drift: E3",
+      "evidence_id": "E3"
+     }
+    ],
+    "evidence": [
+     {
+      "id": "E2",
+      "kind": "changes",
+      "title": "Recent changes (CloudTrail)",
+      "payload": [
+       {
+        "event_name": "RevokeSecurityGroupIngress",
+        "event_source": "ec2.amazonaws.com",
+        "event_time": "2026-09-18T21:40:38+00:00",
+        "actor": "user/prashant",
+        "actor_short": "user/prashant",
+        "by_beacon": false,
+        "user_agent": "aws-cli/2.17.32",
+        "source_ip": "49.37.xx.xx",
+        "resource_ids": [
+         "sg-0f3a9c21e7b4d5a10"
+        ],
+        "source": "ledger"
+       }
+      ]
+     },
+     {
+      "id": "E3",
+      "kind": "diagnostics",
+      "title": "Security group drift",
+      "payload": {
+       "missing_rules": [
+        {
+         "group_id": "sg-0f3a9c21e7b4d5a10",
+         "ip_protocol": "tcp",
+         "from_port": 5432,
+         "to_port": 5432,
+         "source_group_id": "sg-08b1e77c04d92f6e3",
+         "cidr": null
+        }
+       ],
+       "suggested_action": "sg.restore_ingress",
+       "action_params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "text": "Security group drift vs golden snapshot: 1 of 1 golden rule MISSING.\n- MISSING ingress rule: tcp 5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10"
+      }
+     }
+    ],
+    "incident": {
+     "incident_id": "7c1e9d2a-4f0b-4b8e-9a51-2d3f6e8c0a11",
+     "alarm_name": "beacon-demo-infra-errors",
+     "status": "awaiting_engineer",
+     "timestamp": "2026-09-18T21:42:11+00:00",
+     "woken": true,
+     "handled_by": "voice",
+     "resolved_at": null,
+     "executed_at": null,
+     "execution_arn": null,
+     "trigger_type": "alarm",
+     "alarm_reason": "Threshold Crossed: 1 datapoint [4.0] was greater than or equal to the threshold (3.0).",
+     "rca_json": {
+      "status": "High",
+      "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+      "affected_components": [
+       "beacon-demo-webapp",
+       "beacon-demo-db",
+       "payments-service",
+       "orders-service"
+      ],
+      "evidence": [
+       "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+       "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+       "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+      ],
+      "next_steps": [
+       "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+       "Confirm the error rate returns to zero after the rule is back",
+       "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+      ],
+      "change_correlation": "RevokeSecurityGroupIngress on sg-0f3a9c21e7b4d5a10 by user/prashant at 21:40:38, 25 seconds before the first error.",
+      "spoken_summary": "Your demo web service in U S east 1 can no longer reach its database. The security group rule that lets the E C S tasks talk to R D S on port 5432 was removed about twenty-five seconds before the errors began. Restoring that rule should bring the service back.",
+      "beacon_json": {
+       "fingerprint": "rds-sg-ingress-revoked",
+       "suggested_action": "sg.restore_ingress",
+       "action_params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "confidence": 0.92,
+       "correlated_change": "RevokeSecurityGroupIngress by user/prashant at 21:40:38",
+       "action_source": "diagnostics"
+      }
+     },
+     "diagnostics": {
+      "missing_rules": [
+       {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3",
+        "cidr": null
+       }
+      ],
+      "suggested_action": "sg.restore_ingress",
+      "action_params": {
+       "group_id": "sg-0f3a9c21e7b4d5a10",
+       "ip_protocol": "tcp",
+       "from_port": 5432,
+       "to_port": 5432,
+       "source_group_id": "sg-08b1e77c04d92f6e3"
+      },
+      "text": "Security group drift vs golden snapshot: 1 of 1 golden rule MISSING.\n- MISSING ingress rule: tcp 5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10"
+     },
+     "changes": [
+      {
+       "event_name": "RevokeSecurityGroupIngress",
+       "event_source": "ec2.amazonaws.com",
+       "event_time": "2026-09-18T21:40:38+00:00",
+       "actor": "user/prashant",
+       "actor_short": "user/prashant",
+       "by_beacon": false,
+       "user_agent": "aws-cli/2.17.32",
+       "source_ip": "49.37.xx.xx",
+       "resource_ids": [
+        "sg-0f3a9c21e7b4d5a10"
+       ],
+       "source": "ledger"
+      }
+     ],
+     "timeline": [
+      {
+       "t": "2026-09-18T21:42:11+00:00",
+       "event": "alarm_received",
+       "detail": {
+        "trigger_type": "alarm",
+        "alarm_name": "beacon-demo-infra-errors"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:13+00:00",
+       "event": "logs_fetched",
+       "detail": {
+        "groups": 1,
+        "lines": 612
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:20+00:00",
+       "event": "reduced",
+       "detail": {
+        "log_group": "/ecs/beacon-demo",
+        "percentile": 0.38,
+        "model": "bedrock/amazon.nova-2-multimodal-embeddings-v1:0"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "diagnostics_ran",
+       "detail": {
+        "missing_rules": 1,
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "changes_checked",
+       "detail": {
+        "count": 1,
+        "top": "RevokeSecurityGroupIngress",
+        "source": "ledger"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:28+00:00",
+       "event": "rca_ready",
+       "detail": {
+        "status": "High",
+        "model": "us.amazon.nova-2-lite-v1:0",
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:29+00:00",
+       "event": "sns_sent"
+      }
+     ],
+     "proposals": [],
+     "contract_id": null,
+     "turn_count": 6
+    },
+    "turn": 1
+   },
+   {
+    "reply_text": "I can restore that one ingress rule. Blast radius is one rule on one security group, nothing else changes. The dry run passed under the remediator role [E4]. To apply it, say exactly: approve fix one.",
+    "spoken_text": "I can restore that one ingress rule. Blast radius is one rule on one security group, nothing else changes. The dry run passed under the remediator role. To apply it, say exactly: approve fix one.",
+    "cited": [
+     "E4"
+    ],
+    "audio_b64": null,
+    "speech_marks": [],
+    "voice": null,
+    "tts_error": "replay: browser voice",
+    "tool_events": [
+     {
+      "name": "propose_fix",
+      "args": {},
+      "summary": "fix 1: sg.restore_ingress (dry run PASSED)",
+      "evidence_id": "E4"
+     }
+    ],
+    "evidence": [
+     {
+      "id": "E4",
+      "kind": "dry_run",
+      "title": "Dry run of fix 1",
+      "payload": {
+       "ok": true,
+       "code": "DryRunOperation",
+       "detail": "Request would have succeeded, but DryRun flag is set.",
+       "role": "role/beacon-remediator-beacon"
+      }
+     }
+    ],
+    "incident": {
+     "incident_id": "7c1e9d2a-4f0b-4b8e-9a51-2d3f6e8c0a11",
+     "alarm_name": "beacon-demo-infra-errors",
+     "status": "awaiting_engineer",
+     "timestamp": "2026-09-18T21:42:11+00:00",
+     "woken": true,
+     "handled_by": "voice",
+     "resolved_at": null,
+     "executed_at": null,
+     "execution_arn": null,
+     "trigger_type": "alarm",
+     "alarm_reason": "Threshold Crossed: 1 datapoint [4.0] was greater than or equal to the threshold (3.0).",
+     "rca_json": {
+      "status": "High",
+      "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+      "affected_components": [
+       "beacon-demo-webapp",
+       "beacon-demo-db",
+       "payments-service",
+       "orders-service"
+      ],
+      "evidence": [
+       "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+       "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+       "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+      ],
+      "next_steps": [
+       "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+       "Confirm the error rate returns to zero after the rule is back",
+       "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+      ],
+      "change_correlation": "RevokeSecurityGroupIngress on sg-0f3a9c21e7b4d5a10 by user/prashant at 21:40:38, 25 seconds before the first error.",
+      "spoken_summary": "Your demo web service in U S east 1 can no longer reach its database. The security group rule that lets the E C S tasks talk to R D S on port 5432 was removed about twenty-five seconds before the errors began. Restoring that rule should bring the service back.",
+      "beacon_json": {
+       "fingerprint": "rds-sg-ingress-revoked",
+       "suggested_action": "sg.restore_ingress",
+       "action_params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "confidence": 0.92,
+       "correlated_change": "RevokeSecurityGroupIngress by user/prashant at 21:40:38",
+       "action_source": "diagnostics"
+      }
+     },
+     "diagnostics": {
+      "missing_rules": [
+       {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3",
+        "cidr": null
+       }
+      ],
+      "suggested_action": "sg.restore_ingress",
+      "action_params": {
+       "group_id": "sg-0f3a9c21e7b4d5a10",
+       "ip_protocol": "tcp",
+       "from_port": 5432,
+       "to_port": 5432,
+       "source_group_id": "sg-08b1e77c04d92f6e3"
+      },
+      "text": "Security group drift vs golden snapshot: 1 of 1 golden rule MISSING.\n- MISSING ingress rule: tcp 5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10"
+     },
+     "changes": [
+      {
+       "event_name": "RevokeSecurityGroupIngress",
+       "event_source": "ec2.amazonaws.com",
+       "event_time": "2026-09-18T21:40:38+00:00",
+       "actor": "user/prashant",
+       "actor_short": "user/prashant",
+       "by_beacon": false,
+       "user_agent": "aws-cli/2.17.32",
+       "source_ip": "49.37.xx.xx",
+       "resource_ids": [
+        "sg-0f3a9c21e7b4d5a10"
+       ],
+       "source": "ledger"
+      }
+     ],
+     "timeline": [
+      {
+       "t": "2026-09-18T21:42:11+00:00",
+       "event": "alarm_received",
+       "detail": {
+        "trigger_type": "alarm",
+        "alarm_name": "beacon-demo-infra-errors"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:13+00:00",
+       "event": "logs_fetched",
+       "detail": {
+        "groups": 1,
+        "lines": 612
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:20+00:00",
+       "event": "reduced",
+       "detail": {
+        "log_group": "/ecs/beacon-demo",
+        "percentile": 0.38,
+        "model": "bedrock/amazon.nova-2-multimodal-embeddings-v1:0"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "diagnostics_ran",
+       "detail": {
+        "missing_rules": 1,
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "changes_checked",
+       "detail": {
+        "count": 1,
+        "top": "RevokeSecurityGroupIngress",
+        "source": "ledger"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:28+00:00",
+       "event": "rca_ready",
+       "detail": {
+        "status": "High",
+        "model": "us.amazon.nova-2-lite-v1:0",
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:29+00:00",
+       "event": "sns_sent"
+      },
+      {
+       "t": "2026-09-18T21:43:12+00:00",
+       "event": "fix_proposed",
+       "detail": {
+        "fix_id": 1,
+        "action": "sg.restore_ingress",
+        "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+        "dry_run": {
+         "ok": true,
+         "code": "DryRunOperation",
+         "detail": "Request would have succeeded, but DryRun flag is set.",
+         "role": "role/beacon-remediator-beacon"
+        }
+       }
+      }
+     ],
+     "proposals": [
+      {
+       "fix_id": 1,
+       "action": "sg.restore_ingress",
+       "params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+       "dry_run": {
+        "ok": true,
+        "code": "DryRunOperation",
+        "detail": "Request would have succeeded, but DryRun flag is set.",
+        "role": "role/beacon-remediator-beacon"
+       },
+       "expires_at": "2026-09-18T21:48:12+00:00"
+      }
+     ],
+     "contract_id": null,
+     "turn_count": 6
+    },
+    "turn": 1
+   },
+   {
+    "reply_text": "Approved on your word, applying now. A Step Functions loop is restoring the rule, then it will wait for CloudWatch to agree before I call this recovered.",
+    "spoken_text": "Approved on your word, applying now. A Step Functions loop is restoring the rule, then it will wait for CloudWatch to agree before I call this recovered.",
+    "cited": [],
+    "audio_b64": null,
+    "speech_marks": [],
+    "voice": null,
+    "tts_error": "replay: browser voice",
+    "tool_events": [
+     {
+      "name": "approve_fix",
+      "args": {
+       "fix_id": 1,
+       "confirmation_phrase": "approve fix one"
+      },
+      "summary": "approved via transcribe: \"okay approve fix one\""
+     }
+    ],
+    "evidence": [],
+    "incident": {
+     "incident_id": "7c1e9d2a-4f0b-4b8e-9a51-2d3f6e8c0a11",
+     "alarm_name": "beacon-demo-infra-errors",
+     "status": "remediating",
+     "timestamp": "2026-09-18T21:42:11+00:00",
+     "woken": true,
+     "handled_by": "voice",
+     "resolved_at": null,
+     "executed_at": null,
+     "execution_arn": "arn:aws:states:us-east-1:************:execution:beacon-remediate-beacon:5b2f...c0a1",
+     "trigger_type": "alarm",
+     "alarm_reason": "Threshold Crossed: 1 datapoint [4.0] was greater than or equal to the threshold (3.0).",
+     "rca_json": {
+      "status": "High",
+      "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+      "affected_components": [
+       "beacon-demo-webapp",
+       "beacon-demo-db",
+       "payments-service",
+       "orders-service"
+      ],
+      "evidence": [
+       "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+       "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+       "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+      ],
+      "next_steps": [
+       "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+       "Confirm the error rate returns to zero after the rule is back",
+       "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+      ],
+      "change_correlation": "RevokeSecurityGroupIngress on sg-0f3a9c21e7b4d5a10 by user/prashant at 21:40:38, 25 seconds before the first error.",
+      "spoken_summary": "Your demo web service in U S east 1 can no longer reach its database. The security group rule that lets the E C S tasks talk to R D S on port 5432 was removed about twenty-five seconds before the errors began. Restoring that rule should bring the service back.",
+      "beacon_json": {
+       "fingerprint": "rds-sg-ingress-revoked",
+       "suggested_action": "sg.restore_ingress",
+       "action_params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "confidence": 0.92,
+       "correlated_change": "RevokeSecurityGroupIngress by user/prashant at 21:40:38",
+       "action_source": "diagnostics"
+      }
+     },
+     "diagnostics": {
+      "missing_rules": [
+       {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3",
+        "cidr": null
+       }
+      ],
+      "suggested_action": "sg.restore_ingress",
+      "action_params": {
+       "group_id": "sg-0f3a9c21e7b4d5a10",
+       "ip_protocol": "tcp",
+       "from_port": 5432,
+       "to_port": 5432,
+       "source_group_id": "sg-08b1e77c04d92f6e3"
+      },
+      "text": "Security group drift vs golden snapshot: 1 of 1 golden rule MISSING.\n- MISSING ingress rule: tcp 5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10"
+     },
+     "changes": [
+      {
+       "event_name": "RevokeSecurityGroupIngress",
+       "event_source": "ec2.amazonaws.com",
+       "event_time": "2026-09-18T21:40:38+00:00",
+       "actor": "user/prashant",
+       "actor_short": "user/prashant",
+       "by_beacon": false,
+       "user_agent": "aws-cli/2.17.32",
+       "source_ip": "49.37.xx.xx",
+       "resource_ids": [
+        "sg-0f3a9c21e7b4d5a10"
+       ],
+       "source": "ledger"
+      }
+     ],
+     "timeline": [
+      {
+       "t": "2026-09-18T21:42:11+00:00",
+       "event": "alarm_received",
+       "detail": {
+        "trigger_type": "alarm",
+        "alarm_name": "beacon-demo-infra-errors"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:13+00:00",
+       "event": "logs_fetched",
+       "detail": {
+        "groups": 1,
+        "lines": 612
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:20+00:00",
+       "event": "reduced",
+       "detail": {
+        "log_group": "/ecs/beacon-demo",
+        "percentile": 0.38,
+        "model": "bedrock/amazon.nova-2-multimodal-embeddings-v1:0"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "diagnostics_ran",
+       "detail": {
+        "missing_rules": 1,
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "changes_checked",
+       "detail": {
+        "count": 1,
+        "top": "RevokeSecurityGroupIngress",
+        "source": "ledger"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:28+00:00",
+       "event": "rca_ready",
+       "detail": {
+        "status": "High",
+        "model": "us.amazon.nova-2-lite-v1:0",
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:29+00:00",
+       "event": "sns_sent"
+      },
+      {
+       "t": "2026-09-18T21:43:12+00:00",
+       "event": "fix_proposed",
+       "detail": {
+        "fix_id": 1,
+        "action": "sg.restore_ingress",
+        "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+        "dry_run": {
+         "ok": true,
+         "code": "DryRunOperation",
+         "detail": "Request would have succeeded, but DryRun flag is set.",
+         "role": "role/beacon-remediator-beacon"
+        }
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:35+00:00",
+       "event": "approved",
+       "detail": {
+        "fix_id": 1,
+        "channel": "transcribe",
+        "transcript_quote": "okay approve fix one",
+        "approval_id": "e2b7...9f1c"
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:37+00:00",
+       "event": "executing",
+       "detail": {
+        "action": "sg.restore_ingress",
+        "params": {
+         "group_id": "sg-0f3a9c21e7b4d5a10",
+         "ip_protocol": "tcp",
+         "from_port": 5432,
+         "to_port": 5432,
+         "source_group_id": "sg-08b1e77c04d92f6e3"
+        }
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:38+00:00",
+       "event": "executed",
+       "detail": {
+        "code": "Authorized",
+        "detail": "rule added",
+        "executed_at": "2026-09-18T21:43:38+00:00"
+       }
+      }
+     ],
+     "proposals": [
+      {
+       "fix_id": 1,
+       "action": "sg.restore_ingress",
+       "params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+       "dry_run": {
+        "ok": true,
+        "code": "DryRunOperation",
+        "detail": "Request would have succeeded, but DryRun flag is set.",
+        "role": "role/beacon-remediator-beacon"
+       },
+       "expires_at": "2026-09-18T21:48:12+00:00"
+      }
+     ],
+     "contract_id": null,
+     "turn_count": 6
+    },
+    "turn": 1
+   },
+   {
+    "reply_text": "Recovered. The alarm is back to OK after the fix, the error count is zero, and the rule is present. Should I handle this myself next time?",
+    "spoken_text": "Recovered. The alarm is back to OK after the fix, the error count is zero, and the rule is present. Should I handle this myself next time?",
+    "cited": [],
+    "audio_b64": null,
+    "speech_marks": [],
+    "voice": null,
+    "tts_error": "replay: browser voice",
+    "tool_events": [
+     {
+      "name": "check_recovery",
+      "args": {},
+      "summary": "status resolved"
+     }
+    ],
+    "evidence": [],
+    "incident": {
+     "incident_id": "7c1e9d2a-4f0b-4b8e-9a51-2d3f6e8c0a11",
+     "alarm_name": "beacon-demo-infra-errors",
+     "status": "resolved",
+     "timestamp": "2026-09-18T21:42:11+00:00",
+     "woken": true,
+     "handled_by": "voice",
+     "resolved_at": "2026-09-18T21:45:12+00:00",
+     "executed_at": "2026-09-18T21:43:38+00:00",
+     "execution_arn": "arn:aws:states:us-east-1:************:execution:beacon-remediate-beacon:5b2f...c0a1",
+     "trigger_type": "alarm",
+     "alarm_reason": "Threshold Crossed: 1 datapoint [4.0] was greater than or equal to the threshold (3.0).",
+     "rca_json": {
+      "status": "High",
+      "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+      "affected_components": [
+       "beacon-demo-webapp",
+       "beacon-demo-db",
+       "payments-service",
+       "orders-service"
+      ],
+      "evidence": [
+       "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+       "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+       "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+      ],
+      "next_steps": [
+       "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+       "Confirm the error rate returns to zero after the rule is back",
+       "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+      ],
+      "change_correlation": "RevokeSecurityGroupIngress on sg-0f3a9c21e7b4d5a10 by user/prashant at 21:40:38, 25 seconds before the first error.",
+      "spoken_summary": "Your demo web service in U S east 1 can no longer reach its database. The security group rule that lets the E C S tasks talk to R D S on port 5432 was removed about twenty-five seconds before the errors began. Restoring that rule should bring the service back.",
+      "beacon_json": {
+       "fingerprint": "rds-sg-ingress-revoked",
+       "suggested_action": "sg.restore_ingress",
+       "action_params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "confidence": 0.92,
+       "correlated_change": "RevokeSecurityGroupIngress by user/prashant at 21:40:38",
+       "action_source": "diagnostics"
+      }
+     },
+     "diagnostics": {
+      "missing_rules": [
+       {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3",
+        "cidr": null
+       }
+      ],
+      "suggested_action": "sg.restore_ingress",
+      "action_params": {
+       "group_id": "sg-0f3a9c21e7b4d5a10",
+       "ip_protocol": "tcp",
+       "from_port": 5432,
+       "to_port": 5432,
+       "source_group_id": "sg-08b1e77c04d92f6e3"
+      },
+      "text": "Security group drift vs golden snapshot: 1 of 1 golden rule MISSING.\n- MISSING ingress rule: tcp 5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10"
+     },
+     "changes": [
+      {
+       "event_name": "RevokeSecurityGroupIngress",
+       "event_source": "ec2.amazonaws.com",
+       "event_time": "2026-09-18T21:40:38+00:00",
+       "actor": "user/prashant",
+       "actor_short": "user/prashant",
+       "by_beacon": false,
+       "user_agent": "aws-cli/2.17.32",
+       "source_ip": "49.37.xx.xx",
+       "resource_ids": [
+        "sg-0f3a9c21e7b4d5a10"
+       ],
+       "source": "ledger"
+      }
+     ],
+     "timeline": [
+      {
+       "t": "2026-09-18T21:42:11+00:00",
+       "event": "alarm_received",
+       "detail": {
+        "trigger_type": "alarm",
+        "alarm_name": "beacon-demo-infra-errors"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:13+00:00",
+       "event": "logs_fetched",
+       "detail": {
+        "groups": 1,
+        "lines": 612
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:20+00:00",
+       "event": "reduced",
+       "detail": {
+        "log_group": "/ecs/beacon-demo",
+        "percentile": 0.38,
+        "model": "bedrock/amazon.nova-2-multimodal-embeddings-v1:0"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "diagnostics_ran",
+       "detail": {
+        "missing_rules": 1,
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "changes_checked",
+       "detail": {
+        "count": 1,
+        "top": "RevokeSecurityGroupIngress",
+        "source": "ledger"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:28+00:00",
+       "event": "rca_ready",
+       "detail": {
+        "status": "High",
+        "model": "us.amazon.nova-2-lite-v1:0",
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:29+00:00",
+       "event": "sns_sent"
+      },
+      {
+       "t": "2026-09-18T21:43:12+00:00",
+       "event": "fix_proposed",
+       "detail": {
+        "fix_id": 1,
+        "action": "sg.restore_ingress",
+        "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+        "dry_run": {
+         "ok": true,
+         "code": "DryRunOperation",
+         "detail": "Request would have succeeded, but DryRun flag is set.",
+         "role": "role/beacon-remediator-beacon"
+        }
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:35+00:00",
+       "event": "approved",
+       "detail": {
+        "fix_id": 1,
+        "channel": "transcribe",
+        "transcript_quote": "okay approve fix one",
+        "approval_id": "e2b7...9f1c"
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:37+00:00",
+       "event": "executing",
+       "detail": {
+        "action": "sg.restore_ingress",
+        "params": {
+         "group_id": "sg-0f3a9c21e7b4d5a10",
+         "ip_protocol": "tcp",
+         "from_port": 5432,
+         "to_port": 5432,
+         "source_group_id": "sg-08b1e77c04d92f6e3"
+        }
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:38+00:00",
+       "event": "executed",
+       "detail": {
+        "code": "Authorized",
+        "detail": "rule added",
+        "executed_at": "2026-09-18T21:43:38+00:00"
+       }
+      },
+      {
+       "t": "2026-09-18T21:44:09+00:00",
+       "event": "verify_attempt",
+       "detail": {
+        "attempt": 1,
+        "ok": false,
+        "checks": [
+         {
+          "name": "alarm_ok_after_fix",
+          "ok": false,
+          "detail": "alarm state is ALARM"
+         },
+         {
+          "name": "metric_zero",
+          "ok": false,
+          "detail": "BeaconDemoInfra/ErrorCount latest value is 2 at 21:43:00"
+         },
+         {
+          "name": "postcondition",
+          "ok": true,
+          "detail": "post-condition holds"
+         }
+        ]
+       }
+      },
+      {
+       "t": "2026-09-18T21:44:40+00:00",
+       "event": "verify_attempt",
+       "detail": {
+        "attempt": 2,
+        "ok": false,
+        "checks": [
+         {
+          "name": "alarm_ok_after_fix",
+          "ok": false,
+          "detail": "alarm state is ALARM"
+         },
+         {
+          "name": "metric_zero",
+          "ok": true,
+          "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+         },
+         {
+          "name": "postcondition",
+          "ok": true,
+          "detail": "post-condition holds"
+         }
+        ]
+       }
+      },
+      {
+       "t": "2026-09-18T21:45:11+00:00",
+       "event": "verify_attempt",
+       "detail": {
+        "attempt": 3,
+        "ok": true,
+        "checks": [
+         {
+          "name": "alarm_ok_after_fix",
+          "ok": true,
+          "detail": "alarm OK since 2026-09-18T21:45:02+00:00 (fix at 2026-09-18T21:43:38+00:00)"
+         },
+         {
+          "name": "metric_zero",
+          "ok": true,
+          "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+         },
+         {
+          "name": "postcondition",
+          "ok": true,
+          "detail": "post-condition holds"
+         }
+        ]
+       }
+      },
+      {
+       "t": "2026-09-18T21:45:12+00:00",
+       "event": "resolved",
+       "detail": {
+        "handled_by": "voice",
+        "attempts": 3
+       }
+      }
+     ],
+     "proposals": [
+      {
+       "fix_id": 1,
+       "action": "sg.restore_ingress",
+       "params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+       "dry_run": {
+        "ok": true,
+        "code": "DryRunOperation",
+        "detail": "Request would have succeeded, but DryRun flag is set.",
+        "role": "role/beacon-remediator-beacon"
+       },
+       "expires_at": "2026-09-18T21:48:12+00:00"
+      }
+     ],
+     "contract_id": null,
+     "turn_count": 6
+    },
+    "turn": 1
+   },
+   {
+    "reply_text": "Sleep Contract read-back: when alarm beacon-demo-infra-errors fires again, Beacon may run sg.restore_ingress on exactly group sg-0f3a9c21e7b4d5a10, port 5432, from sg-08b1e77c04d92f6e3, at most three times, for seven days. Say grant contract for seven days to confirm.",
+    "spoken_text": "Sleep Contract read-back: when alarm beacon-demo-infra-errors fires again, Beacon may run sg.restore_ingress on exactly group sg-0f3a9c21e7b4d5a10, port 5432, from sg-08b1e77c04d92f6e3, at most three times, for seven days. Say grant contract for seven days to confirm.",
+    "cited": [],
+    "audio_b64": null,
+    "speech_marks": [],
+    "voice": null,
+    "tts_error": "replay: browser voice",
+    "tool_events": [
+     {
+      "name": "grant_sleep_contract",
+      "args": {
+       "days": 7,
+       "max_uses": 3
+      },
+      "summary": "read-back issued, awaiting explicit grant phrase"
+     }
+    ],
+    "evidence": [],
+    "incident": {
+     "incident_id": "7c1e9d2a-4f0b-4b8e-9a51-2d3f6e8c0a11",
+     "alarm_name": "beacon-demo-infra-errors",
+     "status": "resolved",
+     "timestamp": "2026-09-18T21:42:11+00:00",
+     "woken": true,
+     "handled_by": "voice",
+     "resolved_at": "2026-09-18T21:45:12+00:00",
+     "executed_at": "2026-09-18T21:43:38+00:00",
+     "execution_arn": "arn:aws:states:us-east-1:************:execution:beacon-remediate-beacon:5b2f...c0a1",
+     "trigger_type": "alarm",
+     "alarm_reason": "Threshold Crossed: 1 datapoint [4.0] was greater than or equal to the threshold (3.0).",
+     "rca_json": {
+      "status": "High",
+      "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+      "affected_components": [
+       "beacon-demo-webapp",
+       "beacon-demo-db",
+       "payments-service",
+       "orders-service"
+      ],
+      "evidence": [
+       "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+       "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+       "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+      ],
+      "next_steps": [
+       "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+       "Confirm the error rate returns to zero after the rule is back",
+       "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+      ],
+      "change_correlation": "RevokeSecurityGroupIngress on sg-0f3a9c21e7b4d5a10 by user/prashant at 21:40:38, 25 seconds before the first error.",
+      "spoken_summary": "Your demo web service in U S east 1 can no longer reach its database. The security group rule that lets the E C S tasks talk to R D S on port 5432 was removed about twenty-five seconds before the errors began. Restoring that rule should bring the service back.",
+      "beacon_json": {
+       "fingerprint": "rds-sg-ingress-revoked",
+       "suggested_action": "sg.restore_ingress",
+       "action_params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "confidence": 0.92,
+       "correlated_change": "RevokeSecurityGroupIngress by user/prashant at 21:40:38",
+       "action_source": "diagnostics"
+      }
+     },
+     "diagnostics": {
+      "missing_rules": [
+       {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3",
+        "cidr": null
+       }
+      ],
+      "suggested_action": "sg.restore_ingress",
+      "action_params": {
+       "group_id": "sg-0f3a9c21e7b4d5a10",
+       "ip_protocol": "tcp",
+       "from_port": 5432,
+       "to_port": 5432,
+       "source_group_id": "sg-08b1e77c04d92f6e3"
+      },
+      "text": "Security group drift vs golden snapshot: 1 of 1 golden rule MISSING.\n- MISSING ingress rule: tcp 5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10"
+     },
+     "changes": [
+      {
+       "event_name": "RevokeSecurityGroupIngress",
+       "event_source": "ec2.amazonaws.com",
+       "event_time": "2026-09-18T21:40:38+00:00",
+       "actor": "user/prashant",
+       "actor_short": "user/prashant",
+       "by_beacon": false,
+       "user_agent": "aws-cli/2.17.32",
+       "source_ip": "49.37.xx.xx",
+       "resource_ids": [
+        "sg-0f3a9c21e7b4d5a10"
+       ],
+       "source": "ledger"
+      }
+     ],
+     "timeline": [
+      {
+       "t": "2026-09-18T21:42:11+00:00",
+       "event": "alarm_received",
+       "detail": {
+        "trigger_type": "alarm",
+        "alarm_name": "beacon-demo-infra-errors"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:13+00:00",
+       "event": "logs_fetched",
+       "detail": {
+        "groups": 1,
+        "lines": 612
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:20+00:00",
+       "event": "reduced",
+       "detail": {
+        "log_group": "/ecs/beacon-demo",
+        "percentile": 0.38,
+        "model": "bedrock/amazon.nova-2-multimodal-embeddings-v1:0"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "diagnostics_ran",
+       "detail": {
+        "missing_rules": 1,
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "changes_checked",
+       "detail": {
+        "count": 1,
+        "top": "RevokeSecurityGroupIngress",
+        "source": "ledger"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:28+00:00",
+       "event": "rca_ready",
+       "detail": {
+        "status": "High",
+        "model": "us.amazon.nova-2-lite-v1:0",
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:29+00:00",
+       "event": "sns_sent"
+      },
+      {
+       "t": "2026-09-18T21:43:12+00:00",
+       "event": "fix_proposed",
+       "detail": {
+        "fix_id": 1,
+        "action": "sg.restore_ingress",
+        "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+        "dry_run": {
+         "ok": true,
+         "code": "DryRunOperation",
+         "detail": "Request would have succeeded, but DryRun flag is set.",
+         "role": "role/beacon-remediator-beacon"
+        }
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:35+00:00",
+       "event": "approved",
+       "detail": {
+        "fix_id": 1,
+        "channel": "transcribe",
+        "transcript_quote": "okay approve fix one",
+        "approval_id": "e2b7...9f1c"
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:37+00:00",
+       "event": "executing",
+       "detail": {
+        "action": "sg.restore_ingress",
+        "params": {
+         "group_id": "sg-0f3a9c21e7b4d5a10",
+         "ip_protocol": "tcp",
+         "from_port": 5432,
+         "to_port": 5432,
+         "source_group_id": "sg-08b1e77c04d92f6e3"
+        }
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:38+00:00",
+       "event": "executed",
+       "detail": {
+        "code": "Authorized",
+        "detail": "rule added",
+        "executed_at": "2026-09-18T21:43:38+00:00"
+       }
+      },
+      {
+       "t": "2026-09-18T21:44:09+00:00",
+       "event": "verify_attempt",
+       "detail": {
+        "attempt": 1,
+        "ok": false,
+        "checks": [
+         {
+          "name": "alarm_ok_after_fix",
+          "ok": false,
+          "detail": "alarm state is ALARM"
+         },
+         {
+          "name": "metric_zero",
+          "ok": false,
+          "detail": "BeaconDemoInfra/ErrorCount latest value is 2 at 21:43:00"
+         },
+         {
+          "name": "postcondition",
+          "ok": true,
+          "detail": "post-condition holds"
+         }
+        ]
+       }
+      },
+      {
+       "t": "2026-09-18T21:44:40+00:00",
+       "event": "verify_attempt",
+       "detail": {
+        "attempt": 2,
+        "ok": false,
+        "checks": [
+         {
+          "name": "alarm_ok_after_fix",
+          "ok": false,
+          "detail": "alarm state is ALARM"
+         },
+         {
+          "name": "metric_zero",
+          "ok": true,
+          "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+         },
+         {
+          "name": "postcondition",
+          "ok": true,
+          "detail": "post-condition holds"
+         }
+        ]
+       }
+      },
+      {
+       "t": "2026-09-18T21:45:11+00:00",
+       "event": "verify_attempt",
+       "detail": {
+        "attempt": 3,
+        "ok": true,
+        "checks": [
+         {
+          "name": "alarm_ok_after_fix",
+          "ok": true,
+          "detail": "alarm OK since 2026-09-18T21:45:02+00:00 (fix at 2026-09-18T21:43:38+00:00)"
+         },
+         {
+          "name": "metric_zero",
+          "ok": true,
+          "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+         },
+         {
+          "name": "postcondition",
+          "ok": true,
+          "detail": "post-condition holds"
+         }
+        ]
+       }
+      },
+      {
+       "t": "2026-09-18T21:45:12+00:00",
+       "event": "resolved",
+       "detail": {
+        "handled_by": "voice",
+        "attempts": 3
+       }
+      }
+     ],
+     "proposals": [
+      {
+       "fix_id": 1,
+       "action": "sg.restore_ingress",
+       "params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+       "dry_run": {
+        "ok": true,
+        "code": "DryRunOperation",
+        "detail": "Request would have succeeded, but DryRun flag is set.",
+        "role": "role/beacon-remediator-beacon"
+       },
+       "expires_at": "2026-09-18T21:48:12+00:00"
+      }
+     ],
+     "contract_id": null,
+     "turn_count": 6,
+     "contract_readback_pending": {
+      "days": 7,
+      "max_uses": 3,
+      "action": "sg.restore_ingress"
+     }
+    },
+    "turn": 1
+   },
+   {
+    "reply_text": "Contract granted for seven days, three uses, scoped to that one rule. If this alarm fires again I will fix it, verify it, and email you in the morning instead of calling. Good night.",
+    "spoken_text": "Contract granted for seven days, three uses, scoped to that one rule. If this alarm fires again I will fix it, verify it, and email you in the morning instead of calling. Good night.",
+    "cited": [],
+    "audio_b64": null,
+    "speech_marks": [],
+    "voice": null,
+    "tts_error": "replay: browser voice",
+    "tool_events": [
+     {
+      "name": "grant_sleep_contract",
+      "args": {
+       "days": 7,
+       "max_uses": 3
+      },
+      "summary": "granted: \"grant contract for seven days\""
+     }
+    ],
+    "evidence": [],
+    "incident": {
+     "incident_id": "7c1e9d2a-4f0b-4b8e-9a51-2d3f6e8c0a11",
+     "alarm_name": "beacon-demo-infra-errors",
+     "status": "resolved",
+     "timestamp": "2026-09-18T21:42:11+00:00",
+     "woken": true,
+     "handled_by": "voice",
+     "resolved_at": "2026-09-18T21:45:12+00:00",
+     "executed_at": "2026-09-18T21:43:38+00:00",
+     "execution_arn": "arn:aws:states:us-east-1:************:execution:beacon-remediate-beacon:5b2f...c0a1",
+     "trigger_type": "alarm",
+     "alarm_reason": "Threshold Crossed: 1 datapoint [4.0] was greater than or equal to the threshold (3.0).",
+     "rca_json": {
+      "status": "High",
+      "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+      "affected_components": [
+       "beacon-demo-webapp",
+       "beacon-demo-db",
+       "payments-service",
+       "orders-service"
+      ],
+      "evidence": [
+       "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+       "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+       "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+      ],
+      "next_steps": [
+       "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+       "Confirm the error rate returns to zero after the rule is back",
+       "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+      ],
+      "change_correlation": "RevokeSecurityGroupIngress on sg-0f3a9c21e7b4d5a10 by user/prashant at 21:40:38, 25 seconds before the first error.",
+      "spoken_summary": "Your demo web service in U S east 1 can no longer reach its database. The security group rule that lets the E C S tasks talk to R D S on port 5432 was removed about twenty-five seconds before the errors began. Restoring that rule should bring the service back.",
+      "beacon_json": {
+       "fingerprint": "rds-sg-ingress-revoked",
+       "suggested_action": "sg.restore_ingress",
+       "action_params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "confidence": 0.92,
+       "correlated_change": "RevokeSecurityGroupIngress by user/prashant at 21:40:38",
+       "action_source": "diagnostics"
+      }
+     },
+     "diagnostics": {
+      "missing_rules": [
+       {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3",
+        "cidr": null
+       }
+      ],
+      "suggested_action": "sg.restore_ingress",
+      "action_params": {
+       "group_id": "sg-0f3a9c21e7b4d5a10",
+       "ip_protocol": "tcp",
+       "from_port": 5432,
+       "to_port": 5432,
+       "source_group_id": "sg-08b1e77c04d92f6e3"
+      },
+      "text": "Security group drift vs golden snapshot: 1 of 1 golden rule MISSING.\n- MISSING ingress rule: tcp 5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10"
+     },
+     "changes": [
+      {
+       "event_name": "RevokeSecurityGroupIngress",
+       "event_source": "ec2.amazonaws.com",
+       "event_time": "2026-09-18T21:40:38+00:00",
+       "actor": "user/prashant",
+       "actor_short": "user/prashant",
+       "by_beacon": false,
+       "user_agent": "aws-cli/2.17.32",
+       "source_ip": "49.37.xx.xx",
+       "resource_ids": [
+        "sg-0f3a9c21e7b4d5a10"
+       ],
+       "source": "ledger"
+      }
+     ],
+     "timeline": [
+      {
+       "t": "2026-09-18T21:42:11+00:00",
+       "event": "alarm_received",
+       "detail": {
+        "trigger_type": "alarm",
+        "alarm_name": "beacon-demo-infra-errors"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:13+00:00",
+       "event": "logs_fetched",
+       "detail": {
+        "groups": 1,
+        "lines": 612
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:20+00:00",
+       "event": "reduced",
+       "detail": {
+        "log_group": "/ecs/beacon-demo",
+        "percentile": 0.38,
+        "model": "bedrock/amazon.nova-2-multimodal-embeddings-v1:0"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "diagnostics_ran",
+       "detail": {
+        "missing_rules": 1,
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:21+00:00",
+       "event": "changes_checked",
+       "detail": {
+        "count": 1,
+        "top": "RevokeSecurityGroupIngress",
+        "source": "ledger"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:28+00:00",
+       "event": "rca_ready",
+       "detail": {
+        "status": "High",
+        "model": "us.amazon.nova-2-lite-v1:0",
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T21:42:29+00:00",
+       "event": "sns_sent"
+      },
+      {
+       "t": "2026-09-18T21:43:12+00:00",
+       "event": "fix_proposed",
+       "detail": {
+        "fix_id": 1,
+        "action": "sg.restore_ingress",
+        "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+        "dry_run": {
+         "ok": true,
+         "code": "DryRunOperation",
+         "detail": "Request would have succeeded, but DryRun flag is set.",
+         "role": "role/beacon-remediator-beacon"
+        }
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:35+00:00",
+       "event": "approved",
+       "detail": {
+        "fix_id": 1,
+        "channel": "transcribe",
+        "transcript_quote": "okay approve fix one",
+        "approval_id": "e2b7...9f1c"
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:37+00:00",
+       "event": "executing",
+       "detail": {
+        "action": "sg.restore_ingress",
+        "params": {
+         "group_id": "sg-0f3a9c21e7b4d5a10",
+         "ip_protocol": "tcp",
+         "from_port": 5432,
+         "to_port": 5432,
+         "source_group_id": "sg-08b1e77c04d92f6e3"
+        }
+       }
+      },
+      {
+       "t": "2026-09-18T21:43:38+00:00",
+       "event": "executed",
+       "detail": {
+        "code": "Authorized",
+        "detail": "rule added",
+        "executed_at": "2026-09-18T21:43:38+00:00"
+       }
+      },
+      {
+       "t": "2026-09-18T21:44:09+00:00",
+       "event": "verify_attempt",
+       "detail": {
+        "attempt": 1,
+        "ok": false,
+        "checks": [
+         {
+          "name": "alarm_ok_after_fix",
+          "ok": false,
+          "detail": "alarm state is ALARM"
+         },
+         {
+          "name": "metric_zero",
+          "ok": false,
+          "detail": "BeaconDemoInfra/ErrorCount latest value is 2 at 21:43:00"
+         },
+         {
+          "name": "postcondition",
+          "ok": true,
+          "detail": "post-condition holds"
+         }
+        ]
+       }
+      },
+      {
+       "t": "2026-09-18T21:44:40+00:00",
+       "event": "verify_attempt",
+       "detail": {
+        "attempt": 2,
+        "ok": false,
+        "checks": [
+         {
+          "name": "alarm_ok_after_fix",
+          "ok": false,
+          "detail": "alarm state is ALARM"
+         },
+         {
+          "name": "metric_zero",
+          "ok": true,
+          "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+         },
+         {
+          "name": "postcondition",
+          "ok": true,
+          "detail": "post-condition holds"
+         }
+        ]
+       }
+      },
+      {
+       "t": "2026-09-18T21:45:11+00:00",
+       "event": "verify_attempt",
+       "detail": {
+        "attempt": 3,
+        "ok": true,
+        "checks": [
+         {
+          "name": "alarm_ok_after_fix",
+          "ok": true,
+          "detail": "alarm OK since 2026-09-18T21:45:02+00:00 (fix at 2026-09-18T21:43:38+00:00)"
+         },
+         {
+          "name": "metric_zero",
+          "ok": true,
+          "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+         },
+         {
+          "name": "postcondition",
+          "ok": true,
+          "detail": "post-condition holds"
+         }
+        ]
+       }
+      },
+      {
+       "t": "2026-09-18T21:45:12+00:00",
+       "event": "resolved",
+       "detail": {
+        "handled_by": "voice",
+        "attempts": 3
+       }
+      },
+      {
+       "t": "2026-09-18T21:46:07+00:00",
+       "event": "contract_granted",
+       "detail": {
+        "contract_id": "c3f1a2b4-9d8e-4a6c-b5f0-1e2d3c4b5a69",
+        "days": 7,
+        "max_uses": 3,
+        "transcript_quote": "grant contract for seven days"
+       }
+      }
+     ],
+     "proposals": [
+      {
+       "fix_id": 1,
+       "action": "sg.restore_ingress",
+       "params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "blast_radius": "1 ingress rule on 1 security group: allow tcp/5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10. Nothing else changes.",
+       "dry_run": {
+        "ok": true,
+        "code": "DryRunOperation",
+        "detail": "Request would have succeeded, but DryRun flag is set.",
+        "role": "role/beacon-remediator-beacon"
+       },
+       "expires_at": "2026-09-18T21:48:12+00:00"
+      }
+     ],
+     "contract_id": "c3f1a2b4-9d8e-4a6c-b5f0-1e2d3c4b5a69",
+     "turn_count": 6
+    },
+    "turn": 1
+   }
+  ],
+  "a94d2c7b-1e5f-4c33-8d0a-6b7e9f1c2d44": [
+   {
+    "reply_text": "This one was handled while you slept. The same alarm fired at 22:07, the same rule was missing, and the Sleep Contract covered it: I restored the rule, waited for CloudWatch, and verified recovery in eighty-three seconds. Two uses remain on the contract. You were not woken.",
+    "spoken_text": "This one was handled while you slept. The same alarm fired at 22:07, the same rule was missing, and the Sleep Contract covered it: I restored the rule, waited for CloudWatch, and verified recovery in eighty-three seconds. Two uses remain on the contract. You were not woken.",
+    "cited": [
+     "E1"
+    ],
+    "audio_b64": null,
+    "speech_marks": [],
+    "voice": null,
+    "tts_error": "replay: browser voice",
+    "tool_events": [
+     {
+      "name": "get_incident_brief",
+      "args": {},
+      "summary": "briefed on beacon-demo-infra-errors",
+      "evidence_id": "E1"
+     },
+     {
+      "name": "check_recovery",
+      "args": {},
+      "summary": "status resolved"
+     }
+    ],
+    "evidence": [
+     {
+      "id": "E1",
+      "kind": "rca",
+      "title": "RCA (High)",
+      "payload": {
+       "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+       "evidence": [
+        "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+        "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+        "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+       ],
+       "next_steps": [
+        "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+        "Confirm the error rate returns to zero after the rule is back",
+        "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+       ]
+      }
+     }
+    ],
+    "incident": {
+     "incident_id": "a94d2c7b-1e5f-4c33-8d0a-6b7e9f1c2d44",
+     "alarm_name": "beacon-demo-infra-errors",
+     "status": "resolved",
+     "timestamp": "2026-09-18T22:07:11+00:00",
+     "woken": false,
+     "handled_by": "contract",
+     "resolved_at": "2026-09-18T22:08:34+00:00",
+     "executed_at": "2026-09-18T22:07:31+00:00",
+     "execution_arn": "arn:aws:states:us-east-1:************:execution:beacon-remediate-beacon:9e4a...77d3",
+     "trigger_type": "alarm",
+     "alarm_reason": "Threshold Crossed: 1 datapoint [4.0] was greater than or equal to the threshold (3.0).",
+     "rca_json": {
+      "status": "High",
+      "summary": "The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.",
+      "affected_components": [
+       "beacon-demo-webapp",
+       "beacon-demo-db",
+       "payments-service",
+       "orders-service"
+      ],
+      "evidence": [
+       "2026-09-18T21:41:03 ERROR POST /api/v2/payments 503 5004ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED",
+       "2026-09-18T21:41:11 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db.c9x2.us-east-1.rds.amazonaws.com:5432 consecutive_failures=6",
+       "2026-09-18T21:41:11 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable"
+      ],
+      "next_steps": [
+       "Restore the tcp/5432 ingress rule from the ECS task security group on the RDS security group",
+       "Confirm the error rate returns to zero after the rule is back",
+       "Review whether RevokeSecurityGroupIngress at 21:40:38 was intended"
+      ],
+      "change_correlation": "RevokeSecurityGroupIngress on sg-0f3a9c21e7b4d5a10 by user/prashant at 21:40:38, 25 seconds before the first error.",
+      "spoken_summary": "Your demo web service in U S east 1 can no longer reach its database. The security group rule that lets the E C S tasks talk to R D S on port 5432 was removed about twenty-five seconds before the errors began. Restoring that rule should bring the service back.",
+      "beacon_json": {
+       "fingerprint": "rds-sg-ingress-revoked",
+       "suggested_action": "sg.restore_ingress",
+       "action_params": {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3"
+       },
+       "confidence": 0.92,
+       "correlated_change": "RevokeSecurityGroupIngress by user/prashant at 21:40:38",
+       "action_source": "diagnostics"
+      }
+     },
+     "diagnostics": {
+      "missing_rules": [
+       {
+        "group_id": "sg-0f3a9c21e7b4d5a10",
+        "ip_protocol": "tcp",
+        "from_port": 5432,
+        "to_port": 5432,
+        "source_group_id": "sg-08b1e77c04d92f6e3",
+        "cidr": null
+       }
+      ],
+      "suggested_action": "sg.restore_ingress",
+      "action_params": {
+       "group_id": "sg-0f3a9c21e7b4d5a10",
+       "ip_protocol": "tcp",
+       "from_port": 5432,
+       "to_port": 5432,
+       "source_group_id": "sg-08b1e77c04d92f6e3"
+      },
+      "text": "Security group drift vs golden snapshot: 1 of 1 golden rule MISSING.\n- MISSING ingress rule: tcp 5432-5432 from sg-08b1e77c04d92f6e3 into sg-0f3a9c21e7b4d5a10"
+     },
+     "changes": [
+      {
+       "event_name": "RevokeSecurityGroupIngress",
+       "event_source": "ec2.amazonaws.com",
+       "event_time": "2026-09-18T22:06:52+00:00",
+       "actor": "user/prashant",
+       "actor_short": "user/prashant",
+       "by_beacon": false,
+       "user_agent": "aws-cli/2.17.32",
+       "source_ip": "49.37.xx.xx",
+       "resource_ids": [
+        "sg-0f3a9c21e7b4d5a10"
+       ],
+       "source": "ledger"
+      },
+      {
+       "event_name": "AuthorizeSecurityGroupIngress",
+       "event_source": "ec2.amazonaws.com",
+       "event_time": "2026-09-18T21:43:38+00:00",
+       "actor": "beacon remediation",
+       "actor_short": "beacon remediation",
+       "by_beacon": true,
+       "user_agent": "Boto3/1.42 (beacon-remediate)",
+       "source_ip": "49.37.xx.xx",
+       "resource_ids": [
+        "sg-0f3a9c21e7b4d5a10"
+       ],
+       "source": "ledger"
+      }
+     ],
+     "timeline": [
+      {
+       "t": "2026-09-18T22:07:11+00:00",
+       "event": "alarm_received",
+       "detail": {
+        "trigger_type": "alarm",
+        "alarm_name": "beacon-demo-infra-errors"
+       }
+      },
+      {
+       "t": "2026-09-18T22:07:13+00:00",
+       "event": "logs_fetched",
+       "detail": {
+        "groups": 1,
+        "lines": 588
+       }
+      },
+      {
+       "t": "2026-09-18T22:07:19+00:00",
+       "event": "reduced",
+       "detail": {
+        "log_group": "/ecs/beacon-demo",
+        "percentile": 0.41,
+        "model": "bedrock/amazon.nova-2-multimodal-embeddings-v1:0"
+       }
+      },
+      {
+       "t": "2026-09-18T22:07:20+00:00",
+       "event": "diagnostics_ran",
+       "detail": {
+        "missing_rules": 1,
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T22:07:20+00:00",
+       "event": "changes_checked",
+       "detail": {
+        "count": 2,
+        "top": "RevokeSecurityGroupIngress",
+        "source": "ledger"
+       }
+      },
+      {
+       "t": "2026-09-18T22:07:27+00:00",
+       "event": "rca_ready",
+       "detail": {
+        "status": "High",
+        "model": "us.amazon.nova-2-lite-v1:0",
+        "suggested_action": "sg.restore_ingress"
+       }
+      },
+      {
+       "t": "2026-09-18T22:07:27+00:00",
+       "event": "contract_matched",
+       "detail": {
+        "contract_id": "c3f1a2b4-9d8e-4a6c-b5f0-1e2d3c4b5a69",
+        "uses_left": 2
+       }
+      },
+      {
+       "t": "2026-09-18T22:07:28+00:00",
+       "event": "remediation_started",
+       "detail": {
+        "source": "contract"
+       }
+      },
+      {
+       "t": "2026-09-18T22:07:30+00:00",
+       "event": "executing",
+       "detail": {
+        "action": "sg.restore_ingress",
+        "params": {
+         "group_id": "sg-0f3a9c21e7b4d5a10",
+         "ip_protocol": "tcp",
+         "from_port": 5432,
+         "to_port": 5432,
+         "source_group_id": "sg-08b1e77c04d92f6e3"
+        }
+       }
+      },
+      {
+       "t": "2026-09-18T22:07:31+00:00",
+       "event": "executed",
+       "detail": {
+        "code": "Authorized",
+        "detail": "rule added",
+        "executed_at": "2026-09-18T22:07:31+00:00"
+       }
+      },
+      {
+       "t": "2026-09-18T22:08:02+00:00",
+       "event": "verify_attempt",
+       "detail": {
+        "attempt": 1,
+        "ok": false,
+        "checks": [
+         {
+          "name": "alarm_ok_after_fix",
+          "ok": false,
+          "detail": "alarm state is ALARM"
+         },
+         {
+          "name": "metric_zero",
+          "ok": true,
+          "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+         },
+         {
+          "name": "postcondition",
+          "ok": true,
+          "detail": "post-condition holds"
+         }
+        ]
+       }
+      },
+      {
+       "t": "2026-09-18T22:08:33+00:00",
+       "event": "verify_attempt",
+       "detail": {
+        "attempt": 2,
+        "ok": true,
+        "checks": [
+         {
+          "name": "alarm_ok_after_fix",
+          "ok": true,
+          "detail": "alarm OK since 2026-09-18T22:08:26+00:00 (fix at 2026-09-18T22:07:31+00:00)"
+         },
+         {
+          "name": "metric_zero",
+          "ok": true,
+          "detail": "BeaconDemoInfra/ErrorCount: no datapoints in the last 5 min (no errors)"
+         },
+         {
+          "name": "postcondition",
+          "ok": true,
+          "detail": "post-condition holds"
+         }
+        ]
+       }
+      },
+      {
+       "t": "2026-09-18T22:08:34+00:00",
+       "event": "resolved",
+       "detail": {
+        "handled_by": "contract",
+        "attempts": 2
+       }
+      }
+     ],
+     "proposals": [],
+     "turn_count": 0,
+     "contract_readback_pending": null
+    },
+    "turn": 1
+   }
+  ]
+ },
+ "contracts": [
+  {
+   "contract_id": "c3f1a2b4-9d8e-4a6c-b5f0-1e2d3c4b5a69",
+   "alarm_name": "beacon-demo-infra-errors",
+   "action": "sg.restore_ingress",
+   "scope": {
+    "group_id": "sg-0f3a9c21e7b4d5a10",
+    "ip_protocol": "tcp",
+    "from_port": 5432,
+    "to_port": 5432,
+    "source_group_id": "sg-08b1e77c04d92f6e3"
+   },
+   "uses": 1,
+   "max_uses": 3,
+   "granted_at": "2026-09-18T21:46:07+00:00",
+   "expires_at": "2026-09-25T21:46:07+00:00",
+   "transcript_quote": "grant contract for seven days",
+   "granted_by": "transcribe",
+   "incident_id": "7c1e9d2a-4f0b-4b8e-9a51-2d3f6e8c0a11"
+  }
+ ],
+ "tally": {
+  "incidents_handled": 2,
+  "resolved": 2,
+  "escalated": 0,
+  "humans_woken": 1,
+  "handled_by_contract": 1,
+  "median_minutes_to_recovery": 2.2
+ },
+ "safety": {
+  "allowlist": [
+   {
+    "id": "sg.restore_ingress",
+    "description": "Restore one security-group ingress rule that exists in the golden snapshot",
+    "params": {
+     "group_id": "str",
+     "ip_protocol": "str",
+     "from_port": "int",
+     "to_port": "int",
+     "source_group_id": "str"
+    },
+    "iam_actions": [
+     "ec2:AuthorizeSecurityGroupIngress"
+    ]
+   },
+   {
+    "id": "ecs.force_redeploy",
+    "description": "Force a new deployment of one ECS service (same task definition)",
+    "params": {
+     "cluster": "str",
+     "service": "str"
+    },
+    "iam_actions": [
+     "ecs:UpdateService"
+    ]
+   }
+  ],
+  "apply_enabled": {
+   "triage": true,
+   "voice": true,
+   "remediate": true
+  },
+  "rules": [
+   "Only allowlisted actions can run; params must match the schema exactly.",
+   "Security-group restores must exist in the golden snapshot taken on a healthy stack.",
+   "Every action is dry-run under the write-only remediator role before execution.",
+   "Approval is checked against the engineer's raw transcript, never the model's claim.",
+   "One approval executes exactly once (Powertools idempotency on approval_id).",
+   "Verification needs alarm OK after the fix, error metric zero, and the post-condition.",
+   "Sleep Contracts are scoped to alarm + action + exact resources, expire, and count uses.",
+   "APPLY_ENABLED=false stops every write path: triage contract branch, voice approvals, Execute."
+  ]
+ }
+}
