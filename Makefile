@@ -3,7 +3,8 @@
        test lint check-image-tags smoke-strands deploy-remediation teardown-remediation \
        snapshot-sg tag-remediable dry-run changes incidents lint-templates \
        deploy-console teardown-console web-build set-passcode console-config \
-       check-reduction capture-run
+       check-reduction capture-run propose approve replay-approval demo-alarm demo-reset \
+       demo-sleep demo-rehearse apply-on apply-off warm latest-incident
 
 # Deploy variables persisted by earlier runs (IMAGE_URI, EMAIL, ...). Gitignored.
 -include .beacon.env
@@ -480,6 +481,102 @@ teardown-console:
 	[ -n "$$BUCKET" ] && aws s3 rm "s3://$$BUCKET" --recursive --region $(REGION) || true
 	aws cloudformation delete-stack --stack-name $(CONSOLE_STACK) --region $(REGION)
 	@echo "Console stack deletion initiated (CloudFront disable + delete takes ~10 min)."
+
+# ---------- Operator loop (Saturday morning proof, no UI needed) ----------
+
+INCIDENT ?=
+FIX      ?= 1
+PHRASE   ?= approve fix $(FIX)
+APPROVAL ?=
+
+# Newest incident id.
+latest-incident:
+	@PYTHON=$(PYTHON) bash scripts/latest_incident.sh $(STACK_NAME) $(REGION)
+
+# Ask Beacon to propose the fix for INCIDENT (defaults to the newest). Dry-run runs under the remediator role.
+propose:
+	@INC=$${INCIDENT:-$$(PYTHON=$(PYTHON) bash scripts/latest_incident.sh $(STACK_NAME) $(REGION))} && [ -n "$$INC" ] || { echo "no incident"; exit 1; }; \
+	echo "==> propose_fix on $$INC" && \
+	PYTHON=$(PYTHON) bash scripts/voice_tool.sh $(STACK_NAME) $(REGION) "$$INC" propose_fix '{}' "can you fix it" "$(PASSCODE)"
+
+# Approve fix FIX on INCIDENT by "saying" PHRASE (the server checks the transcript).
+approve:
+	@INC=$${INCIDENT:-$$(PYTHON=$(PYTHON) bash scripts/latest_incident.sh $(STACK_NAME) $(REGION))} && [ -n "$$INC" ] || { echo "no incident"; exit 1; }; \
+	echo "==> approve_fix $(FIX) on $$INC with transcript: '$(PHRASE)'" && \
+	PYTHON=$(PYTHON) bash scripts/voice_tool.sh $(STACK_NAME) $(REGION) "$$INC" approve_fix '{"fix_id": $(FIX), "confirmation_phrase": "$(PHRASE)"}' "$(PHRASE)" "$(PASSCODE)"
+
+# Re-run the Execute step for an approval: proves idempotency (returns the cached result, no second write).
+replay-approval:
+	$(call check_param,APPROVAL)
+	@INC=$${INCIDENT:-$$(PYTHON=$(PYTHON) bash scripts/latest_incident.sh $(STACK_NAME) $(REGION))} && \
+	PARAMS=$$(REGION=$(REGION) bash scripts/demo_params.sh) && \
+	PAYLOAD="{\"step\":\"execute\",\"approval_id\":\"$(APPROVAL)\",\"incident_id\":\"$$INC\",\"action\":\"sg.restore_ingress\",\"params\":$$PARAMS}" && \
+	aws lambda invoke --function-name beacon-remediate-$(STACK_NAME) --region $(REGION) \
+		--cli-binary-format raw-in-base64-out --payload "$$PAYLOAD" /dev/stdout | head -1 | $(PYTHON) -m json.tool && \
+	echo "(idempotent_replay: true means the stored result was returned and nothing was re-executed)"
+
+# Force the alarm into ALARM without waiting for metric evaluation (retakes only; the recorded take uses the real alarm).
+demo-alarm:
+	@ALARM=$$(aws cloudformation describe-stacks --stack-name $(DEMO_INFRA_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`DemoAlarmName`].OutputValue' --output text) && \
+	aws cloudwatch set-alarm-state --alarm-name "$$ALARM" --state-value ALARM --state-reason "beacon demo" --region $(REGION) && \
+	echo "Alarm $$ALARM forced to ALARM. Beacon triage starts now."
+
+# Back to a healthy, quiet baseline between takes: fix the SG, set the alarm OK, wait for 200s in the app log.
+demo-reset:
+	@REGION=$(REGION) bash demo/trigger.sh fix
+	@ALARM=$$(aws cloudformation describe-stacks --stack-name $(DEMO_INFRA_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`DemoAlarmName`].OutputValue' --output text) && \
+	aws cloudwatch set-alarm-state --alarm-name "$$ALARM" --state-value OK --state-reason "beacon demo reset" --region $(REGION) && \
+	echo "==> waiting for healthy 200 lines from the demo app (up to 2 min)..." && \
+	for i in $$(seq 1 12); do \
+		if aws logs tail /ecs/beacon-demo --since 20s --region $(REGION) --format short 2>/dev/null | grep -q " 200 "; then echo "Demo app healthy. Ready for the next take."; exit 0; fi; \
+		sleep 10; \
+	done; echo "WARNING: no 200 lines seen yet; check aws logs tail /ecs/beacon-demo"
+
+# The second incident: a REAL re-break. With a Sleep Contract in place Beacon fixes it without paging.
+demo-sleep:
+	@REGION=$(REGION) bash demo/trigger.sh break
+	@echo "==> Broken again. Waiting for the real alarm (2-3 min). Watch: make incidents / the Night Board."
+	@echo "    (retake shortcut after ~50 s of errors: make demo-alarm)"
+
+# Full unattended rehearsal of cycle 1 through the CLI: break -> alarm -> incident -> propose -> approve -> resolved.
+demo-rehearse:
+	@echo "==> [1/5] reset" && $(MAKE) demo-reset REGION=$(REGION)
+	@echo "==> [2/5] break" && REGION=$(REGION) bash demo/trigger.sh break
+	@echo "==> [3/5] waiting for a new incident (real alarm, up to 6 min)..." && \
+	BEFORE=$$(PYTHON=$(PYTHON) bash scripts/latest_incident.sh $(STACK_NAME) $(REGION)) && \
+	for i in $$(seq 1 36); do NOW=$$(PYTHON=$(PYTHON) bash scripts/latest_incident.sh $(STACK_NAME) $(REGION)); if [ -n "$$NOW" ] && [ "$$NOW" != "$$BEFORE" ]; then echo "    incident $$NOW"; break; fi; sleep 10; done && \
+	INC=$$(PYTHON=$(PYTHON) bash scripts/latest_incident.sh $(STACK_NAME) $(REGION)) && \
+	echo "==> [4/5] propose + approve" && \
+	PYTHON=$(PYTHON) bash scripts/voice_tool.sh $(STACK_NAME) $(REGION) "$$INC" propose_fix '{}' "can you fix it" "$(PASSCODE)" && \
+	PYTHON=$(PYTHON) bash scripts/voice_tool.sh $(STACK_NAME) $(REGION) "$$INC" approve_fix '{"fix_id": 1, "confirmation_phrase": "approve fix 1"}' "approve fix 1" "$(PASSCODE)" && \
+	echo "==> [5/5] waiting for resolved (up to 5 min)..." && \
+	for i in $$(seq 1 30); do \
+		ST=$$(aws dynamodb get-item --table-name beacon-incidents-$(STACK_NAME) --region $(REGION) --key "{\"incident_id\":{\"S\":\"$$INC\"}}" --query 'Item.status.S' --output text); \
+		echo "    status=$$ST"; if [ "$$ST" = "resolved" ]; then echo "REHEARSAL PASSED"; exit 0; fi; if [ "$$ST" = "escalated" ]; then echo "REHEARSAL FAILED: escalated"; exit 1; fi; sleep 10; \
+	done; echo "REHEARSAL TIMED OUT"; exit 1
+
+# Kill switch across all three write paths (merges env so nothing else is lost) and remember it for the next deploy.
+apply-off:
+	@for FN in beacon-$(STACK_NAME) beacon-voice-turn-$(STACK_NAME) beacon-remediate-$(STACK_NAME); do \
+		$(PYTHON) scripts/set_env.py $$FN APPLY_ENABLED false --region $(REGION); \
+	done
+	$(call save_env,APPLY_ENABLED,false)
+	@echo "APPLY_ENABLED=false on triage, voice and remediate. No write path can execute."
+
+apply-on:
+	@for FN in beacon-$(STACK_NAME) beacon-voice-turn-$(STACK_NAME) beacon-remediate-$(STACK_NAME); do \
+		$(PYTHON) scripts/set_env.py $$FN APPLY_ENABLED true --region $(REGION); \
+	done
+	$(call save_env,APPLY_ENABLED,true)
+	@echo "APPLY_ENABLED=true on triage, voice and remediate."
+
+# Warm the voice and remediate Lambdas before recording.
+warm:
+	@for FN in beacon-voice-turn-$(STACK_NAME) beacon-remediate-$(STACK_NAME) beacon-dashboard-$(STACK_NAME); do \
+		aws lambda invoke --function-name $$FN --region $(REGION) --cli-binary-format raw-in-base64-out --payload '{"mode":"warm"}' /dev/null > /dev/null && echo "warm: $$FN"; \
+	done
 
 # ---------- Development ----------
 
