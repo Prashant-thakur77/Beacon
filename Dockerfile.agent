@@ -1,0 +1,19 @@
+# Slim image for the voice, remediation, change-ledger and dashboard Lambdas.
+# No torch / cordon: cold starts stay in the low seconds. The triage Lambda
+# keeps using ./Dockerfile. Each function overrides the handler via
+# ImageConfig.Command in CloudFormation.
+FROM public.ecr.aws/lambda/python:3.12
+
+RUN pip install --no-cache-dir \
+    boto3 \
+    strands-agents \
+    "aws-lambda-powertools[tracer]" \
+    pydantic \
+    litellm \
+    pyyaml
+
+ENV LITELLM_LOCAL_MODEL_COST_MAP=True
+
+COPY src/beacon/ ${LAMBDA_TASK_ROOT}/beacon/
+
+CMD ["beacon.voice_turn.handler"]
