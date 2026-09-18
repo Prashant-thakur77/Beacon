@@ -151,9 +151,48 @@ curl -s "$(aws cloudformation describe-stacks --stack-name beacon-console --regi
 
 Before sleeping: `make fix-demo`, confirm the alarm is back to OK, and answer `docs/QUESTIONS.md`.
 
-## §3 — Saturday 08:00-10:30 (updates only; all stacks exist)
+## §3 — Saturday 08:00-10:30: prove the loop from the CLI (no UI needed)
 
-Written by the agent overnight. Priority order and the 09:45 stop rule are in `docs/PLAN.md` §6 row H4.
+Strict priority order. **At 09:45 stop wherever you are, paste the state into chat, pack.** All stacks exist since Friday, so every step is an update.
+
+```bash
+# 08:00  images at the current SHA (code layers only, ~5 min each; run in two terminals)
+make setup-image REGION=us-east-1
+make setup-agent-image REGION=us-east-1
+
+# 08:10  stack updates (order matters: remediation first, then base, then console)
+make deploy-remediation REGION=us-east-1
+make deploy INCIDENTS_ENABLED=true REGION=us-east-1
+make deploy-console REGION=us-east-1            # PASSCODE comes from .beacon.env (make set-passcode PASSCODE=... if not yet)
+
+# 08:25  safety preconditions
+make snapshot-sg REGION=us-east-1               # idempotent; stack must be healthy (make fix-demo first if not)
+make dry-run REGION=us-east-1                   # must print DRY RUN PASSED
+make warm REGION=us-east-1
+
+# 08:30  THE LOOP, cycle 1 (voice-approved, but via CLI)
+make demo-reset REGION=us-east-1                # healthy baseline, alarm OK, 200 lines flowing
+make break-demo REGION=us-east-1                # revoke tcp/5432 (CloudTrail records it)
+watch -n 15 'make incidents REGION=us-east-1'   # a new row with status awaiting_engineer appears ~40-60 s after the REAL alarm (2-3 min)
+make propose REGION=us-east-1                   # dry_run.ok=true, role = beacon-remediator, blast_radius "1 ingress rule on 1 security group"
+make approve REGION=us-east-1 FIX=1             # transcript "approve fix 1" -> execution_arn
+#     open Step Functions console -> beacon-remediate-beacon -> the execution: DryRun -> RequireApproval -> Execute -> Wait30 -> Verify -> Resolve
+#     EC2 console -> the RDS security group -> Inbound rules: 5432 from the ECS SG is back
+#     CloudWatch -> alarm beacon-demo-infra-errors: back to OK (1-2 evaluation periods after the fix)
+make incidents REGION=us-east-1                 # status=resolved
+make replay-approval REGION=us-east-1 APPROVAL=<approval_id from the approve output>   # idempotent_replay: true, nothing re-executed
+
+# 09:15  (if time) cycle 2: a Sleep Contract via CLI, then a real re-break handled without a page
+INC=$(make -s latest-incident REGION=us-east-1)
+PYTHON=.venv/bin/python bash scripts/voice_tool.sh beacon us-east-1 "$INC" grant_sleep_contract '{"days":7,"max_uses":3}' "yes" "$(grep ^PASSCODE= .beacon.env | cut -d= -f2)"        # read-back
+PYTHON=.venv/bin/python bash scripts/voice_tool.sh beacon us-east-1 "$INC" grant_sleep_contract '{"days":7,"max_uses":3}' "grant contract for seven days" "$(grep ^PASSCODE= .beacon.env | cut -d= -f2)"   # granted: true
+make demo-sleep REGION=us-east-1                # real re-break; wait for the real alarm
+watch -n 15 'make incidents REGION=us-east-1'   # new row: status auto_remediating -> resolved, and the email subject says "(not woken)"
+```
+
+If anything fails: paste the verbatim output. Most likely culprits, in order: `UnauthorizedOperation` in `make dry-run` (IAM statement), Step Functions execution `FAILED` at `RequireApproval` (approval table name env), Verify escalating with `ErrorCount` still > 0 (the app needs ~60 s of 200s after the rule returns; a retake with `make demo-reset` fixes it).
+
+**One-line fallback if Step Functions is the problem at 09:45:** the voice Lambda can run the loop inline through the remediate Lambda (`{step: "all"}`) with no template change; tell the agent and it flips `REMEDIATION_MODE=inline`.
 
 ---
 
