@@ -1,0 +1,262 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Beacon demo — real ECS Fargate web service + RDS PostgreSQL.
+  Trigger a network partition with 'make break-demo' to produce real
+  CloudWatch errors for Beacon to analyze.
+
+Parameters:
+  DemoImageUri:
+    Type: String
+    Description: ECR URI for the demo web app image (demo/Dockerfile.demo)
+
+  DBPassword:
+    Type: String
+    Default: beaconDem0Pass
+    NoEcho: true
+    Description: Password for the demo RDS instance
+
+Resources:
+
+  # ---------- VPC ----------
+
+  DemoVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.99.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: beacon-demo-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  IGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref DemoVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DemoVPC
+      CidrBlock: 10.99.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: beacon-demo-public-a
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DemoVPC
+      CidrBlock: 10.99.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: beacon-demo-public-b
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DemoVPC
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IGWAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetARouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  SubnetBRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  # ---------- Security Groups ----------
+
+  EcsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Beacon demo ECS tasks
+      VpcId: !Ref DemoVPC
+
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Beacon demo RDS - revoke ingress to simulate network partition
+      VpcId: !Ref DemoVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref EcsSecurityGroup
+
+  # ---------- RDS ----------
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Beacon demo subnets
+      SubnetIds:
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetB
+
+  DemoDatabase:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    Properties:
+      DBInstanceIdentifier: beacon-demo-db
+      Engine: postgres
+      EngineVersion: "16.4"
+      DBInstanceClass: db.t4g.micro
+      AllocatedStorage: 20
+      StorageType: gp3
+      MasterUsername: demo
+      MasterUserPassword: !Ref DBPassword
+      DBName: demo
+      VPCSecurityGroups:
+        - !Ref RdsSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      PubliclyAccessible: false
+      MultiAZ: false
+      BackupRetentionPeriod: 0
+      DeletionProtection: false
+
+  # ---------- ECS ----------
+
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: beacon-demo
+
+  DemoLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/beacon-demo
+      RetentionInDays: 3
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: beacon-demo-webapp
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: webapp
+          Image: !Ref DemoImageUri
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8080
+          Environment:
+            - Name: DB_HOST
+              Value: !GetAtt DemoDatabase.Endpoint.Address
+            - Name: DB_PORT
+              Value: !GetAtt DemoDatabase.Endpoint.Port
+            - Name: DB_NAME
+              Value: demo
+            - Name: DB_USER
+              Value: demo
+            - Name: DB_PASSWORD
+              Value: !Ref DBPassword
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref DemoLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: webapp
+
+  DemoService:
+    Type: AWS::ECS::Service
+    DependsOn: DemoDatabase
+    Properties:
+      Cluster: !Ref ECSCluster
+      ServiceName: beacon-demo-webapp
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref PublicSubnetA
+            - !Ref PublicSubnetB
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+
+  # ---------- CloudWatch Alarm ----------
+
+  DemoErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref DemoLogGroup
+      FilterPattern: "ERROR"
+      MetricTransformations:
+        - MetricNamespace: BeaconDemoInfra
+          MetricName: ErrorCount
+          MetricValue: "1"
+          DefaultValue: 0
+
+  DemoErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: beacon-demo-infra-errors
+      AlarmDescription: Fires when the demo web service logs database errors
+      Namespace: BeaconDemoInfra
+      MetricName: ErrorCount
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+Outputs:
+  DemoVPCId:
+    Value: !Ref DemoVPC
+  DemoLogGroupName:
+    Value: !Ref DemoLogGroup
+  DemoDatabaseEndpoint:
+    Value: !GetAtt DemoDatabase.Endpoint.Address
+  DemoEcsCluster:
+    Value: !Ref ECSCluster
+  DemoServiceName:
+    Value: !GetAtt DemoService.Name
+  RdsSecurityGroupId:
+    Description: Revoke/restore ingress on this SG to trigger/fix the incident
+    Value: !Ref RdsSecurityGroup
+  EcsSecurityGroupId:
+    Value: !Ref EcsSecurityGroup
+  DemoAlarmName:
+    Value: !Ref DemoErrorAlarm

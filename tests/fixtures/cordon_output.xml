@@ -1,0 +1,20 @@
+<cordon_output>
+
+<anomalous_block lines="27-33" score="0.2834">
+    2026-02-26T10:00:13+00:00 WARN Connection latency spike: host=db-primary.internal latency_ms=1245
+    2026-02-26T10:00:13+00:00 ERROR Connection refused to db-primary.internal:5432 attempt=1
+    2026-02-26T10:00:14+00:00 ERROR Connection refused to db-primary.internal:5432 attempt=2
+    2026-02-26T10:00:14+00:00 ERROR Connection refused to db-primary.internal:5432 attempt=3
+    2026-02-26T10:00:15+00:00 WARN Failover initiated: switching from db-primary to db-replica.internal:5432
+    2026-02-26T10:00:15+00:00 INFO Connection pool re-established on db-replica.internal
+    2026-02-26T10:00:16+00:00 WARN Running in read-only mode: writes will fail until primary recovers
+</anomalous_block>
+
+<anomalous_block lines="50-53" score="0.1912">
+    2026-02-26T10:00:23+00:00 ERROR Write operation failed: ReadOnlyError on db-replica.internal
+    2026-02-26T10:00:24+00:00 ERROR Write operation failed: ReadOnlyError on db-replica.internal
+    2026-02-26T10:00:24+00:00 ERROR Transaction rollback: order_id=ORD-98765 reason=ReadOnlyError
+    2026-02-26T10:00:25+00:00 INFO Processing batch 38: status=partial records=512 duration_ms=456
+</anomalous_block>
+
+</cordon_output>

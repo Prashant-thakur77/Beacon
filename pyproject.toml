@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "beacon"
+version = "0.1.0"
+description = "AI-powered log triage for AWS using Cordon and Amazon Nova"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = [
+    "boto3",
+    "cordon",
+    "genji",
+    "litellm",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "moto[logs,sns,dynamodb,cloudwatch]",
+    "pytest-mock",
+    "mypy",
+    "boto3-stubs[logs,sns,bedrock-runtime,dynamodb,connect,cloudwatch]",
+    "types-tqdm",
+    "ruff>=0.15",
+    "pre-commit",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.mypy]
+strict = true
+packages = ["beacon"]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["cordon.*", "genji", "genji.*", "litellm", "litellm.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["mypy_boto3_dynamodb", "mypy_boto3_dynamodb.*", "mypy_boto3_connect", "mypy_boto3_connect.*"]
+ignore_missing_imports = true
+
+[tool.ruff]
+target-version = "py312"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "TCH"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["TCH"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
