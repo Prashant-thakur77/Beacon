@@ -265,3 +265,19 @@ def test_contract_match_with_apply_disabled_pages_instead(
     assert any(
         e["event"] == "contract_matched_apply_disabled" for e in incident["timeline"]
     )
+
+
+@patch("litellm.completion")
+def test_triage_records_token_usage_on_the_incident(
+    mock_completion: MagicMock, env: Any
+) -> None:
+    env["mock_resp"].usage = MagicMock(prompt_tokens=15000, completion_tokens=900)
+    result = _run(env, mock_completion)
+    from boto3.dynamodb.types import TypeDeserializer
+
+    d = TypeDeserializer()
+    item = env["ddb"].get_item(
+        TableName=INCIDENTS, Key={"incident_id": {"S": result["incident_id"]}}
+    )["Item"]
+    usage = {k: d.deserialize(v) for k, v in item.items()}["usage"]
+    assert usage["input_tokens"] == 15000 and usage["output_tokens"] == 900

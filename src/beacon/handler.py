@@ -16,7 +16,7 @@ from beacon.config import BeaconConfig
 from beacon.events import TriggerInfo, TriggerType, parse_event
 from beacon.logs import fetch_logs, resolve_log_groups
 from beacon.notifier import notify
-from beacon.triage import build_trigger_context, get_system_prompt, triage
+from beacon.triage import build_trigger_context, get_system_prompt, last_usage, triage
 
 logger = logging.getLogger(__name__)
 
@@ -264,6 +264,7 @@ def _store_and_investigate(
             diagnostics=diagnostics,
             changes=change_rows,
         )
+        _store_usage(incident_id, config)
         with ThreadPoolExecutor(max_workers=2) as pool:
             futures: list[Future[Any]] = [
                 pool.submit(prefetch.run, incident_id, analysis, trigger, config)
@@ -278,6 +279,20 @@ def _store_and_investigate(
     except Exception:
         logger.exception("Incident pipeline failed, SNS notification was still sent")
         return None
+
+
+def _store_usage(incident_id: str, config: BeaconConfig) -> None:
+    """Attach the triage model's token counts (for the ₹-per-incident tally)."""
+    if not last_usage:
+        return
+    from beacon import store
+
+    try:
+        store.add_usage(
+            incident_id, dict(last_usage), table_name=config.incidents_table_name
+        )
+    except Exception:
+        logger.exception("usage write failed")
 
 
 def _alarm_time(trigger: TriggerInfo) -> datetime:
@@ -467,6 +482,7 @@ def _remediate_under_contract(
         status="auto_remediating",
         woken=False,
     )
+    _store_usage(incident_id, config)
     approval = approvals.create(
         incident_id,
         action,

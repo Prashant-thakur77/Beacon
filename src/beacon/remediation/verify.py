@@ -110,13 +110,19 @@ def verify_metric(
         Period=period,
         Statistics=[metric.get("statistic", "Sum")],
     )
-    points = sorted(resp.get("Datapoints", []), key=lambda p: p["Timestamp"])
     label = f"{metric['namespace']}/{metric['metric_name']}"
+    # Only the most recent window counts: a metric filter emits nothing when
+    # there are no matches, so an old error with silence since is recovery.
+    window_start = end - timedelta(seconds=2 * period)
+    points = sorted(
+        (p for p in resp.get("Datapoints", []) if p["Timestamp"] >= window_start),
+        key=lambda p: p["Timestamp"],
+    )
     if not points:
         return VerifyCheck(
             "metric_zero",
             True,
-            f"{label}: no datapoints in the last {lookback_minutes} min (no errors)",
+            f"{label}: no datapoints in the last {2 * period} s (no errors)",
             metric,
         )
     latest = points[-1]

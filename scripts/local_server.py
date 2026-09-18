@@ -148,6 +148,22 @@ class LocalWorld:
         self.cw.set_alarm_state(
             AlarmName=ALARM, StateValue="ALARM", StateReason="local break"
         )
+        # what the demo app's metric filter would have produced over the last minutes
+        from datetime import timedelta
+
+        now = datetime.now(tz=UTC)
+        self.cw.put_metric_data(
+            Namespace="BeaconDemoInfra",
+            MetricData=[
+                {
+                    "MetricName": "ErrorCount",
+                    "Value": float(v),
+                    "Unit": "Count",
+                    "Timestamp": now - timedelta(minutes=m),
+                }
+                for m, v in ((7, 3), (6, 5), (5, 7), (4, 6), (3, 6))
+            ],
+        )
 
     def alarm_ok(self) -> None:
         self.cw.set_alarm_state(
@@ -193,6 +209,18 @@ def _patch_remote_calls(world: LocalWorld) -> None:
 
         def verify_all_local(alarm_name: str, **kwargs: Any) -> Any:
             if actions_sg.postcondition(world.params, ec2_client=world.ec2):
+                # the app recovers: the metric filter emits zero errors, the alarm clears
+                world.cw.put_metric_data(
+                    Namespace="BeaconDemoInfra",
+                    MetricData=[
+                        {
+                            "MetricName": "ErrorCount",
+                            "Value": 0.0,
+                            "Unit": "Count",
+                            "Timestamp": datetime.now(tz=UTC),
+                        }
+                    ],
+                )
                 world.alarm_ok()
             return real_verify_alarm(alarm_name, **kwargs)
 
@@ -222,7 +250,14 @@ def _patch_remote_calls(world: LocalWorld) -> None:
     triage_handler.fetch_logs = lambda group, lookback: (
         "ERROR CRITICAL: Database unreachable. Host=beacon-demo-db:5432\n" * 8
     )  # type: ignore[assignment]
-    triage_handler.triage = lambda combined, trigger, config: TRIAGE_TEXT  # type: ignore[assignment]
+    from beacon import triage as triage_module
+
+    def scripted_triage(combined: str, trigger: Any, config: Any) -> str:
+        triage_module.last_usage.clear()
+        triage_module.last_usage.update({"input_tokens": 14200, "output_tokens": 620})
+        return TRIAGE_TEXT
+
+    triage_handler.triage = scripted_triage  # type: ignore[assignment]
     triage_handler.compute_available_tokens = lambda config, sp, tc: 100_000  # type: ignore[assignment]
     import beacon.prefetch as prefetch
 
@@ -326,7 +361,20 @@ class ScriptedAgent:
                 f"{b.get('summary', '')} Ask me what changed, or whether I can fix it."
             )
         self.messages.append({"role": "assistant", "content": [{"text": reply}]})
-        return reply
+        return _ScriptedResult(reply)
+
+
+class _ScriptedResult:
+    """Looks like a Strands AgentResult to voice_turn (text + token metrics)."""
+
+    def __init__(self, text: str) -> None:
+        self._text = text
+        self.metrics = type(
+            "M", (), {"accumulated_usage": {"inputTokens": 2100, "outputTokens": 140}}
+        )()
+
+    def __str__(self) -> str:
+        return self._text
 
 
 # ---------------------------------------------------------------------------
