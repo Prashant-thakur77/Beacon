@@ -40,6 +40,7 @@ dev = [
     "fastapi",
     "uvicorn",
     "httpx",
+    "websockets",
 ]
 
 [tool.setuptools.packages.find]
@@ -71,6 +72,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["TCH"]
 "scripts/local_server.py" = ["E501"]  # fixture RCA text and scripted replies stay verbatim
+"scripts/assemblyai_probe.py" = ["E501"]  # dev probe; prose strings stay on one line
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

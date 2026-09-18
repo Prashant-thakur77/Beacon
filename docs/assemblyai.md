@@ -32,7 +32,7 @@ Facts verified from the docs on 18 Sep (re-verify on day 1, the spike):
 - `web/src/components/TalkDuplex.tsx`: full-duplex Talk — continuous mic, interrupt button, *interrupted* marker on the cut-off reply, "heard: … (97%)" line, per-incident keyterms sent in `session.update`, tool results routed through `/tools/<name>`.
 - `console-template.yaml` `AssemblyAIKeyParam` → `ASSEMBLYAI_KEY_PARAM`; `make set-assemblyai-key ASSEMBLYAI_API_KEY=…` then `make deploy-console VOICE_BACKEND=assemblyai`.
 
-Day 1's spike is now: connect, confirm the token path, confirm event names against `assemblyai.ts`, and fix whatever differs in that one file.
+Day 1's spike is now one command: `ASSEMBLYAI_API_KEY=… .venv/bin/python scripts/assemblyai_probe.py` — it tries the three auth variants (header, minted query token, query key), sends `session.update` with an echo tool, prints one line per distinct event, and ends with the list of event names `assemblyai.ts` expects but did not see. Fix whatever differs in `assemblyai.ts` / `_mint_assemblyai_token` and move on.
 
 ## Day by day
 
