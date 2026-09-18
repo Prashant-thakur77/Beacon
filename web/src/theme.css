@@ -155,21 +155,6 @@ select.input { width: auto; padding: 4px 8px; font-size: 12.5px; color: var(--di
   display: grid; place-items: center; cursor: pointer; font-size: 20px; flex: none;
   transition: border-color 120ms, box-shadow 120ms, background 120ms; user-select: none; -webkit-user-select: none; touch-action: none;
 }
-<<<<<<< HEAD
-.mic:active, .mic.live { border-color: var(--amber); transform: scale(1.04); box-shadow: 0 0 0 8px var(--amber-soft); }
-.mic.speaking { border-color: var(--green); box-shadow: 0 0 0 8px var(--green-soft); }
-.state { font-weight: 700; }
-.state.listening { color: var(--amber); } .state.thinking { color: var(--blue); } .state.speaking { color: var(--green); } .state.error { color: var(--red); }
-.partial { font-family: var(--font-mono); font-size: 13px; color: var(--dim); min-height: 1.4em; }
-.bubbles { display: flex; flex-direction: column; gap: 10px; }
-.bubble { max-width: 100%; padding: 10px 14px; border-radius: 14px; }
-.bubble.user { align-self: flex-end; background: var(--surface-2); border: 1px solid var(--line); }
-.bubble.user .who { color: var(--faint); }
-.bubble.beacon { align-self: stretch; background: var(--surface); border: 1px solid var(--line); }
-.bubble.interrupted { border-style: dashed; }
-.bubble .who { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: var(--amber); margin-bottom: 4px; }
-.sentence { transition: background 150ms; border-radius: 4px; }
-=======
 .mic:hover { background: var(--raised); }
 .mic:active, .mic.live { border-color: var(--amber); box-shadow: 0 0 0 6px var(--amber-soft); }
 .mic.speaking { border-color: var(--green); box-shadow: 0 0 0 6px var(--green-soft); }
@@ -184,7 +169,6 @@ select.input { width: auto; padding: 4px 8px; font-size: 12.5px; color: var(--di
 .bubble.user > div:not(.who) { color: var(--dim); }
 .bubble.interrupted > div:not(.who) { color: var(--dim); }
 .sentence { transition: background 150ms; border-radius: 3px; }
->>>>>>> main
 .sentence.hot { background: var(--amber-soft); }
 .chip {
   display: inline-flex; align-items: center; padding: 0 5px; margin-left: 4px; border-radius: 4px; font-family: var(--font-mono);
