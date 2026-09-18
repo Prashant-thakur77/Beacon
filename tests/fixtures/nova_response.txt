@@ -1,8 +1,21 @@
-SEVERITY: High
-ROOT CAUSE: The primary database (db-primary.internal:5432) became unreachable, triggering an automatic failover to a read replica. Write operations failed because the replica is read-only.
-AFFECTED COMPONENTS: db-primary.internal, db-replica.internal, order processing pipeline
-EVIDENCE: Connection refused to db-primary.internal:5432 (3 attempts), Failover initiated, Write operation failed: ReadOnlyError, Transaction rollback: order_id=ORD-98765
+STATUS: High
+SUMMARY: The demo web service lost connectivity to its PostgreSQL database; every request that touches the database is failing with connection timeouts.
+AFFECTED COMPONENTS: beacon-demo-webapp, beacon-demo-db, orders-service, payments-service
+EVIDENCE:
+- 2026-09-18T20:01:02 ERROR POST /api/v2/payments 503 5003ms - service=payments-service error='connection_timeout' db_pool=EXHAUSTED
+- 2026-09-18T20:01:09 ERROR CRITICAL: Database unreachable. Host=beacon-demo-db:5432 consecutive_failures=6
+- 2026-09-18T20:01:09 ERROR HealthCheck FAILED: /health returned 503. db_primary=unreachable
 NEXT STEPS:
-1. Check db-primary.internal health: verify the RDS/EC2 instance status, disk space, and network connectivity
-2. If primary is unrecoverable, promote the read replica to primary using RDS failover or manual promotion
-3. Review order ORD-98765 and any other transactions that were rolled back during the read-only window for reprocessing
+1. Check the RDS security group for the missing tcp/5432 ingress rule from the ECS task security group
+2. Restore the rule and confirm the error rate returns to zero
+3. Review whether the change that removed the rule was intended
+CHANGE CORRELATION: RevokeSecurityGroupIngress on sg-0abc123 by user/prashant at 20:00:41, 21 seconds before the first error.
+SPOKEN SUMMARY: Your demo web service in U S east 1 can no longer reach its database. It looks like the security group rule that allows the E C S tasks to talk to R D S on port 5432 was removed about twenty seconds before the errors started. Restoring that rule should bring the service back.
+BEACON_JSON:
+```json
+{"fingerprint": "rds-sg-ingress-revoked",
+ "suggested_action": "sg.restore_ingress",
+ "action_params": {"group_id": "sg-0abc123", "ip_protocol": "tcp", "from_port": 5432, "to_port": 5432, "source_group_id": "sg-0def456"},
+ "confidence": 0.9,
+ "correlated_change": "RevokeSecurityGroupIngress by user/prashant at 20:00:41"}
+```

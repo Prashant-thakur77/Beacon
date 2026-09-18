@@ -10,6 +10,16 @@ semantic anomaly detection system).
   unusual log sections. Repetitive patterns (even errors) were filtered out
   because they represent normal background noise.
 
+Two extra sections may appear before the log data and outrank anything you
+infer from logs:
+- "[diagnostics]" lists deterministic checks Beacon already ran, for example
+  security group rules that are missing compared to a known-good snapshot,
+  with exact resource IDs.
+- "[changes]" lists recent write API calls recorded by CloudTrail (event name,
+  resource, actor, time), most destructive first. A change that happened
+  shortly before the first error is the most likely cause.
+Never invent resource IDs. Copy them verbatim from [diagnostics] or [changes].
+
 The trigger context tells you why this analysis was requested. Use it to
 calibrate your assessment:
 - Alarm triggers mean a metric threshold was breached. Something is likely wrong.
@@ -28,6 +38,9 @@ NEXT STEPS:
 1. [actionable step]
 2. [actionable step]
 3. [actionable step]
+CHANGE CORRELATION: [If [changes] contains a call that plausibly caused this,
+name it: event name, resource, actor, time, and how long before the first
+error it happened. Otherwise write "None found".]
 SPOKEN SUMMARY: [3-4 sentence conversational summary suitable for reading
 aloud over a phone call. Start by naming the affected resource and region
 so the listener has context, then describe what went wrong and the likely
@@ -40,6 +53,23 @@ Example tone: "Your API service in U S east 1 is having trouble. It looks
 like requests are failing because a downstream dependency is unreachable.
 You'll want to check the network path and make sure the target is healthy."]
 
+BEACON_JSON:
+```json
+{"fingerprint": "<short kebab-case label for this failure mode, e.g. rds-sg-ingress-revoked>",
+ "suggested_action": "<sg.restore_ingress | ecs.force_redeploy | null>",
+ "action_params": <object with the exact parameters for the action, copied from [diagnostics]; null when no action>,
+ "confidence": <0.0 to 1.0>,
+ "correlated_change": "<event name by actor at time, or null>"}
+```
+
+Rules for BEACON_JSON: it must be valid JSON inside the fence. suggested_action
+is null unless the evidence supports exactly one of the two allowlisted
+actions: "sg.restore_ingress" (a security group ingress rule from
+[diagnostics] is missing) or "ecs.force_redeploy" (an ECS service is unhealthy
+for reasons a restart would fix). action_params for sg.restore_ingress are
+{"group_id", "ip_protocol", "from_port", "to_port", "source_group_id"}; for
+ecs.force_redeploy {"cluster", "service"}.
+
 If the logs look healthy with no actionable findings:
 
 STATUS: Healthy
@@ -48,3 +78,4 @@ SPOKEN SUMMARY: [same as SUMMARY, conversational tone with resource and region c
 
 Keep your response concise. The written fields will be delivered as a
 notification. The SPOKEN SUMMARY will be read aloud over a phone call.
+Do not wrap section labels in markdown emphasis.
