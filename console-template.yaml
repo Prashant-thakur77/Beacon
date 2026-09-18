@@ -215,8 +215,10 @@ Resources:
                 Resource: "*"
 
   # The browser gets 15-minute credentials for exactly one action. The trust
-  # policy names the voice role by ARN (fixed RoleName) to avoid a circular
-  # reference; the AssumeRole grant lives in a separate policy resource.
+  # policy admits only the voice role (by ARN condition on the account root
+  # principal, which avoids both the circular reference and IAM's "Invalid
+  # principal" race on a freshly created role); the AssumeRole grant lives in
+  # a separate policy resource.
   BeaconMicRole:
     Type: AWS::IAM::Role
     DependsOn: BeaconVoiceTurnRole
@@ -228,8 +230,11 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/beacon-voice-turn-${BaseStackName}"
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
             Action: sts:AssumeRole
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/beacon-voice-turn-${BaseStackName}"
       Policies:
         - PolicyName: BeaconMicTranscribeOnly
           PolicyDocument:
