@@ -1,6 +1,7 @@
 .PHONY: deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
-       test lint check-image-tags smoke-strands
+       test lint check-image-tags smoke-strands deploy-remediation teardown-remediation \
+       snapshot-sg tag-remediable dry-run changes incidents lint-templates
 
 # Deploy variables persisted by earlier runs (IMAGE_URI, EMAIL, ...). Gitignored.
 -include .beacon.env
@@ -97,6 +98,22 @@ endif
 ifneq ($(TOKEN_BUDGET),)
 	OVERRIDES += TokenBudget=$(TOKEN_BUDGET)
 endif
+ifneq ($(INCIDENTS_ENABLED),)
+	OVERRIDES += IncidentsEnabled=$(INCIDENTS_ENABLED)
+endif
+ifneq ($(APPLY_ENABLED),)
+	OVERRIDES += ApplyEnabled=$(APPLY_ENABLED)
+endif
+ifneq ($(DASHBOARD_URL),)
+	OVERRIDES += DashboardUrl=$(DASHBOARD_URL)
+endif
+
+# Remediation stack
+REMEDIATION_STACK      ?= $(STACK_NAME)-remediation
+CREATE_INCIDENTS_TABLE ?= true
+APPLY_ENABLED          ?=
+INCIDENTS_ENABLED      ?=
+DASHBOARD_URL          ?=
 
 # ---------- Image Setup ----------
 
@@ -318,9 +335,81 @@ break-demo:
 fix-demo:
 	@REGION=$(REGION) bash demo/trigger.sh fix
 
+# ---------- Remediation stack ----------
+
+lint-templates:
+	$(CFN_LINT) template.yaml remediation-template.yaml demo/demo-infra-template.yaml
+
+deploy-remediation:
+	@bash scripts/check_image_tag.sh AGENT_IMAGE_URI "$(AGENT_IMAGE_URI)"
+	$(CFN_LINT) remediation-template.yaml
+	aws cloudformation validate-template --template-body file://remediation-template.yaml --region $(REGION) > /dev/null
+	@SNS_ARN=$$(aws cloudformation describe-stacks --stack-name $(STACK_NAME) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`BeaconSNSTopicArn`].OutputValue' --output text) && \
+	echo "==> Deploying $(REMEDIATION_STACK) (SNS: $$SNS_ARN)..." && \
+	aws cloudformation deploy \
+		--template-file remediation-template.yaml \
+		--stack-name $(REMEDIATION_STACK) \
+		--region $(REGION) \
+		--capabilities CAPABILITY_NAMED_IAM \
+		--parameter-overrides BaseStackName=$(STACK_NAME) AgentImageUri=$(AGENT_IMAGE_URI) \
+			SnsTopicArn=$$SNS_ARN CreateIncidentsTable=$(CREATE_INCIDENTS_TABLE) \
+			LambdaArchitecture=$(LAMBDA_ARCH) $(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),)
+	$(call save_env,AGENT_IMAGE_URI,$(AGENT_IMAGE_URI))
+	@echo "Done. Next: make snapshot-sg && make tag-remediable && make dry-run"
+
+teardown-remediation:
+	aws cloudformation delete-stack --stack-name $(REMEDIATION_STACK) --region $(REGION)
+	@echo "Remediation stack deletion initiated."
+
+# Golden snapshot of the demo security groups (run on a HEALTHY stack).
+snapshot-sg:
+	@RDS_SG=$$(aws cloudformation describe-stacks --stack-name $(DEMO_INFRA_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`RdsSecurityGroupId`].OutputValue' --output text) && \
+	ECS_SG=$$(aws cloudformation describe-stacks --stack-name $(DEMO_INFRA_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`EcsSecurityGroupId`].OutputValue' --output text) && \
+	$(PYTHON) scripts/snapshot_sg.py --param /beacon/$(STACK_NAME)/golden-sg --region $(REGION) $$RDS_SG $$ECS_SG
+
+# Tag the demo resources so the remediator role's tag condition matches
+# (idempotent; the demo template also sets the tags on create).
+tag-remediable:
+	@RDS_SG=$$(aws cloudformation describe-stacks --stack-name $(DEMO_INFRA_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`RdsSecurityGroupId`].OutputValue' --output text) && \
+	ECS_SG=$$(aws cloudformation describe-stacks --stack-name $(DEMO_INFRA_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`EcsSecurityGroupId`].OutputValue' --output text) && \
+	CLUSTER=$$(aws cloudformation describe-stacks --stack-name $(DEMO_INFRA_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`DemoEcsCluster`].OutputValue' --output text) && \
+	SERVICE=$$(aws cloudformation describe-stacks --stack-name $(DEMO_INFRA_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`DemoServiceName`].OutputValue' --output text) && \
+	aws ec2 create-tags --resources $$RDS_SG $$ECS_SG --tags Key=beacon:remediable,Value=true --region $(REGION) && \
+	SERVICE_ARN=$$(aws ecs describe-services --cluster $$CLUSTER --services $$SERVICE --region $(REGION) --query 'services[0].serviceArn' --output text) && \
+	aws ecs tag-resource --resource-arn $$SERVICE_ARN --tags key=beacon:remediable,value=true --region $(REGION) && \
+	echo "Tagged $$RDS_SG $$ECS_SG $$SERVICE_ARN with beacon:remediable=true"
+
+# Proposal-time dry-run of the demo fix under the remediator role.
+# Must print DryRunOperation or InvalidPermission.Duplicate, never UnauthorizedOperation.
+dry-run:
+	@PARAMS=$$(REGION=$(REGION) bash scripts/demo_params.sh) && \
+	PAYLOAD="{\"step\":\"dryrun\",\"action\":\"sg.restore_ingress\",\"params\":$$PARAMS}" && \
+	echo "==> invoking beacon-remediate-$(STACK_NAME) with $$PAYLOAD" && \
+	aws lambda invoke --function-name beacon-remediate-$(STACK_NAME) --region $(REGION) \
+		--cli-binary-format raw-in-base64-out --payload "$$PAYLOAD" /dev/stdout | $(PYTHON) -c 'import json,sys; d=json.loads(sys.stdin.read().split("\n")[0]); print(json.dumps(d, indent=1)); sys.exit(0 if d.get("ok") else 1)' \
+		&& echo "DRY RUN PASSED" || (echo "DRY RUN FAILED (see error above)"; exit 1)
+
+# Rows in the change ledger, newest first.
+changes:
+	@aws dynamodb scan --table-name beacon-changes-$(STACK_NAME) --region $(REGION) --output json | \
+	$(PYTHON) -c 'import json,sys; rows=sorted(json.load(sys.stdin)["Items"], key=lambda r: r["sk"]["S"], reverse=True); [print(r["event_time"]["S"], r["event_name"]["S"], "by", r["actor_short"]["S"], ",".join(x["S"] for x in r.get("resource_ids",{}).get("L",[]))) for r in rows[:20]]; print(f"{len(rows)} row(s)")'
+
+# Incidents, newest first.
+incidents:
+	@aws dynamodb scan --table-name beacon-incidents-$(STACK_NAME) --region $(REGION) --output json | \
+	$(PYTHON) -c 'import json,sys; rows=sorted(json.load(sys.stdin)["Items"], key=lambda r: r["timestamp"]["S"], reverse=True); [print(r["timestamp"]["S"], r["incident_id"]["S"], r.get("status",{}).get("S","?"), r.get("alarm_name",{}).get("S","-")) for r in rows[:20]]; print(f"{len(rows)} row(s)")'
+
 # ---------- Development ----------
 
-PYTHON ?= .venv/bin/python
+PYTHON   ?= .venv/bin/python
+CFN_LINT ?= .venv/bin/cfn-lint
 
 # One Strands turn with one tool on Nova 2 Lite against your real account.
 # Needs AWS credentials + Bedrock model access. Decides VOICE_ENGINE (see PLAN.md).
