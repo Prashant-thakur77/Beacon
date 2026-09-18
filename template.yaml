@@ -109,6 +109,12 @@ Parameters:
     MinValue: 60
     MaxValue: 900
 
+  LambdaArchitecture:
+    Type: String
+    Default: x86_64
+    AllowedValues: [x86_64, arm64]
+    Description: Must match the host that built the container image (make deploy detects it)
+
   # --- Voice (set by voice stack, not by user) ---
 
   ConnectEnabled:
@@ -234,6 +240,8 @@ Resources:
     Properties:
       FunctionName: !Sub "beacon-${AWS::StackName}"
       PackageType: Image
+      Architectures:
+        - !Ref LambdaArchitecture
       Code:
         ImageUri: !Ref ImageUri
       Role: !GetAtt BeaconFunctionRole.Arn

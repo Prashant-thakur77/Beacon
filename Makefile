@@ -1,8 +1,30 @@
 .PHONY: deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
-       setup-image deploy-demo teardown-demo break-demo fix-demo test lint
+       setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
+       test lint check-image-tags
 
-STACK_NAME := beacon
+# Deploy variables persisted by earlier runs (IMAGE_URI, EMAIL, ...). Gitignored.
+-include .beacon.env
+
+STACK_NAME ?= beacon
 REGION     ?= us-east-1
+
+# Host architecture drives the container platform, the Fargate CpuArchitecture
+# and the Lambda Architectures value so an x86 laptop and an Apple Silicon
+# laptop both produce images that actually start.
+UNAME_M     := $(shell uname -m)
+HOST_ARCH   := $(if $(filter aarch64 arm64,$(UNAME_M)),arm64,amd64)
+CFN_ARCH    := $(if $(filter arm64,$(HOST_ARCH)),ARM64,X86_64)
+LAMBDA_ARCH := $(if $(filter arm64,$(HOST_ARCH)),arm64,x86_64)
+
+# Every image is tagged with the git SHA so CloudFormation sees a new URI on
+# every code change (a ':latest' URI never redeploys the Lambda).
+IMAGE_TAG ?= $(shell git rev-parse --short HEAD 2>/dev/null || date +%s)
+
+# Persist KEY=VALUE into .beacon.env (upsert) so the next make run remembers it.
+define save_env
+	@touch .beacon.env && grep -v '^$(1)=' .beacon.env > .beacon.env.tmp || true; \
+	echo '$(1)=$(2)' >> .beacon.env.tmp && mv .beacon.env.tmp .beacon.env
+endef
 
 # Required
 EMAIL          ?=
@@ -25,11 +47,13 @@ TOKEN_BUDGET     ?=
 ONCALL_PHONE         ?=
 CONNECT_INSTANCE_ID  ?=
 
-# Local image tag built from the Dockerfile by `make setup-image`
-LOCAL_IMAGE ?= beacon:latest
+# Local image tags built by `make setup-image` / `make setup-agent-image`
+LOCAL_IMAGE       ?= beacon:$(IMAGE_TAG)
+LOCAL_AGENT_IMAGE ?= beacon-agent:$(IMAGE_TAG)
 
-# ECR image URI in your account (populated by `make setup-image`)
-IMAGE_URI ?=
+# ECR image URIs in your account (populated into .beacon.env by the setup targets)
+IMAGE_URI       ?=
+AGENT_IMAGE_URI ?=
 
 # Container runtime (docker, podman, etc.)
 CONTAINER_RT ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
@@ -82,21 +106,47 @@ setup-image:
 	ECR_REPO="$$ACCOUNT_ID.dkr.ecr.$(REGION).amazonaws.com/beacon" && \
 	echo "==> Ensuring ECR repository exists..." && \
 	aws ecr create-repository --repository-name beacon --region $(REGION) 2>/dev/null || true && \
-	echo "==> Building $(LOCAL_IMAGE) from Dockerfile..." && \
-	$(CONTAINER_RT) build -t $(LOCAL_IMAGE) . && \
+	echo "==> Building $(LOCAL_IMAGE) for linux/$(HOST_ARCH) from Dockerfile..." && \
+	$(CONTAINER_RT) build --platform linux/$(HOST_ARCH) -t $(LOCAL_IMAGE) . && \
 	echo "==> Tagging for ECR..." && \
-	$(CONTAINER_RT) tag $(LOCAL_IMAGE) "$$ECR_REPO:latest" && \
+	$(CONTAINER_RT) tag $(LOCAL_IMAGE) "$$ECR_REPO:$(IMAGE_TAG)" && \
+	echo "==> Logging in to ECR..." && \
+	aws ecr get-login-password --region $(REGION) | $(CONTAINER_RT) login --username AWS --password-stdin "$$ECR_REPO" && \
+	echo "==> Pushing to ECR (first push is multi-GB; later pushes move only the code layer)..." && \
+	$(CONTAINER_RT) push "$$ECR_REPO:$(IMAGE_TAG)" && \
+	echo "" && \
+	echo "Done. IMAGE_URI saved to .beacon.env:" && \
+	echo "  IMAGE_URI=$$ECR_REPO:$(IMAGE_TAG)" && \
+	touch .beacon.env && grep -v '^IMAGE_URI=' .beacon.env > .beacon.env.tmp || true; \
+	echo "IMAGE_URI=$$ECR_REPO:$(IMAGE_TAG)" >> .beacon.env.tmp && mv .beacon.env.tmp .beacon.env
+
+# Slim image (no torch/cordon) for the voice, remediation, changes and dashboard Lambdas.
+setup-agent-image:
+	$(call check_param,REGION)
+	@ACCOUNT_ID=$$(aws sts get-caller-identity --query Account --output text) && \
+	ECR_REPO="$$ACCOUNT_ID.dkr.ecr.$(REGION).amazonaws.com/beacon-agent" && \
+	echo "==> Ensuring ECR repository exists..." && \
+	aws ecr create-repository --repository-name beacon-agent --region $(REGION) 2>/dev/null || true && \
+	echo "==> Building $(LOCAL_AGENT_IMAGE) for linux/$(HOST_ARCH) from Dockerfile.agent..." && \
+	$(CONTAINER_RT) build --platform linux/$(HOST_ARCH) -f Dockerfile.agent -t $(LOCAL_AGENT_IMAGE) . && \
+	$(CONTAINER_RT) tag $(LOCAL_AGENT_IMAGE) "$$ECR_REPO:$(IMAGE_TAG)" && \
 	echo "==> Logging in to ECR..." && \
 	aws ecr get-login-password --region $(REGION) | $(CONTAINER_RT) login --username AWS --password-stdin "$$ECR_REPO" && \
 	echo "==> Pushing to ECR..." && \
-	$(CONTAINER_RT) push "$$ECR_REPO:latest" && \
+	$(CONTAINER_RT) push "$$ECR_REPO:$(IMAGE_TAG)" && \
 	echo "" && \
-	echo "Done. Use this IMAGE_URI for deploy commands:" && \
-	echo "  IMAGE_URI=$$ECR_REPO:latest"
+	echo "Done. AGENT_IMAGE_URI saved to .beacon.env:" && \
+	echo "  AGENT_IMAGE_URI=$$ECR_REPO:$(IMAGE_TAG)" && \
+	touch .beacon.env && grep -v '^AGENT_IMAGE_URI=' .beacon.env > .beacon.env.tmp || true; \
+	echo "AGENT_IMAGE_URI=$$ECR_REPO:$(IMAGE_TAG)" >> .beacon.env.tmp && mv .beacon.env.tmp .beacon.env
+
+# Fails if an image URI is ':latest' or its tag is not the current git HEAD.
+check-image-tags:
+	@bash scripts/check_image_tag.sh IMAGE_URI "$(IMAGE_URI)"
 
 # ---------- Deploy ----------
 
-deploy:
+deploy: check-image-tags
 	$(call check_param,IMAGE_URI)
 	$(call check_param,EMAIL)
 	$(call check_param,LOG_GROUP_PATTERNS)
@@ -105,7 +155,13 @@ deploy:
 		--stack-name $(STACK_NAME) \
 		--region $(REGION) \
 		--capabilities CAPABILITY_IAM \
-		--parameter-overrides $(OVERRIDES)
+		--parameter-overrides $(OVERRIDES) LambdaArchitecture=$(LAMBDA_ARCH)
+	$(call save_env,EMAIL,$(EMAIL))
+	$(call save_env,LOG_GROUP_PATTERNS,$(LOG_GROUP_PATTERNS))
+	$(call save_env,REGION,$(REGION))
+	$(if $(TOKEN_BUDGET),$(call save_env,TOKEN_BUDGET,$(TOKEN_BUDGET)))
+	$(if $(ENABLE_ALARM),$(call save_env,ENABLE_ALARM,$(ENABLE_ALARM)))
+	$(if $(ALARM_NAME_PREFIX),$(call save_env,ALARM_NAME_PREFIX,$(ALARM_NAME_PREFIX)))
 	@echo "Done. Check your email to confirm the SNS subscription."
 
 deploy-voice:
@@ -190,7 +246,7 @@ endif
 		--stack-name $(STACK_NAME) \
 		--region $(REGION) \
 		--capabilities CAPABILITY_IAM \
-		--parameter-overrides $(OVERRIDES) ConnectEnabled=true OncallPhone=$(ONCALL_PHONE)
+		--parameter-overrides $(OVERRIDES) LambdaArchitecture=$(LAMBDA_ARCH) ConnectEnabled=true OncallPhone=$(ONCALL_PHONE)
 	@echo "Voice pipeline active. Your phone will ring on incidents."
 
 deploy-all:
@@ -223,14 +279,15 @@ teardown-all: teardown-voice
 # ---------- Demo (ECS + RDS) ----------
 
 DEMO_INFRA_STACK := beacon-demo-infra
+PG_VERSION       ?= 16.10
 
 deploy-demo:
 	@ACCOUNT_ID=$$(aws sts get-caller-identity --query Account --output text) && \
 	DEMO_ECR_REPO="$$ACCOUNT_ID.dkr.ecr.$(REGION).amazonaws.com/beacon-demo" && \
 	echo "==> Creating demo ECR repo (if needed)..." && \
 	aws ecr create-repository --repository-name beacon-demo --region $(REGION) 2>/dev/null || true && \
-	echo "==> Building demo app image..." && \
-	$(CONTAINER_RT) build -t "$$DEMO_ECR_REPO:latest" -f demo/Dockerfile.demo demo/ && \
+	echo "==> Building demo app image for linux/$(HOST_ARCH)..." && \
+	$(CONTAINER_RT) build --platform linux/$(HOST_ARCH) -t "$$DEMO_ECR_REPO:latest" -f demo/Dockerfile.demo demo/ && \
 	echo "==> Logging in to ECR..." && \
 	aws ecr get-login-password --region $(REGION) | $(CONTAINER_RT) login --username AWS --password-stdin "$$DEMO_ECR_REPO" && \
 	echo "==> Pushing demo image..." && \
@@ -241,7 +298,7 @@ deploy-demo:
 		--stack-name $(DEMO_INFRA_STACK) \
 		--region $(REGION) \
 		--capabilities CAPABILITY_IAM \
-		--parameter-overrides DemoImageUri="$$DEMO_ECR_REPO:latest" && \
+		--parameter-overrides DemoImageUri="$$DEMO_ECR_REPO:latest" CpuArchitecture=$(CFN_ARCH) PostgresVersion=$(PG_VERSION) && \
 	echo "" && \
 	echo "Demo infrastructure deployed. Verify healthy logs:" && \
 	echo "  aws logs tail /ecs/beacon-demo --follow --region $(REGION)" && \
@@ -256,10 +313,10 @@ teardown-demo:
 	@echo "Demo infrastructure torn down."
 
 break-demo:
-	@bash demo/trigger.sh break
+	@REGION=$(REGION) bash demo/trigger.sh break
 
 fix-demo:
-	@bash demo/trigger.sh fix
+	@REGION=$(REGION) bash demo/trigger.sh fix
 
 # ---------- Development ----------
 

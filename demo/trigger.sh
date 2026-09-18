@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REGION="${AWS_REGION:-us-east-1}"
+REGION="${REGION:-${AWS_REGION:-us-east-1}}"
 INFRA_STACK="beacon-demo-infra"
 
 # ---------------------------------------------------------------------------
