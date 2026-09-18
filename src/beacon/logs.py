@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import time
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+
+import boto3
+
+if TYPE_CHECKING:
+    from mypy_boto3_logs import CloudWatchLogsClient
+
+
+def format_log_line(timestamp_ms: int, message: str) -> str:
+    """Format a CloudWatch log event into an ``ISO-timestamp message`` line."""
+    dt = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
+    return f"{dt.isoformat()} {message.rstrip(chr(10))}"
+
+
+def resolve_log_groups(
+    patterns: list[str],
+    *,
+    logs_client: CloudWatchLogsClient | None = None,
+) -> list[str]:
+    """Expand log group patterns into concrete log group names.
+
+    Patterns ending with ``*`` are treated as prefixes and resolved via
+    ``describe_log_groups`` with pagination.  Exact names are passed
+    through as-is.  Results are deduplicated and returned sorted.
+    """
+    if logs_client is None:
+        logs_client = boto3.client("logs")
+
+    resolved: set[str] = set()
+    for pattern in patterns:
+        if pattern.endswith("*"):
+            prefix = pattern.rstrip("*").rstrip("/")
+            next_token: str | None = None
+            while True:
+                if next_token:
+                    resp = logs_client.describe_log_groups(
+                        logGroupNamePrefix=prefix, nextToken=next_token
+                    )
+                else:
+                    resp = logs_client.describe_log_groups(logGroupNamePrefix=prefix)
+                for group in resp.get("logGroups", []):
+                    name = group.get("logGroupName", "")
+                    if name:
+                        resolved.add(name)
+                next_token = resp.get("nextToken")
+                if not next_token:
+                    break
+        else:
+            resolved.add(pattern)
+
+    return sorted(resolved)
+
+
+def fetch_logs(
+    log_group: str,
+    lookback_minutes: int,
+    *,
+    logs_client: CloudWatchLogsClient | None = None,
+) -> str:
+    """Fetch log events from a CloudWatch log group within a time window.
+
+    Returns all events from the last ``lookback_minutes`` as a single
+    string with one ``ISO-timestamp message`` per line.  Paginates
+    automatically to retrieve the full result set.
+    """
+    if logs_client is None:
+        logs_client = boto3.client("logs")
+
+    end_ms = int(time.time() * 1000)
+    start_ms = end_ms - (lookback_minutes * 60 * 1000)
+
+    lines: list[str] = []
+    kwargs: dict[str, object] = {
+        "logGroupName": log_group,
+        "startTime": start_ms,
+        "endTime": end_ms,
+        "interleaved": True,
+    }
+
+    while True:
+        response = logs_client.filter_log_events(**kwargs)  # type: ignore[arg-type]
+        for event in response.get("events", []):
+            lines.append(
+                format_log_line(event.get("timestamp", 0), event.get("message", ""))
+            )
+
+        next_token = response.get("nextToken")
+        if not next_token:
+            break
+        kwargs["nextToken"] = next_token
+
+    return "\n".join(lines)

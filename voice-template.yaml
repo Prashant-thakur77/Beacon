@@ -1,0 +1,631 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Beacon Voice - Amazon Connect + Nova 2 Sonic voice layer for Beacon
+
+Parameters:
+
+  BaseStackName:
+    Type: String
+    Default: beacon
+    Description: Name of the base Beacon stack (used for DynamoDB table and SSM naming)
+
+  ImageUri:
+    Type: String
+    Description: ECR container image URI (must match the base stack)
+
+  OncallPhone:
+    Type: String
+    Description: On-call engineer phone number (E.164 format, e.g., +15551234567)
+
+  BedrockRegion:
+    Type: String
+    Default: us-east-1
+
+  LogGroupPatterns:
+    Type: CommaDelimitedList
+    Description: Log group patterns (should match the base stack)
+
+  ConnectInstanceId:
+    Type: String
+    Default: ""
+    Description: Existing Connect instance ID (leave empty to create a new one)
+
+Conditions:
+  CreateConnectInstance: !Equals [!Ref ConnectInstanceId, ""]
+
+Resources:
+
+  # --- DynamoDB (incident state + pre-fetched investigation cache) ---
+
+  BeaconIncidentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "beacon-incidents-${BaseStackName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: incident_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: incident_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # --- Voice Handler Lambda ---
+
+  BeaconVoiceHandlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: VoiceDynamoDBRead
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: !GetAtt BeaconIncidentsTable.Arn
+        - PolicyName: VoiceReadOnlyInvestigation
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:Describe*
+                  - logs:FilterLogEvents
+                  - logs:Get*
+                  - cloudwatch:Get*
+                  - cloudwatch:List*
+                  - cloudwatch:Describe*
+                  - ec2:Describe*
+                  - ecs:Describe*
+                  - ecs:List*
+                  - rds:Describe*
+                  - rds:List*
+                  - lambda:Get*
+                  - lambda:List*
+                  - elasticloadbalancing:Describe*
+                  - autoscaling:Describe*
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                  - sns:Get*
+                  - sns:List*
+                  - sqs:Get*
+                  - sqs:List*
+                  - apigateway:GET
+                  - route53:List*
+                  - route53:Get*
+                  - cloudfront:Get*
+                  - cloudfront:List*
+                  - iam:Get*
+                  - iam:List*
+                  - sts:GetCallerIdentity
+                  - dynamodb:Describe*
+                  - dynamodb:List*
+                  - elasticache:Describe*
+                  - elasticache:List*
+                  - es:Describe*
+                  - es:List*
+                  - kafka:Describe*
+                  - kafka:List*
+                  - kinesis:Describe*
+                  - kinesis:List*
+                  - cloudformation:Describe*
+                  - cloudformation:Get*
+                  - cloudformation:List*
+                  - cloudtrail:LookupEvents
+                  - cloudtrail:Get*
+                  - ssm:Describe*
+                  - ssm:Get*
+                  - ssm:List*
+                  - events:Describe*
+                  - events:List*
+                  - application-autoscaling:Describe*
+                  - tag:GetResources
+                  - tag:GetTagKeys
+                  - health:Describe*
+                  - secretsmanager:Describe*
+                  - secretsmanager:List*
+                  - acm:Describe*
+                  - acm:List*
+                  - wafv2:Get*
+                  - wafv2:List*
+                  - eks:Describe*
+                  - eks:List*
+                  - ecr:Describe*
+                  - ecr:List*
+                  - ecr:GetLifecyclePolicy
+                Resource: "*"
+        - PolicyName: VoiceBedrockInvoke
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource:
+                  - "arn:aws:bedrock:*::foundation-model/amazon.nova-*"
+                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*amazon.nova-*"
+
+  BeaconVoiceHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "beacon-voice-${BaseStackName}"
+      PackageType: Image
+      Code:
+        ImageUri: !Ref ImageUri
+      ImageConfig:
+        Command:
+          - "beacon.voice_handler.voice_dispatch"
+      Role: !GetAtt BeaconVoiceHandlerRole.Arn
+      MemorySize: 1024
+      Timeout: 30
+      Environment:
+        Variables:
+          LOG_GROUP_PATTERNS: !Join [",", !Ref LogGroupPatterns]
+          SNS_TOPIC_ARN: !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:beacon-alerts-${BaseStackName}"
+          BEDROCK_REGION: !Ref BedrockRegion
+          INCIDENTS_TABLE_NAME: !Ref BeaconIncidentsTable
+
+  BeaconVoiceHandlerConnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BeaconVoiceHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: connect.amazonaws.com
+
+  BeaconVoiceHandlerLexPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BeaconVoiceHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: lexv2.amazonaws.com
+      SourceArn: !Sub "arn:aws:lex:${AWS::Region}:${AWS::AccountId}:bot-alias/${BeaconBot}/*"
+
+  # --- Amazon Connect ---
+
+  BeaconConnectInstance:
+    Type: AWS::Connect::Instance
+    Condition: CreateConnectInstance
+    Properties:
+      IdentityManagementType: CONNECT_MANAGED
+      InstanceAlias: !Sub "beacon-${BaseStackName}"
+      Attributes:
+        InboundCalls: true
+        OutboundCalls: true
+
+  BeaconPhoneNumber:
+    Type: AWS::Connect::PhoneNumber
+    Properties:
+      TargetArn: !If
+        - CreateConnectInstance
+        - !GetAtt BeaconConnectInstance.Arn
+        - !Sub "arn:aws:connect:${AWS::Region}:${AWS::AccountId}:instance/${ConnectInstanceId}"
+      CountryCode: US
+      Type: DID
+      Description: Beacon outbound calling
+
+  BeaconLambdaAssociation:
+    Type: AWS::Connect::IntegrationAssociation
+    Properties:
+      InstanceId: !If
+        - CreateConnectInstance
+        - !GetAtt BeaconConnectInstance.Arn
+        - !Sub "arn:aws:connect:${AWS::Region}:${AWS::AccountId}:instance/${ConnectInstanceId}"
+      IntegrationType: LAMBDA_FUNCTION
+      IntegrationArn: !GetAtt BeaconVoiceHandlerFunction.Arn
+
+  BeaconContactFlow:
+    Type: AWS::Connect::ContactFlow
+    DependsOn:
+      - BeaconLambdaAssociation
+      - BeaconBotAlias
+    Properties:
+      InstanceArn: !If
+        - CreateConnectInstance
+        - !GetAtt BeaconConnectInstance.Arn
+        - !Sub "arn:aws:connect:${AWS::Region}:${AWS::AccountId}:instance/${ConnectInstanceId}"
+      Name: !Sub "beacon-incident-commander-${BaseStackName}"
+      Type: CONTACT_FLOW
+      Content: !Sub |
+        {
+          "Version": "2019-10-30",
+          "StartAction": "setVoice",
+          "Actions": [
+            {
+              "Identifier": "setVoice",
+              "Type": "UpdateContactTextToSpeechVoice",
+              "Parameters": {
+                "TextToSpeechVoice": "Matthew",
+                "TextToSpeechEngine": "Generative"
+              },
+              "Transitions": {
+                "NextAction": "lambda1",
+                "Errors": [{"NextAction": "lambda1", "ErrorType": "NoMatchingError"}],
+                "Conditions": []
+              }
+            },
+            {
+              "Identifier": "lambda1",
+              "Type": "InvokeLambdaFunction",
+              "Parameters": {
+                "LambdaFunctionARN": "${BeaconVoiceHandlerFunction.Arn}",
+                "InvocationTimeLimitSeconds": "8",
+                "ResponseValidation": {"ResponseType": "STRING_MAP"}
+              },
+              "Transitions": {
+                "NextAction": "lexbot",
+                "Errors": [{"NextAction": "dc1", "ErrorType": "NoMatchingError"}],
+                "Conditions": []
+              }
+            },
+            {
+              "Identifier": "lexbot",
+              "Type": "ConnectParticipantWithLexBot",
+              "Parameters": {
+                "Text": "Hey, this is Beacon calling about an incident.",
+                "LexV2Bot": {
+                  "AliasArn": "${BeaconBotAlias.Arn}"
+                },
+                "LexSessionAttributes": {
+                  "incident_id": "$.Attributes.incident_id",
+                  "rca_summary": "$.External.rca_summary"
+                }
+              },
+              "Transitions": {
+                "NextAction": "dc1",
+                "Errors": [
+                  {"NextAction": "dc1", "ErrorType": "NoMatchingError"},
+                  {"NextAction": "dc1", "ErrorType": "NoMatchingCondition"},
+                  {"NextAction": "lexbot", "ErrorType": "InputTimeLimitExceeded"}
+                ],
+                "Conditions": []
+              }
+            },
+            {
+              "Identifier": "dc1",
+              "Type": "DisconnectParticipant",
+              "Parameters": {},
+              "Transitions": {}
+            }
+          ]
+        }
+
+  # SSM parameter /beacon/{stack}/connect-config is written by the
+  # Makefile post-deploy steps (step 7/8) since it requires resolving
+  # the contact flow ID and E.164 phone number from the Connect API.
+
+  # --- Lex V2 Bot with Nova 2 Sonic S2S ---
+
+  BeaconLexRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lexv2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BeaconLexPolly
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - polly:SynthesizeSpeech
+                Resource: "*"
+
+  BeaconBot:
+    Type: AWS::Lex::Bot
+    Properties:
+      Name: !Sub "BeaconCommander-${BaseStackName}"
+      Description: Voice triage assistant for Beacon
+      RoleArn: !GetAtt BeaconLexRole.Arn
+      IdleSessionTTLInSeconds: 300
+      AutoBuildBotLocales: true
+      DataPrivacy:
+        ChildDirected: false
+      BotLocales:
+        - LocaleId: en_US
+          NluConfidenceThreshold: 0.65
+          VoiceSettings:
+            VoiceId: Matthew
+            Engine: generative
+          Intents:
+            - Name: CheckMetrics
+              Description: Check CloudWatch metrics for a resource
+              SampleUtterances:
+                - Utterance: "Check the metrics for {resource}"
+                - Utterance: "What are the error rates"
+                - Utterance: "How is the CPU looking on {resource}"
+                - Utterance: "Show me the connection count for {resource}"
+                - Utterance: "What is the latency on {resource}"
+                - Utterance: "Does {resource} look overwhelmed"
+                - Utterance: "Are there any metric spikes"
+                - Utterance: "Check {metric} for {resource}"
+                - Utterance: "How is {resource} performing"
+                - Utterance: "What do the metrics show"
+                - Utterance: "Pull up the {metric} data"
+                - Utterance: "Is {resource} under heavy load"
+              SlotPriorities:
+                - Priority: 1
+                  SlotName: resource
+                - Priority: 2
+                  SlotName: metric
+              Slots:
+                - Name: resource
+                  SlotTypeName: AMAZON.AlphaNumeric
+                  ValueElicitationSetting:
+                    SlotConstraint: Optional
+                    PromptSpecification:
+                      MaxRetries: 1
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "Which resource should I check?"
+                - Name: metric
+                  SlotTypeName: AMAZON.AlphaNumeric
+                  ValueElicitationSetting:
+                    SlotConstraint: Optional
+                    PromptSpecification:
+                      MaxRetries: 1
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "Which metric?"
+              FulfillmentCodeHook:
+                Enabled: true
+            - Name: CheckLogs
+              Description: Search CloudWatch Logs for errors
+              SampleUtterances:
+                - Utterance: "Show me recent logs for {service}"
+                - Utterance: "Any errors in the logs"
+                - Utterance: "What do the {service} logs show"
+                - Utterance: "Pull up the logs for {service}"
+                - Utterance: "Are there error logs"
+                - Utterance: "What errors are showing up"
+                - Utterance: "Show me what is in the logs"
+                - Utterance: "Any connection errors in the logs"
+                - Utterance: "What is the log output for {service}"
+                - Utterance: "Check the logs"
+              SlotPriorities:
+                - Priority: 1
+                  SlotName: service
+              Slots:
+                - Name: service
+                  SlotTypeName: AMAZON.AlphaNumeric
+                  ValueElicitationSetting:
+                    SlotConstraint: Optional
+                    PromptSpecification:
+                      MaxRetries: 1
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "Which service's logs?"
+              FulfillmentCodeHook:
+                Enabled: true
+            - Name: CheckStatus
+              Description: Check health status of an AWS resource
+              SampleUtterances:
+                - Utterance: "Is {resource} healthy"
+                - Utterance: "What is the status of {resource}"
+                - Utterance: "Is {resource} running"
+                - Utterance: "Check if {resource} is up"
+                - Utterance: "How is {resource} doing"
+                - Utterance: "What is the health of {resource}"
+                - Utterance: "Is {resource} responding"
+                - Utterance: "Check the status"
+              SlotPriorities:
+                - Priority: 1
+                  SlotName: resource
+              Slots:
+                - Name: resource
+                  SlotTypeName: AMAZON.AlphaNumeric
+                  ValueElicitationSetting:
+                    SlotConstraint: Optional
+                    PromptSpecification:
+                      MaxRetries: 1
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "Which resource?"
+              FulfillmentCodeHook:
+                Enabled: true
+            - Name: Summarize
+              Description: Summarize the incident investigation so far
+              SampleUtterances:
+                - Utterance: "Give me a summary"
+                - Utterance: "What do we know so far"
+                - Utterance: "Summarize the situation"
+                - Utterance: "What is the current status"
+                - Utterance: "Walk me through what happened"
+                - Utterance: "Recap the incident"
+                - Utterance: "What is the big picture"
+                - Utterance: "Give me the rundown"
+                - Utterance: "Okay what is it"
+                - Utterance: "Go ahead"
+                - Utterance: "Tell me"
+                - Utterance: "What is going on"
+                - Utterance: "What is the incident"
+                - Utterance: "Tell me what happened"
+                - Utterance: "What is the problem"
+                - Utterance: "Okay tell me"
+                - Utterance: "Go ahead and tell me"
+                - Utterance: "Okay what happened"
+              FulfillmentCodeHook:
+                Enabled: true
+            - Name: Goodbye
+              Description: Engineer is done investigating and wants to hang up
+              SampleUtterances:
+                - Utterance: "That is all I need"
+                - Utterance: "Thanks I am done"
+                - Utterance: "Thank you goodbye"
+                - Utterance: "Goodbye"
+                - Utterance: "I am good"
+                - Utterance: "That is it for now"
+                - Utterance: "Hang up"
+                - Utterance: "I am all set"
+                - Utterance: "Thanks for your help"
+                - Utterance: "I think I have what I need"
+                - Utterance: "I am going to go fix this"
+                - Utterance: "Let me go take care of this"
+                - Utterance: "No thanks"
+                - Utterance: "No that is all"
+                - Utterance: "No I am good"
+                - Utterance: "Nope"
+                - Utterance: "Okay thank you goodbye"
+                - Utterance: "Alright thanks"
+                - Utterance: "That will do"
+                - Utterance: "Nothing else"
+                - Utterance: "I am done"
+                - Utterance: "No thank you"
+                - Utterance: "No thank you that is all"
+              FulfillmentCodeHook:
+                Enabled: true
+            - Name: CheckNetworking
+              Description: Investigate security groups, VPCs, subnets, and network configuration
+              SampleUtterances:
+                - Utterance: "Check the security groups"
+                - Utterance: "What are the network settings"
+                - Utterance: "Are there any firewall rules blocking traffic"
+                - Utterance: "Show me the VPC configuration"
+                - Utterance: "What subnets is it running in"
+                - Utterance: "Check the inbound rules"
+                - Utterance: "Is there a network issue"
+                - Utterance: "Can you look at the routing"
+                - Utterance: "Check the network for {resource}"
+                - Utterance: "What are the security group rules"
+                - Utterance: "Is something blocking the connection"
+                - Utterance: "Check if there is a firewall issue"
+              SlotPriorities:
+                - Priority: 1
+                  SlotName: resource
+              Slots:
+                - Name: resource
+                  SlotTypeName: AMAZON.AlphaNumeric
+                  ValueElicitationSetting:
+                    SlotConstraint: Optional
+                    PromptSpecification:
+                      MaxRetries: 1
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "Which resource?"
+              FulfillmentCodeHook:
+                Enabled: true
+            - Name: CheckDeployments
+              Description: Check for recent deployments or configuration changes
+              SampleUtterances:
+                - Utterance: "Were there any recent deployments"
+                - Utterance: "Has anything changed recently"
+                - Utterance: "Check for recent changes"
+                - Utterance: "Was there a deployment"
+                - Utterance: "What was the last change"
+                - Utterance: "Show me recent CloudFormation events"
+                - Utterance: "Did someone push a change"
+                - Utterance: "Any recent updates to {resource}"
+                - Utterance: "When was the last deployment"
+                - Utterance: "Check the change history"
+              SlotPriorities:
+                - Priority: 1
+                  SlotName: resource
+              Slots:
+                - Name: resource
+                  SlotTypeName: AMAZON.AlphaNumeric
+                  ValueElicitationSetting:
+                    SlotConstraint: Optional
+                    PromptSpecification:
+                      MaxRetries: 1
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "Which resource?"
+              FulfillmentCodeHook:
+                Enabled: true
+            - Name: SuggestFix
+              Description: Ask for remediation guidance or next steps
+              SampleUtterances:
+                - Utterance: "What should I do to fix this"
+                - Utterance: "How do I fix this"
+                - Utterance: "What are the next steps"
+                - Utterance: "What do you recommend"
+                - Utterance: "How do I resolve this"
+                - Utterance: "What is the fix"
+                - Utterance: "Walk me through the remediation"
+                - Utterance: "How do I restore service"
+                - Utterance: "What can I do right now"
+                - Utterance: "How do I get this back up"
+              FulfillmentCodeHook:
+                Enabled: true
+            - Name: FallbackIntent
+              Description: Catch-all for unmatched questions
+              ParentIntentSignature: "AMAZON.FallbackIntent"
+              FulfillmentCodeHook:
+                Enabled: true
+
+  BeaconBotVersion:
+    Type: AWS::Lex::BotVersion
+    Properties:
+      BotId: !GetAtt BeaconBot.Id
+      BotVersionLocaleSpecification:
+        - LocaleId: en_US
+          BotVersionLocaleDetails:
+            SourceBotVersion: DRAFT
+
+  BeaconBotAlias:
+    Type: AWS::Lex::BotAlias
+    Properties:
+      BotId: !GetAtt BeaconBot.Id
+      BotAliasName: live
+      BotVersion: !GetAtt BeaconBotVersion.BotVersion
+      BotAliasLocaleSettings:
+        - LocaleId: en_US
+          BotAliasLocaleSetting:
+            Enabled: true
+
+Outputs:
+  BeaconConnectInstanceId:
+    Description: Amazon Connect instance ID
+    Value: !If
+      - CreateConnectInstance
+      - !GetAtt BeaconConnectInstance.Id
+      - !Ref ConnectInstanceId
+
+  BeaconPhoneNumber:
+    Description: Claimed phone number (E.164)
+    Value: !Ref BeaconPhoneNumber
+
+  BeaconBotId:
+    Description: Lex V2 bot ID
+    Value: !GetAtt BeaconBot.Id
+
+  BeaconIncidentsTableName:
+    Description: DynamoDB table for incident state
+    Value: !Ref BeaconIncidentsTable
+
+  BeaconVoiceHandlerArn:
+    Description: Voice handler Lambda ARN
+    Value: !GetAtt BeaconVoiceHandlerFunction.Arn
+
+  BeaconBotAliasArn:
+    Description: Lex bot alias ARN (for Connect association)
+    Value: !GetAtt BeaconBotAlias.Arn
+
+  BeaconConnectInstanceArn:
+    Description: Connect instance ARN
+    Value: !If
+      - CreateConnectInstance
+      - !GetAtt BeaconConnectInstance.Arn
+      - !Sub "arn:aws:connect:${AWS::Region}:${AWS::AccountId}:instance/${ConnectInstanceId}"

@@ -1,0 +1,31 @@
+Given the following incident analysis, identify the CloudWatch metrics,
+log queries, and AWS resource lookups an on-call engineer would most
+likely investigate next.
+
+Return ONLY valid JSON with this schema:
+{
+  "metrics": [
+    {"query_key": "human-readable label", "namespace": "AWS/RDS", "metric_name": "DatabaseConnections",
+     "dimensions": {"DBInstanceIdentifier": "<instance-id>"}, "stat": "Average", "period_minutes": 60}
+  ],
+  "log_queries": [
+    {"query_key": "human-readable label", "log_group": "<log-group-name>",
+     "filter_pattern": "ERROR connection", "lookback_minutes": 60}
+  ],
+  "status_checks": [
+    {"query_key": "human-readable label", "resource_type": "rds", "resource_id": "<instance-id>"}
+  ],
+  "resource_lookups": [
+    {"query_key": "human-readable label", "service": "ec2", "operation": "describe_security_groups",
+     "params": {"GroupIds": ["<sg-id>"]}}
+  ]
+}
+
+resource_lookups use read-only AWS API calls (describe_*, get_*, list_*) via
+boto3. Use snake_case for the operation name. Include lookups for security
+groups, VPCs, subnets, or network interfaces when the analysis mentions
+connectivity, networking, or access issues.
+
+Limit to 10 total queries. Focus on resources and metrics mentioned in the
+analysis, plus 1-2 "adjacent" resources that could be related.
+Use only real AWS CloudWatch namespace and metric names.
