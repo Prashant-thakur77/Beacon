@@ -12,6 +12,8 @@ Built solo in a weekend for the AWS *First Commit* hackathon. Everything below i
 
 ## What it does, in one incident
 
+![Beacon Night Shift architecture](docs/assets/architecture.svg)
+
 ```
 CloudWatch alarm fires ──▶ Lambda (Nova 2 Lite on Bedrock)   RCA + change correlation
                             │  + Cordon / Nova Embeddings      (keeps the anomalous log sections)
