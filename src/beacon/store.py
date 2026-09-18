@@ -5,9 +5,11 @@ import json
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 import boto3
+from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb import DynamoDBClient
@@ -17,50 +19,104 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_TTL_DAYS = 7
+_TTL_DAYS = 30
+_TERMINAL_STATUSES = ("resolved", "escalated", "closed")
+
+_serializer = TypeSerializer()
+_deserializer = TypeDeserializer()
+
+
+def _now() -> datetime:
+    return datetime.now(tz=UTC)
+
+
+def _client(dynamodb_client: DynamoDBClient | None) -> DynamoDBClient:
+    return dynamodb_client if dynamodb_client is not None else boto3.client("dynamodb")
+
+
+def _resolve_table(config: BeaconConfig | None, table_name: str | None) -> str:
+    """Return the explicit table name, else the one from config.
+
+    New Lambdas (voice, remediation, dashboard) pass ``table_name`` and never
+    build a :class:`BeaconConfig`, which requires the triage env vars.
+    """
+    if table_name:
+        return table_name
+    if config is not None and config.incidents_table_name:
+        return config.incidents_table_name
+    raise ValueError("A DynamoDB table name is required (table_name or config)")
+
+
+def _to_dynamo(value: Any) -> Any:
+    """Serialize a JSON-like value to DynamoDB attribute-value format.
+
+    Floats are converted to ``Decimal`` (DynamoDB rejects float).
+    """
+    normalised = json.loads(json.dumps(value, default=str), parse_float=Decimal)
+    return _serializer.serialize(normalised)
 
 
 def put_incident(
     analysis: str,
     trigger: TriggerInfo,
-    config: BeaconConfig,
+    config: BeaconConfig | None = None,
     *,
     dynamodb_client: DynamoDBClient | None = None,
+    table_name: str | None = None,
+    rca_json: dict[str, Any] | None = None,
+    timeline: list[dict[str, Any]] | None = None,
+    diagnostics: dict[str, Any] | None = None,
+    changes: list[dict[str, Any]] | None = None,
+    status: str = "awaiting_engineer",
+    woken: bool = True,
 ) -> str:
     """Store a new incident record and return its generated UUID.
 
-    Sets ``prefetch_status`` to ``"pending"`` and a 7-day TTL.
+    Sets ``prefetch_status`` to ``"pending"``, a 30-day TTL, the lifecycle
+    ``status`` and the structured ``rca_json``/``timeline`` used by the
+    dashboard and the voice agent.
     """
-    if dynamodb_client is None:
-        dynamodb_client = boto3.client("dynamodb")
+    client = _client(dynamodb_client)
+    table = _resolve_table(config, table_name)
 
     incident_id = str(uuid.uuid4())
-    ttl = int((datetime.now(tz=UTC) + timedelta(days=_TTL_DAYS)).timestamp())
+    now = _now()
+    ttl = int((now + timedelta(days=_TTL_DAYS)).timestamp())
 
     item: dict[str, Any] = {
         "incident_id": {"S": incident_id},
         "rca": {"S": analysis},
         "trigger_type": {"S": trigger.trigger_type.value},
-        "timestamp": {"S": datetime.now(tz=UTC).isoformat()},
+        "timestamp": {"S": now.isoformat()},
         "ttl": {"N": str(ttl)},
         "prefetch_status": {"S": "pending"},
+        "status": {"S": status},
+        "woken": {"BOOL": woken},
+        "timeline": _to_dynamo(timeline or []),
     }
     if trigger.alarm_name:
         item["alarm_name"] = {"S": trigger.alarm_name}
     if trigger.alarm_reason:
         item["alarm_reason"] = {"S": trigger.alarm_reason}
-    if config.log_group_patterns:
+    if config is not None and config.log_group_patterns:
         item["log_groups"] = {"L": [{"S": g} for g in config.log_group_patterns]}
+    if rca_json is not None:
+        item["rca_json"] = _to_dynamo(rca_json)
+    if diagnostics is not None:
+        item["diagnostics"] = _to_dynamo(diagnostics)
+    if changes is not None:
+        item["changes"] = _to_dynamo(changes)
 
-    dynamodb_client.put_item(TableName=config.incidents_table_name, Item=item)
+    client.put_item(TableName=table, Item=item)
     logger.info("Stored incident %s in DynamoDB", incident_id)
     return incident_id
 
 
 def get_incident(
     incident_id: str,
-    config: BeaconConfig,
+    config: BeaconConfig | None = None,
     *,
+    table_name: str | None = None,
     dynamodb_client: DynamoDBClient | None = None,
 ) -> dict[str, Any]:
     """Read an incident record by ID and deserialize it into a plain dict.
@@ -68,23 +124,113 @@ def get_incident(
     Returns an empty dict if the item does not exist.  The ``cached_data``
     field is automatically JSON-decoded if present.
     """
-    if dynamodb_client is None:
-        dynamodb_client = boto3.client("dynamodb")
-
-    resp = dynamodb_client.get_item(
-        TableName=config.incidents_table_name,
+    client = _client(dynamodb_client)
+    resp = client.get_item(
+        TableName=_resolve_table(config, table_name),
         Key={"incident_id": {"S": incident_id}},
     )
-    raw = resp.get("Item", {})
-    return _deserialize_item(raw)
+    return _deserialize_item(resp.get("Item", {}))
+
+
+def append_timeline(
+    incident_id: str,
+    event: str,
+    *,
+    table_name: str,
+    detail: dict[str, Any] | None = None,
+    dynamodb_client: DynamoDBClient | None = None,
+) -> dict[str, Any]:
+    """Append one ``{t, event, detail?}`` entry to the incident timeline."""
+    entry: dict[str, Any] = {"t": _now().isoformat(), "event": event}
+    if detail:
+        entry["detail"] = detail
+    _client(dynamodb_client).update_item(
+        TableName=table_name,
+        Key={"incident_id": {"S": incident_id}},
+        UpdateExpression="SET #tl = list_append(if_not_exists(#tl, :empty), :entry)",
+        ExpressionAttributeNames={"#tl": "timeline"},
+        ExpressionAttributeValues={
+            ":empty": {"L": []},
+            ":entry": {"L": [_to_dynamo(entry)]},
+        },
+    )
+    return entry
+
+
+def update_status(
+    incident_id: str,
+    status: str,
+    *,
+    table_name: str,
+    extra: dict[str, Any] | None = None,
+    dynamodb_client: DynamoDBClient | None = None,
+) -> None:
+    """Set the lifecycle ``status`` plus any extra top-level attributes."""
+    names = {"#status": "status"}
+    values: dict[str, Any] = {":status": {"S": status}}
+    sets = ["#status = :status"]
+    for i, (key, value) in enumerate((extra or {}).items()):
+        names[f"#e{i}"] = key
+        values[f":e{i}"] = _to_dynamo(value)
+        sets.append(f"#e{i} = :e{i}")
+    _client(dynamodb_client).update_item(
+        TableName=table_name,
+        Key={"incident_id": {"S": incident_id}},
+        UpdateExpression="SET " + ", ".join(sets),
+        ExpressionAttributeNames=names,
+        ExpressionAttributeValues=values,
+    )
+
+
+def find_open_incident(
+    alarm_name: str,
+    *,
+    table_name: str,
+    within_minutes: int = 10,
+    dynamodb_client: DynamoDBClient | None = None,
+) -> dict[str, Any] | None:
+    """Return the newest non-terminal incident for *alarm_name* in the window.
+
+    Used to deduplicate alarm re-evaluations (and ``set-alarm-state`` flaps)
+    so one outage produces one incident.  The table is small, so a filtered
+    scan is fine.
+    """
+    since = (_now() - timedelta(minutes=within_minutes)).isoformat()
+    client = _client(dynamodb_client)
+    kwargs: dict[str, Any] = {
+        "TableName": table_name,
+        "FilterExpression": (
+            "alarm_name = :alarm AND #ts >= :since AND NOT (#st IN (:r, :e, :c))"
+        ),
+        "ExpressionAttributeNames": {"#ts": "timestamp", "#st": "status"},
+        "ExpressionAttributeValues": {
+            ":alarm": {"S": alarm_name},
+            ":since": {"S": since},
+            ":r": {"S": _TERMINAL_STATUSES[0]},
+            ":e": {"S": _TERMINAL_STATUSES[1]},
+            ":c": {"S": _TERMINAL_STATUSES[2]},
+        },
+    }
+    items: list[dict[str, Any]] = []
+    while True:
+        resp = client.scan(**kwargs)
+        items.extend(_deserialize_item(raw) for raw in resp.get("Items", []))
+        last_key = resp.get("LastEvaluatedKey")
+        if not last_key:
+            break
+        kwargs["ExclusiveStartKey"] = last_key
+    if not items:
+        return None
+    return max(items, key=lambda item: str(item.get("timestamp", "")))
 
 
 def update_cached_data(
     incident_id: str,
     cached_data: dict[str, Any],
-    config: BeaconConfig,
+    config: BeaconConfig | None = None,
     *,
     status: str = "complete",
+    table_name: str | None = None,
     dynamodb_client: DynamoDBClient | None = None,
 ) -> None:
     """Write pre-fetched investigation data to an incident record.
@@ -92,11 +238,8 @@ def update_cached_data(
     Serializes *cached_data* as JSON and sets ``prefetch_status`` to
     *status* (``"complete"`` or ``"failed"``).
     """
-    if dynamodb_client is None:
-        dynamodb_client = boto3.client("dynamodb")
-
-    dynamodb_client.update_item(
-        TableName=config.incidents_table_name,
+    _client(dynamodb_client).update_item(
+        TableName=_resolve_table(config, table_name),
         Key={"incident_id": {"S": incident_id}},
         UpdateExpression="SET cached_data = :cd, prefetch_status = :ps",
         ExpressionAttributeValues={
@@ -107,36 +250,32 @@ def update_cached_data(
     logger.info("Updated cached data for incident %s (status=%s)", incident_id, status)
 
 
+def _from_decimal(value: Any) -> Any:
+    """Turn DynamoDB ``Decimal`` numbers back into int/float recursively."""
+    if isinstance(value, Decimal):
+        return int(value) if value == value.to_integral_value() else float(value)
+    if isinstance(value, list):
+        return [_from_decimal(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _from_decimal(v) for k, v in value.items()}
+    return value
+
+
 def _deserialize_item(item: dict[str, Any]) -> dict[str, Any]:
-    """Flatten DynamoDB attribute-value format into plain dicts."""
+    """Flatten DynamoDB attribute-value format into plain dicts.
+
+    Numbers come back as int/float, except ``ttl`` which stays a string for
+    backwards compatibility with callers that ``int()`` it.
+    """
     result: dict[str, Any] = {}
     for key, value in item.items():
-        if "S" in value:
-            result[key] = value["S"]
-        elif "N" in value:
-            result[key] = value["N"]
-        elif "L" in value:
-            result[key] = [_deserialize_value(v) for v in value["L"]]
-        elif "M" in value:
-            result[key] = _deserialize_item(value["M"])
-        else:
-            result[key] = value
+        plain = _from_decimal(_deserializer.deserialize(value))
+        if key == "ttl":
+            plain = str(plain)
+        result[key] = plain
 
     if "cached_data" in result and isinstance(result["cached_data"], str):
         with contextlib.suppress(json.JSONDecodeError, TypeError):
             result["cached_data"] = json.loads(result["cached_data"])
 
     return result
-
-
-def _deserialize_value(value: dict[str, Any]) -> Any:
-    """Recursively unwrap a single DynamoDB attribute value."""
-    if "S" in value:
-        return value["S"]
-    if "N" in value:
-        return value["N"]
-    if "L" in value:
-        return [_deserialize_value(v) for v in value["L"]]
-    if "M" in value:
-        return _deserialize_item(value["M"])
-    return value
