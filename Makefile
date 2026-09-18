@@ -20,9 +20,11 @@ HOST_ARCH   := $(if $(filter aarch64 arm64,$(UNAME_M)),arm64,amd64)
 CFN_ARCH    := $(if $(filter arm64,$(HOST_ARCH)),ARM64,X86_64)
 LAMBDA_ARCH := $(if $(filter arm64,$(HOST_ARCH)),arm64,x86_64)
 
-# Every image is tagged with the git SHA so CloudFormation sees a new URI on
-# every code change (a ':latest' URI never redeploys the Lambda).
-IMAGE_TAG ?= $(shell git rev-parse --short HEAD 2>/dev/null || date +%s)
+# Every image is tagged with the short SHA of the last commit that touched the
+# image inputs (src/beacon, Dockerfiles, pyproject), so CloudFormation sees a
+# new URI on every code change (a ':latest' URI never redeploys the Lambda)
+# while docs-only commits do not invalidate a built image.
+IMAGE_TAG ?= $(shell bash scripts/image_tag.sh)
 
 # Persist KEY=VALUE into .beacon.env (upsert) so the next make run remembers it.
 define save_env

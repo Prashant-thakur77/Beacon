@@ -39,5 +39,8 @@ Ordered by demo risk. Each task is self-contained: file list + definition of don
 - [x] README rewrite; `docs/safety.md`, `docs/demo-script.md`, `docs/submission.md`, `docs/blog.md`; CI updated
 - [ ] fixes from H4/H6 (human deploy feedback) — **needs the human's AWS runs**
 - [ ] `tests/fixtures/real/` + refreshed `web/public/replay/incident-001.json` from a real run (`make capture-run`)
-- [ ] `docs/assemblyai.md` + branch `assemblyai` scaffold (`web/src/voice/transport.ts` interface, `/tools/<name>` route) — after the First Commit submission
-- [ ] cover image `docs/assets/cover.svg`, architecture SVG for the video overlay
+- [x] `docs/assemblyai.md` + branch `assemblyai` scaffold (transport interface, AssemblyAI transport, `/tools/<name>` + `/assemblyai/token`, tools.json export) — on branch `assemblyai`, not merged
+- [x] architecture SVG (`docs/assets/architecture.svg`) for README + video overlay
+- [x] Step Functions definition walked against the real handler (`tests/test_asl_walk.py`)
+- [x] image tags track the last commit touching image inputs (docs commits no longer invalidate built images)
+- [ ] cover image `docs/assets/cover.png` (AssemblyAI submission; from a real Night Board screenshot)

@@ -17,7 +17,7 @@ if [ -z "$uri" ]; then
 fi
 
 tag="${uri##*:}"
-head_sha="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+head_sha="$(bash "$(dirname "$0")/image_tag.sh")"
 
 if [ "$tag" = "latest" ] || [ "$tag" = "$uri" ]; then
     if [ "${ALLOW_STALE_IMAGE:-0}" = "1" ]; then
@@ -30,10 +30,10 @@ fi
 
 if [ "$tag" != "$head_sha" ]; then
     if [ "${ALLOW_STALE_IMAGE:-0}" = "1" ]; then
-        echo "${yellow}WARNING: $name tag '$tag' != git HEAD '$head_sha'. The deployed code will not match the tree. Continuing because ALLOW_STALE_IMAGE=1.${reset}" >&2
+        echo "${yellow}WARNING: $name tag '$tag' != source tag '$head_sha'. The deployed code will not match the tree. Continuing because ALLOW_STALE_IMAGE=1.${reset}" >&2
         exit 0
     fi
-    echo "${red}ERROR: $name tag '$tag' does not match git HEAD '$head_sha'. Rebuild with 'make setup-image' / 'make setup-agent-image' (only the code layer is pushed, a few minutes), or set ALLOW_STALE_IMAGE=1 to deploy anyway.${reset}" >&2
+    echo "${red}ERROR: $name tag '$tag' does not match the current source tag '$head_sha' (last commit touching src/beacon, Dockerfiles or pyproject; '-dirty' = uncommitted changes there). Rebuild with 'make setup-image' / 'make setup-agent-image' (only the code layer is pushed, a few minutes), or set ALLOW_STALE_IMAGE=1 to deploy anyway.${reset}" >&2
     exit 1
 fi
 

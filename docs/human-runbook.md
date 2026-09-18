@@ -190,6 +190,10 @@ make demo-sleep REGION=us-east-1                # real re-break; wait for the re
 watch -n 15 'make incidents REGION=us-east-1'   # new row: status auto_remediating -> resolved, and the email subject says "(not woken)"
 ```
 
+Local mic smoke before touching CloudFront (Saturday 14:00, per the plan): `make local LOCAL_PORT=8765` (port 8000 is taken on this machine), open `http://localhost:8765/?stt=webspeech`, passcode `local`, hold the mic and speak. This proves the worklet + playback path on the laptop; the Transcribe path itself needs the live URL (it needs the STS creds from `/session`).
+
+If Transcribe answers `BadRequestException ... language` for `en-IN`, redeploy with `make deploy-console STT_LANGUAGE=en-US` (the console reads it from `/config.json`, no rebuild).
+
 If anything fails: paste the verbatim output. Most likely culprits, in order: `UnauthorizedOperation` in `make dry-run` (IAM statement), Step Functions execution `FAILED` at `RequireApproval` (approval table name env), Verify escalating with `ErrorCount` still > 0 (the app needs ~60 s of 200s after the rule returns; a retake with `make demo-reset` fixes it).
 
 **One-line fallback if Step Functions is the problem at 09:45:** the voice Lambda can run the loop inline through the remediate Lambda (`{step: "all"}`) with no template change; tell the agent and it flips `REMEDIATION_MODE=inline`.
