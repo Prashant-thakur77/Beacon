@@ -1,0 +1,54 @@
+# AssemblyAI Voice Agent hackathon — phase plan (21–30 Sep 2026)
+
+Same product, same backend, a different mouth and ears. Judged on *Application of Technology, Presentation, Business Value, Originality*; five flat winners out of ~80 entries, most of which are receptionists and support bots. Beacon's pitch: **a voice agent whose most important sentence is a tool call that can change production — and the transcript is the safety artifact.**
+
+## API choice
+
+**Voice Agent API** (`wss://agents.assemblyai.com/v1/ws`) as the primary path: Universal-3 Pro STT, managed turn detection and barge-in, LLM routing, TTS, JSON-Schema tool calling on one socket. The Realtime STT API stays as a fallback (`VOICE_BACKEND=assemblyai_stt`: swap only the STT transport, keep Strands + Nova + Polly) if client-side tool semantics do not fit.
+
+Facts verified from the docs on 18 Sep (re-verify on day 1, the spike):
+
+| Item | Verified |
+|---|---|
+| Endpoint | `wss://agents.assemblyai.com/v1/ws`; auth documented as `Authorization: Bearer <key>` (header) — browsers cannot set WS headers, so the spike must confirm the temporary-token or query-param path. `voice_turn._mint_assemblyai_token` is the single function to adjust. |
+| First message | `session.update { session: { system_prompt, greeting, input:{format:{encoding:"audio/pcm"}, turn_detection:{vad_threshold}, transcription_mode, language_codes, voice_focus}, output:{voice, format}, tools:[{type:"function", name, description, parameters}] } }`; re-sendable mid-call. |
+| Audio | in: `input.audio { audio: base64 PCM16 24 kHz mono, ~50 ms chunks }`; out: `reply.audio` base64 PCM16 24 kHz. |
+| Events | `session.ready`, `transcript.user.delta` (partial, overwrite), `transcript.user` (final), `reply.started`, `reply.audio`, `transcript.agent` (full, trimmed if interrupted), `tool.call { call_id, name, arguments }`, `reply.done { status: completed \| interrupted }`, `session.error`. |
+| Tool results | `tool.result { call_id, result: "<json string>", is_error }` — **only when `reply.done` is the latest event** for the turn that carried the call. The transport buffers results until then. |
+| Limits | ~1 s end-to-end latency, 30 s reconnect window. |
+
+## The boundary in code (already on branch `assemblyai`)
+
+- **Browser** `web/src/voice/transport.ts`: `VoiceTransport { start(session, handlers), sendAudio, sendText, interrupt, stop }` with handlers for user transcript (partial/final + confidence), agent text (with `[E#]` citations), agent audio, done/interrupted, tool results, state. `web/src/voice/assemblyai.ts` implements it; the First Commit cascade gets wrapped as `AwsCascadeTransport` on day 2.
+- **Tool definitions** `web/src/tools.json`, generated from `voice_tools.TOOL_SCHEMAS` by `make export-tools`; a test fails if it drifts.
+- **Server** `POST /tools/<name>` on the voice Lambda: runs one tool with a `TurnContext` built from the **browser-supplied final transcript and its confidence**. Consent tools (`approve_fix`, `grant_sleep_contract`) are refused below 0.85 confidence with "please repeat the exact phrase". `POST /assemblyai/token` mints a short-lived token from an SSM SecureString (`ASSEMBLYAI_KEY_PARAM`), passcode-gated.
+- **Everything else is unchanged:** triage, ledger, registry, Step Functions loop, contracts, dashboard, DynamoDB, Bedrock inside the tools. Both entries share one backend and one CloudFront URL (`?voice=assemblyai` / `?voice=aws`).
+
+## Day by day
+
+| Day | Work | Done when |
+|---|---|---|
+| **Mon 21** | Spike: connect with a temp token from the browser, `session.update` with one echo tool, confirm the token path, the exact event names, whether a server-injected context message mid-session is supported (for the "alarm is back to OK" turn), and measure a turn. Add `AssemblyAIKeyParam` + `ssm:GetParameter (WithDecryption)` to `console-template.yaml`. | Decision (Voice Agent vs Realtime STT) written here; `make deploy-console VOICE_BACKEND=assemblyai` works. |
+| **Tue 22** | Wire `AssemblyAITransport` into `Talk.tsx` behind `config.voiceBackend`; mic → 24 kHz PCM via the worklet; playback ring buffer with flush on `interrupted`; `AwsCascadeTransport` wrapper for parity. Per-incident **keyterms** from `rca_json` + diagnostics (`sg-…`, alarm name, `approve fix one`, `grant contract for seven days`) sent in `session.update`. | Full loop (brief → evidence → propose → approve → resolved → contract) on the AssemblyAI path against the live AWS backend. |
+| **Wed 23** | Behaviours: **barge-in during the read-back** → `interrupt()` + a `cancel_proposal` tool + UI marker; **confidence gate** on approvals (already server-side) with the "repeat the phrase" line; **Hinglish** affirmatives for the read-back and the code-switched grant phrase (`saat din ke liye contract do`); **agent-initiated turn** when the watcher sees `resolved` (context injection if supported, else a Polly one-liner + chime); `grant_sleep_contract(until: "till Monday")` natural-duration parsing (still behind the read-back); **drop-safety** test: close the socket mid-approval, assert nothing executed. | Each behaviour has a test and a rehearsed script line. |
+| **Thu 24** | Latency overlay (measured per turn: cascade vs Voice Agent); replay mode for the AssemblyAI path; three end-to-end runs; merge `assemblyai` → `main` behind the flag; redeploy. | `?voice=assemblyai` and `?voice=aws` both work on the same CloudFront URL. |
+| **Fri 25** | Record raw footage: interruption, Hinglish approval, mumbled approval refused then clear approval executes, contract "till Monday", drop-safety, agent-initiated recovery line, latency overlay. Slide deck (10 slides) and cover image. | Raw clips + deck v1 + cover. |
+| **Sat 26** | Edit the 3-minute video; descriptions and tags; deck polish. | Video uploaded (unlisted). |
+| **Sun 27** | Submit v1 early; ask a mentor in Discord for feedback. | Submission confirmed. |
+| **Mon 28 – Tue 29** | Fixes, re-cut, final submit by Tue 29 evening (deadline Wed 30 20:30 IST). | Final. |
+
+## What is new for this hackathon (the originality story)
+
+1. **Consent from the ASR transcript, gated on confidence.** The model's tool argument is ignored; the server checks what Universal-3 Pro actually heard and refuses a mumbled approval.
+2. **Barge-in cancels a pending fix.** Interrupting the read-back withdraws the proposal — turn-taking with a safety meaning.
+3. **Sleep Contracts granted by voice**, in English or Hinglish, with the quote stored on every approval they later produce.
+4. **Agent-initiated turn**: Beacon speaks first when CloudWatch says the alarm cleared.
+5. **Drop-safety**: kill the socket mid-approval and nothing executes, because execution is a DynamoDB record plus a Step Functions run, not a socket state.
+
+## Submission checklist
+
+Title *Beacon Night Shift: the on-call agent you can interrupt* · short + long description (from `docs/submission.md` plus this page) · tags (Voice Agent API, Universal-3 Pro, tool calling; DevOps, incident response, SRE) · cover image `docs/assets/cover.png` (1280×720 from the Night Board) · video (YouTube) · slides (`.pptx` + PDF) · repo (`main`, tag `v0.3.0`) · platform: Web · application URL: the CloudFront URL with `?voice=assemblyai` · judge passcode in the description.
+
+## Repo strategy
+
+`v0.2.0` = First Commit submission (immutable). Branch `assemblyai` from it (this branch). Merge to `main` on 24 Sep behind `VOICE_BACKEND` / `config.voiceBackend`; `?voice=aws` reproduces the First Commit experience exactly; images re-tagged with the new SHA and the deploy guard enforced. If the demo stack is torn down for cost, replay mode keeps both URLs meaningful.

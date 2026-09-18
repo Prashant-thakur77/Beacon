@@ -39,6 +39,8 @@ logger.setLevel(logging.INFO)
 SERVICE = "beacon-voice-turn"
 _CITATION_RE = re.compile(r"\s*\[(E\d+)\]")
 _MAX_HISTORY = 20
+_CONSENT_TOOLS = ("approve_fix", "grant_sleep_contract")
+_MIN_CONSENT_CONFIDENCE = 0.85
 
 app = LambdaFunctionUrlResolver(
     cors=CORSConfig(allow_origin="*", allow_headers=["x-beacon-passcode"])
@@ -332,6 +334,123 @@ def turn() -> Response[str]:
             "turn": turns_so_far + 1,
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# AssemblyAI phase: the agent lives in the browser session; tools run here
+# ---------------------------------------------------------------------------
+
+
+def _run_tool(
+    name: str,
+    args: dict[str, Any],
+    *,
+    incident_id: str,
+    session_id: str,
+    transcript: str,
+    channel: str,
+    confidence: float | None,
+) -> dict[str, Any]:
+    """Execute one tool with a TurnContext built from the browser's transcript.
+
+    For consent tools the STT confidence must clear a bar: a mumbled
+    "approve fix one" is refused with a request to repeat the phrase.
+    """
+    if (
+        name in _CONSENT_TOOLS
+        and confidence is not None
+        and confidence < _MIN_CONSENT_CONFIDENCE
+    ):
+        return {
+            "ok": False,
+            "result": {
+                "approved": False,
+                "granted": False,
+                "error": (
+                    f"I heard that at {int(confidence * 100)}% confidence; "
+                    "please repeat the exact phrase clearly"
+                ),
+            },
+            "tool_events": [],
+            "evidence": [],
+        }
+    ctx = TurnContext(
+        incident_id=incident_id,
+        session_id=session_id,
+        transcript=transcript,
+        channel=channel,
+        passcode_ok=True,
+    )
+    with turn_context(ctx):
+        result = voice_tools.dispatch(name, args)
+    return {
+        "ok": "error" not in result,
+        "result": result,
+        "tool_events": ctx.tool_events,
+        "evidence": ctx.evidence,
+    }
+
+
+@app.post("/tools/<name>")
+def tools_route(name: str) -> Response[str]:
+    if not _passcode_ok(dict(app.current_event.headers)):
+        return _json(401, {"error": "passcode required"})
+    if name not in voice_tools.TOOL_FUNCTIONS:
+        return _json(404, {"error": f"unknown tool {name}"})
+    body = app.current_event.json_body or {}
+    incident_id = str(body.get("incident_id", ""))
+    if not incident_id:
+        return _json(400, {"error": "incident_id is required"})
+    if not store.get_incident(incident_id, table_name=_incidents_table()):
+        return _json(404, {"error": f"incident {incident_id} not found"})
+    raw_conf = body.get("confidence")
+    out = _run_tool(
+        name,
+        dict(body.get("args") or {}),
+        incident_id=incident_id,
+        session_id=str(body.get("session_id", "assemblyai")),
+        transcript=str(body.get("transcript", "")).strip(),
+        channel=str(body.get("channel", "assemblyai")),
+        confidence=float(raw_conf) if isinstance(raw_conf, int | float) else None,
+    )
+    fresh = store.get_incident(incident_id, table_name=_incidents_table())
+    fresh.pop("conversation", None)
+    fresh.pop("rca", None)
+    out["incident"] = fresh
+    return _json(200, out)
+
+
+def _mint_assemblyai_token(api_key: str) -> dict[str, Any]:
+    """Exchange the long-lived key for a short-lived browser token."""
+    import urllib.request
+
+    req = urllib.request.Request(
+        "https://api.assemblyai.com/v2/realtime/token",
+        data=json.dumps({"expires_in": 600}).encode(),
+        headers={"authorization": api_key, "content-type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+        data = json.loads(resp.read().decode())
+    return {"token": data.get("token"), "expires_in_seconds": 600}
+
+
+@app.post("/assemblyai/token")
+def assemblyai_token() -> Response[str]:
+    if not _passcode_ok(dict(app.current_event.headers)):
+        return _json(401, {"error": "passcode required"})
+    param = _env("ASSEMBLYAI_KEY_PARAM")
+    if not param:
+        return _json(503, {"error": "AssemblyAI is not configured on this deployment"})
+    try:
+        api_key = boto3.client("ssm").get_parameter(Name=param, WithDecryption=True)[
+            "Parameter"
+        ]["Value"]
+        minted = _mint_assemblyai_token(api_key)
+    except Exception as exc:
+        logger.exception("assemblyai token mint failed")
+        return _json(502, {"error": f"could not mint an AssemblyAI token: {exc}"})
+    return _json(200, minted)
 
 
 # ---------------------------------------------------------------------------

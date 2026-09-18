@@ -297,3 +297,146 @@ def test_strip_citations_and_collect_ids() -> None:
     text, ids = voice_turn.strip_citations("The rule is gone [E1][E3]. Fix ready [E2].")
     assert text == "The rule is gone. Fix ready."
     assert ids == ["E1", "E3", "E2"]
+
+
+# ------------------------------------------------ AssemblyAI phase routes
+
+
+def test_tools_route_runs_one_tool_with_the_browser_transcript(env: Any) -> None:
+    resp = _post(
+        "/tools/get_incident_brief",
+        {
+            "incident_id": env["incident_id"],
+            "args": {},
+            "transcript": "brief me",
+            "channel": "assemblyai",
+            "confidence": 0.97,
+        },
+    )
+    assert resp["statusCode"] == 200
+    body = json.loads(resp["body"])
+    assert body["ok"] is True and body["result"]["status"] == "High"
+    assert body["evidence"][0]["id"] == "E1"
+
+
+def test_tools_route_approve_uses_the_transcript_not_the_args(
+    env: Any, mocker: Any
+) -> None:
+    mocker.patch(
+        "beacon.voice_tools._invoke_remediate",
+        return_value={
+            "ok": True,
+            "code": "DryRunOperation",
+            "blast_radius": "1 rule",
+            "role": "r",
+        },
+    )
+    mocker.patch("beacon.voice_tools._start_execution", return_value="arn:aws:states:x")
+    store.update_status(
+        env["incident_id"],
+        "awaiting_engineer",
+        table_name=INCIDENTS,
+        extra={
+            "rca_json": {
+                **RCA,
+                "beacon_json": {
+                    "suggested_action": "sg.restore_ingress",
+                    "action_params": {
+                        "group_id": "sg-1",
+                        "ip_protocol": "tcp",
+                        "from_port": 5432,
+                        "to_port": 5432,
+                        "source_group_id": "sg-2",
+                    },
+                },
+            }
+        },
+    )
+    _post(
+        "/tools/propose_fix",
+        {
+            "incident_id": env["incident_id"],
+            "args": {},
+            "transcript": "fix it",
+            "channel": "assemblyai",
+        },
+    )
+    refused = json.loads(
+        _post(
+            "/tools/approve_fix",
+            {
+                "incident_id": env["incident_id"],
+                "args": {"fix_id": 1, "confirmation_phrase": "approve fix 1"},
+                "transcript": "yeah go ahead",
+                "channel": "assemblyai",
+            },
+        )["body"]
+    )
+    assert refused["result"]["approved"] is False
+    ok = json.loads(
+        _post(
+            "/tools/approve_fix",
+            {
+                "incident_id": env["incident_id"],
+                "args": {"fix_id": 1, "confirmation_phrase": "approve fix 1"},
+                "transcript": "okay approve fix one",
+                "channel": "assemblyai",
+            },
+        )["body"]
+    )
+    assert ok["result"]["approved"] is True
+
+
+def test_tools_route_rejects_low_confidence_approvals(env: Any) -> None:
+    resp = _post(
+        "/tools/approve_fix",
+        {
+            "incident_id": env["incident_id"],
+            "args": {"fix_id": 1, "confirmation_phrase": "approve fix 1"},
+            "transcript": "approve fix one",
+            "channel": "assemblyai",
+            "confidence": 0.6,
+        },
+    )
+    body = json.loads(resp["body"])
+    assert body["ok"] is False and "repeat" in body["result"]["error"]
+
+
+def test_tools_route_requires_passcode_and_known_tool(env: Any) -> None:
+    assert (
+        _post(
+            "/tools/get_incident_brief",
+            {"incident_id": env["incident_id"]},
+            passcode=None,
+        )["statusCode"]
+        == 401
+    )
+    assert (
+        _post("/tools/launch_nukes", {"incident_id": env["incident_id"]})["statusCode"]
+        == 404
+    )
+
+
+def test_assemblyai_token_route_mints_a_temporary_token(
+    env: Any, mocker: Any, monkeypatch: Any
+) -> None:
+    monkeypatch.setenv("ASSEMBLYAI_KEY_PARAM", "/beacon/test/assemblyai-key")
+    boto3.client("ssm", region_name="us-east-1").put_parameter(
+        Name="/beacon/test/assemblyai-key", Type="SecureString", Value="aai-secret"
+    )
+    minted = mocker.patch(
+        "beacon.voice_turn._mint_assemblyai_token",
+        return_value={"token": "tmp-123", "expires_in_seconds": 600},
+    )
+    resp = _post("/assemblyai/token", {})
+    assert resp["statusCode"] == 200
+    assert json.loads(resp["body"])["token"] == "tmp-123"
+    assert minted.call_args.args[0] == "aai-secret"
+    assert _post("/assemblyai/token", {}, passcode=None)["statusCode"] == 401
+
+
+def test_assemblyai_token_route_is_503_when_not_configured(
+    env: Any, monkeypatch: Any
+) -> None:
+    monkeypatch.delenv("ASSEMBLYAI_KEY_PARAM", raising=False)
+    assert _post("/assemblyai/token", {})["statusCode"] == 503

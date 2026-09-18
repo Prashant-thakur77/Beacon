@@ -1,6 +1,6 @@
 .PHONY: deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
-       test lint check-image-tags smoke-strands deploy-remediation teardown-remediation \
+       test lint check-image-tags smoke-strands export-tools deploy-remediation teardown-remediation \
        snapshot-sg tag-remediable dry-run changes incidents lint-templates \
        deploy-console teardown-console web-build set-passcode console-config \
        check-reduction capture-run propose approve replay-approval demo-alarm demo-reset \
@@ -604,6 +604,10 @@ CFN_LINT ?= .venv/bin/cfn-lint
 # Needs AWS credentials + Bedrock model access. Decides VOICE_ENGINE (see PLAN.md).
 smoke-strands:
 	$(PYTHON) scripts/smoke_strands.py
+
+# Regenerate web/src/tools.json from TOOL_SCHEMAS (the AssemblyAI browser agent registers these).
+export-tools:
+	$(PYTHON) scripts/export_tools.py
 
 test:
 	pytest -v

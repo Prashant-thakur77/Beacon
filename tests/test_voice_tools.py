@@ -298,3 +298,14 @@ def test_check_recovery_reports_status_and_verify_checks(env: Any) -> None:
     with turn_context(_ctx(env["incident_id"], "is it fixed")):
         out = voice_tools.check_recovery()
     assert out["status"] == "resolved" and out["last_verify"]["attempt"] == 2
+
+
+def test_exported_tools_json_matches_tool_schemas() -> None:
+    """web/src/tools.json is what the browser agent registers; keep it in sync."""
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).parent.parent / "web" / "src" / "tools.json"
+    assert json.loads(path.read_text()) == voice_tools.TOOL_SCHEMAS, (
+        "run make export-tools"
+    )

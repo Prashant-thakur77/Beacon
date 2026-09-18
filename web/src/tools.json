@@ -1,0 +1,92 @@
+[
+  {
+    "name": "get_incident_brief",
+    "description": "Get the incident summary, severity, likely cause and the suggested fix. Call this first.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "get_evidence",
+    "description": "Fetch evidence of one kind for the current incident: logs, metrics, changes (CloudTrail write calls before the alarm), diagnostics (security group drift), or rca.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "logs",
+            "metrics",
+            "changes",
+            "diagnostics",
+            "rca"
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    }
+  },
+  {
+    "name": "propose_fix",
+    "description": "Propose the one allowlisted fix for this incident. Runs a dry run under the remediator role and returns the blast radius and the exact confirmation phrase. Never applies anything.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "approve_fix",
+    "description": "Apply a proposed fix. Only succeeds if the engineer literally said 'approve fix <n>' in this turn; the server checks the transcript. Then a verified remediation loop runs.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "fix_id": {
+          "type": "integer",
+          "description": "The fix number from propose_fix"
+        },
+        "confirmation_phrase": {
+          "type": "string",
+          "description": "What the engineer said, e.g. 'approve fix 1'"
+        }
+      },
+      "required": [
+        "fix_id",
+        "confirmation_phrase"
+      ]
+    }
+  },
+  {
+    "name": "grant_sleep_contract",
+    "description": "Grant Beacon a standing approval to run this same fix for this alarm next time without waking anyone. First call returns a read-back to speak aloud; it is granted only when the engineer then says 'grant contract for <n> days'.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "days": {
+          "type": "integer",
+          "description": "How many days the contract lasts (1-30)",
+          "default": 7
+        },
+        "max_uses": {
+          "type": "integer",
+          "description": "How many times it may be used (1-10)",
+          "default": 3
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "check_recovery",
+    "description": "Check whether the remediation loop has verified recovery (alarm OK after the fix, error metric zero, post-condition).",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  }
+]
