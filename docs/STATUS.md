@@ -1,4 +1,4 @@
-# Status — Sat 19 Sep 2026, 12:00 IST
+# Status — Sat 19 Sep 2026, 14:00 IST
 
 ## What works (verified in the sandbox)
 
@@ -7,7 +7,7 @@
 | Backend, all three stacks, safety model | 242 tests; `bash scripts/gate.sh` green (ruff, mypy --strict, cfn-lint, pytest, web `tsc`) |
 | Production hardening | `tests/test_hardening.py` (fail-closed passcode, limits, bounded clients, recorded execute failures) and `tests/test_template_ops.py` (log groups, alarms, concurrency, PITR, CSP, CORS, Secrets Manager); README "Production notes" |
 | The Step Functions loop against the real handler | `tests/test_asl_walk.py` drives the real ASL through `remediate.handler` |
-| The whole product with no AWS account | `make local LOCAL_PORT=8765`: both incident cycles driven over HTTP, second one "not woken" |
+| The whole product with no AWS account | `make local LOCAL_PORT=8765`: both incident cycles driven over HTTP, second one "not woken"; `?night=1` plays the whole night in the browser unattended (verified headless via CDP: 9 turns, 2 incidents, 1 human woken, contract listed) |
 | Console (minimal redesign) | screenshots at 1440 and 400 px: board, replay, safety; no horizontal scroll |
 | Both container images | `docker build` of `Dockerfile` and `Dockerfile.agent` succeed; imports smoke-tested |
 | Voice protocol facts | Nova 2 Sonic, Transcribe, Polly, AssemblyAI Voice Agent event shapes fetched from the docs on 18 Sep |
@@ -31,9 +31,9 @@ These are not known to be broken — they are unproven. In order of risk:
 
 ## Next (sandbox side, in order)
 
-1. **AssemblyAI day-1 spike prep**: a `scripts/assemblyai_probe.py` that opens the socket with a key, sends `session.update` with an echo tool, and prints every event name it sees — so the spike is "run one script and paste the output", not "read the docs at 9 AM".
-2. **Slides skeleton** for the AssemblyAI submission (`docs/assemblyai-deck.md` → `.pptx` on 25 Sep).
-3. **Cover image** from a real Night Board screenshot once a real run exists.
+1. ~~AssemblyAI day-1 spike prep~~ done (`scripts/assemblyai_probe.py` on the branch).
+2. ~~Slides skeleton~~ done (`docs/assemblyai-deck.md` on the branch; `.pptx` on 25 Sep).
+3. **Cover image** from a real Night Board screenshot once a real run exists (`docs/assets/night-board.png` from local mode is the placeholder).
 4. Item 10 (AgentCore Memory) only on a mentor's yes.
 
 ## Next (your side, in order)
