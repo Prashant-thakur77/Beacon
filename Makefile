@@ -4,7 +4,7 @@
        snapshot-sg tag-remediable dry-run changes incidents lint-templates remediable-ecs break-demo-deploy fix-demo-deploy \
        deploy-console teardown-console web-build set-passcode console-config \
        check-reduction capture-run propose approve replay-approval demo-alarm demo-reset \
-       demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix preflight dashboard build-replay help
+       demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix preflight dashboard build-replay help setup
 
 # Deploy variables persisted by earlier runs (IMAGE_URI, EMAIL, ...). Gitignored.
 -include .beacon.env
@@ -15,6 +15,7 @@ help:  ## every target with a "##" comment, grouped as the runbook uses them
 	@echo "Beacon Night Shift — make targets"
 	@echo
 	@echo "Try it without AWS:"
+	@echo "  setup              one-time: uv venv + CPU torch + cordon + extras, npm ci"
 	@echo "  local              build the console and run the whole product against moto (?night=1 plays a full night)"
 	@echo "  local-break        cut the demo's database rule again (second incident, handled under a contract)"
 	@echo "  local-fix          restore the rule by hand"
@@ -658,6 +659,18 @@ LOCAL_PASSCODE ?= local
 
 # The whole product on localhost against an in-process moto AWS: real tools,
 # real safety checks, scripted agent instead of Bedrock, browser TTS.
+# One-time developer/judge setup: Python venv (CPU torch, cordon without its CUDA
+# pull, the package with agent+dev extras) and the console's npm modules.
+setup: export UV_HTTP_TIMEOUT = 300
+setup:
+	@command -v uv >/dev/null || { echo "install uv first: https://docs.astral.sh/uv/"; exit 1; }
+	uv venv --python 3.12 --allow-existing .venv
+	uv pip install --python .venv/bin/python torch --index-url https://download.pytorch.org/whl/cpu
+	uv pip install --python .venv/bin/python --no-deps cordon
+	uv pip install --python .venv/bin/python -e ".[agent,dev]"
+	cd web && npm ci --silent
+	@echo "Done. Next: make local   (or bash scripts/gate.sh)"
+
 local: web-build
 	@echo "==> http://localhost:$(LOCAL_PORT)  (passcode: $(LOCAL_PASSCODE)). Ctrl-C to stop."
 	@echo "    http://localhost:$(LOCAL_PORT)/?night=1 plays the whole night unattended."
