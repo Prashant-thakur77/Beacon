@@ -1,0 +1,9 @@
+# Runtime of the triage image (Dockerfile). Pinned to the versions the test
+# suite ran against; bump deliberately, then run bash scripts/gate.sh.
+# torch is installed first from the CPU index and cordon with --no-deps (see Dockerfile).
+numpy==2.5.3
+litellm==1.101.0
+tqdm==4.70.1
+tokenizers==0.23.2
+boto3==1.43.97
+genji==1.0.1

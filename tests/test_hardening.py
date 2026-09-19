@@ -147,3 +147,24 @@ def test_health_reports_version() -> None:
 
     resp = voice_turn.handler(url_event("GET", "/health"), None)
     assert json.loads(resp["body"])["version"] == __version__
+
+
+def test_image_requirement_pins_match_the_tested_environment() -> None:
+    """The images install ``requirements/*.txt``; those pins must be the
+    versions this suite ran against, or the image is untested."""
+    import re
+    from importlib.metadata import version
+    from pathlib import Path
+
+    for name in ("triage", "agent"):
+        text = (
+            Path(__file__)
+            .parent.parent.joinpath("requirements", f"{name}.txt")
+            .read_text()
+        )
+        pins = re.findall(r"^([A-Za-z0-9_.-]+)(?:\[[^\]]+\])?==([^\s#]+)", text, re.M)
+        assert pins, name
+        for pkg, pinned in pins:
+            assert version(pkg) == pinned, (
+                f"{name}: {pkg} pinned {pinned}, env {version(pkg)}"
+            )
