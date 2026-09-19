@@ -27,6 +27,9 @@ Dated, specific, in the order they happened. The "Learning" criterion and the la
 - **11:45 — CORS belongs in exactly one place.** A Function URL with a CORS config *and* a Powertools resolver with `CORSConfig` both add `Access-Control-Allow-Origin`; duplicated headers are rejected by browsers. The URL config is the right place (it also answers preflights without invoking the function), so the resolvers now carry none.
 - **11:50 — A per-container read cache needs an escape hatch for single-process test modes.** The 2 s dashboard cache was invisible in production (separate Lambdas write and read) but made `make local` show a stale board for one poll after `local-break` and leaked across test apps. The local server clears it before each dashboard request.
 
+- **14:30 — Test the judge's path, not yours.** A fresh clone in a scratch directory (`git clone … && make setup && pytest && make local`) found two things the working tree never would: `uv venv` refuses an existing `.venv` (the target was not re-runnable) and the image-pin test failed because a fresh install resolves the newest boto3 patch. Now `make setup` is idempotent and the pin check compares major.minor. Do this once per day before a submission.
+- **13:30 — Headless Chromium's `--screenshot` fires on load, and `--virtual-time-budget` never ends on a page that polls.** To watch the console over time, drive it over CDP (`--remote-debugging-port`, `Page.captureScreenshot` at chosen seconds). Twenty lines of Python with `websockets`; it is how "Run the night" was verified end to end.
+
 ## Sat 19 Sep — workshop (fill in at 11:00–14:00)
 
 - Nova 2 Lite tool use through Strands: recommended temperature / quirks →
