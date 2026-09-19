@@ -15,6 +15,7 @@ Routes (JSON, CORS open):
 from __future__ import annotations
 
 import base64
+import hmac
 import json
 import logging
 import os
@@ -24,20 +25,21 @@ from functools import cache
 from importlib.resources import files
 from typing import Any, cast
 
-import boto3
 from aws_lambda_powertools.event_handler import (
     CORSConfig,
     LambdaFunctionUrlResolver,
     Response,
 )
 
-from beacon import observability, store, voice_tools
+from beacon import aws, observability, store, voice_tools
 from beacon.turn_context import TurnContext, turn_context
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 SERVICE = "beacon-voice-turn"
+_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+_MAX_TEXT = 2000
 _CITATION_RE = re.compile(r"\s*\[(E\d+)\]")
 _MAX_HISTORY = 20
 
@@ -70,11 +72,12 @@ def _json(status: int, body: dict[str, Any]) -> Response[str]:
 
 
 def _passcode_ok(headers: dict[str, str]) -> bool:
+    """Constant-time compare; an unset passcode fails closed (the URL is public)."""
     expected = _env("PASSCODE")
-    if not expected:
-        return True
     given = headers.get("x-beacon-passcode") or headers.get("X-Beacon-Passcode") or ""
-    return given == expected
+    if not expected or not given:
+        return False
+    return hmac.compare_digest(given.encode(), expected.encode())
 
 
 def strip_citations(text: str) -> tuple[str, list[str]]:
@@ -93,7 +96,7 @@ def strip_citations(text: str) -> tuple[str, list[str]]:
 @observability.span("polly.synthesize")
 def _synthesize(text: str) -> dict[str, Any]:
     """Polly mp3 + sentence speech marks; falls back through voices/engines."""
-    polly: Any = boto3.client("polly")
+    polly: Any = aws.client("polly", read_timeout=10)
     attempts = [
         (_env("POLLY_VOICE_ID", "Kajal"), "neural"),
         ("Joanna", "neural"),
@@ -242,7 +245,9 @@ def _turn_prompt(body: dict[str, Any]) -> str:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": SERVICE}
+    from beacon import __version__
+
+    return {"ok": True, "service": SERVICE, "version": __version__}
 
 
 @app.post("/session")
@@ -252,7 +257,7 @@ def session() -> Response[str]:
     role_arn = _env("MIC_ROLE_ARN")
     if not role_arn:
         return _json(500, {"error": "MIC_ROLE_ARN not configured"})
-    creds = boto3.client("sts").assume_role(
+    creds = aws.client("sts").assume_role(
         RoleArn=role_arn, RoleSessionName="beacon-mic", DurationSeconds=900
     )["Credentials"]
     return _json(
@@ -313,11 +318,16 @@ def _turn() -> Response[str]:
         return _json(401, {"error": "passcode required"})
     body = app.current_event.json_body or {}
     incident_id = str(body.get("incident_id", ""))
-    session_id = str(body.get("session_id", "default"))
-    channel = str(body.get("channel", "typed"))
+    session_id = str(body.get("session_id", "default"))[:64]
+    channel = str(body.get("channel", "typed"))[:32]
+    raw_text = str(body.get("text", ""))
+    if len(raw_text) > _MAX_TEXT:
+        return _json(413, {"error": f"text is limited to {_MAX_TEXT} characters"})
+    if not _ID_RE.match(incident_id):
+        return _json(400, {"error": "incident_id is required (letters, digits, . _ -)"})
     text = _turn_prompt(body)
-    if not incident_id or not text:
-        return _json(400, {"error": "incident_id and text (or mode) are required"})
+    if not text:
+        return _json(400, {"error": "text (or mode) is required"})
 
     incident = store.get_incident(incident_id, table_name=_incidents_table())
     if not incident:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import boto3
@@ -34,6 +35,8 @@ def _table(ddb: Any, name: str, key: str) -> None:
 
 @pytest.fixture()
 def env(monkeypatch: Any) -> Any:
+    dashboard_api._cache.clear()
+    monkeypatch.setattr(dashboard_api, "_CACHE_SECONDS", 0.0)
     with mock_aws():
         for var, val in {
             "AWS_DEFAULT_REGION": "us-east-1",
@@ -73,7 +76,9 @@ def env(monkeypatch: Any) -> Any:
             "resolved",
             table_name=INCIDENTS,
             extra={
-                "resolved_at": "2026-09-18T20:10:00+00:00",
+                "resolved_at": (
+                    datetime.now(tz=UTC) + timedelta(minutes=3)
+                ).isoformat(),
                 "handled_by": "voice",
                 "conversation": [
                     {"role": "user", "content": [{"text": "secret chat"}]}
@@ -97,7 +102,9 @@ def env(monkeypatch: Any) -> Any:
             "resolved",
             table_name=INCIDENTS,
             extra={
-                "resolved_at": "2026-09-18T21:03:00+00:00",
+                "resolved_at": (
+                    datetime.now(tz=UTC) + timedelta(minutes=2)
+                ).isoformat(),
                 "handled_by": "contract",
             },
         )

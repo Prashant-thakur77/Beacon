@@ -457,6 +457,9 @@ def create_app() -> FastAPI:
 
     @app.api_route("/dash/{rest:path}", methods=["GET", "POST", "DELETE", "OPTIONS"])
     async def dash(request: Request, rest: str) -> Response:
+        # One process writes and reads here; skip the per-container cache so
+        # the board reflects a break/fix on the very next poll.
+        dashboard_api._cache.clear()
         return _to_response(
             dashboard_api.handler(
                 _url_event(request, await request.body(), "/dash"), None

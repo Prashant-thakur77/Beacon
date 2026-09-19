@@ -186,7 +186,30 @@ def execute(event: dict[str, Any]) -> dict[str, Any]:
         "executing",
         {"action": spec.id, "params": params, "approval_id": approval_id},
     )
-    result = spec.execute(params)
+    try:
+        result = spec.execute(params)
+    except (
+        Exception
+    ) as exc:  # the approval is consumed; record why so a retry replays it
+        logger.exception("execute raised")
+        failed: dict[str, Any] = {
+            "ok": False,
+            "code": type(exc).__name__,
+            "detail": str(exc),
+            "executed_at": _now_iso(),
+            "action": spec.id,
+            "params": params,
+            "approval_id": approval_id,
+            "idempotent_replay": False,
+            "error": f"execute failed: {type(exc).__name__}: {exc}",
+        }
+        approvals.record_execution(approval_id, failed, table_name=table)
+        _timeline(
+            incident_id,
+            "execute_failed",
+            {"code": failed["code"], "detail": failed["detail"]},
+        )
+        return failed
     executed_at = _now_iso()
     out: dict[str, Any] = {
         "ok": result.ok,
