@@ -23,9 +23,7 @@ import os
 import re
 from typing import TYPE_CHECKING, Any
 
-import boto3
-
-from beacon import approvals, contracts, observability, store
+from beacon import approvals, aws, contracts, observability, store
 from beacon.remediation import registry
 from beacon.remediation.base import ParamError
 from beacon.turn_context import current
@@ -97,7 +95,7 @@ def _invoke_remediate(payload: dict[str, Any]) -> dict[str, Any]:
     arn = os.environ.get("REMEDIATE_FUNCTION_ARN", "")
     if not arn:
         return {"ok": False, "error": "REMEDIATE_FUNCTION_ARN not set"}
-    resp = boto3.client("lambda").invoke(
+    resp = aws.client("lambda", read_timeout=12).invoke(
         FunctionName=arn,
         InvocationType="RequestResponse",
         Payload=json.dumps(payload).encode(),
@@ -116,7 +114,7 @@ def _start_execution(payload: dict[str, Any]) -> str:
     arn = os.environ.get("STATE_MACHINE_ARN", "")
     if not arn:
         raise RuntimeError("STATE_MACHINE_ARN not set")
-    resp = boto3.client("stepfunctions").start_execution(
+    resp = aws.client("stepfunctions").start_execution(
         stateMachineArn=arn, input=json.dumps(payload, default=str)
     )
     return str(resp["executionArn"])

@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import statistics
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -97,9 +98,13 @@ def _public(incident: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in incident.items() if k not in _PRIVATE_FIELDS}
 
 
-def _all_incidents() -> list[dict[str, Any]]:
+_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+_CACHE_SECONDS = 2.0
+
+
+def _scan_incidents(table: str) -> list[dict[str, Any]]:
     client = boto3.client("dynamodb")
-    kwargs: dict[str, Any] = {"TableName": _env("INCIDENTS_TABLE_NAME")}
+    kwargs: dict[str, Any] = {"TableName": table}
     rows: list[dict[str, Any]] = []
     while True:
         resp = client.scan(**kwargs)
@@ -108,6 +113,18 @@ def _all_incidents() -> list[dict[str, Any]]:
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     rows.sort(key=lambda r: str(r.get("timestamp", "")), reverse=True)
+    return rows
+
+
+def _all_incidents() -> list[dict[str, Any]]:
+    """Incident list with a per-container cache: many viewers poll every 3 s."""
+    table = _env("INCIDENTS_TABLE_NAME")
+    now = time.monotonic()
+    hit = _cache.get(table)
+    if hit and now - hit[0] < _CACHE_SECONDS:
+        return hit[1]
+    rows = _scan_incidents(table)
+    _cache[table] = (now, rows)
     return rows
 
 
