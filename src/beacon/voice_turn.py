@@ -1,6 +1,6 @@
 """Voice-turn Lambda behind a Function URL (``beacon-voice-turn-<stack>``).
 
-Routes (JSON, CORS open):
+Routes (JSON; CORS is configured on the Function URL):
 
 * ``GET /health``, plus the EventBridge keep-warm ping ``{"mode": "warm"}``.
 * ``POST /session`` (passcode) -> 15-minute STS credentials for the browser
@@ -26,7 +26,6 @@ from importlib.resources import files
 from typing import Any, cast
 
 from aws_lambda_powertools.event_handler import (
-    CORSConfig,
     LambdaFunctionUrlResolver,
     Response,
 )
@@ -43,9 +42,9 @@ _MAX_TEXT = 2000
 _CITATION_RE = re.compile(r"\s*\[(E\d+)\]")
 _MAX_HISTORY = 20
 
-app = LambdaFunctionUrlResolver(
-    cors=CORSConfig(allow_origin="*", allow_headers=["x-beacon-passcode"])
-)
+# CORS lives on the Function URL (console-template.yaml), scoped to the console
+# origin; setting it here too would duplicate the headers in every response.
+app = LambdaFunctionUrlResolver()
 
 
 def _env(name: str, default: str = "") -> str:

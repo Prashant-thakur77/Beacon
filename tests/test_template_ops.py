@@ -127,3 +127,20 @@ def test_demo_database_password_lives_in_secrets_manager() -> None:
         for a in ([s["Action"]] if isinstance(s["Action"], str) else s["Action"])
     }
     assert actions == {"secretsmanager:GetSecretValue"}
+
+
+def test_function_urls_only_accept_the_console_origin(
+    stacks: dict[str, dict[str, Any]],
+) -> None:
+    console = stacks["console-template.yaml"]
+    urls = _resources(console, "AWS::Lambda::Url")
+    assert len(urls) == 2
+    for name, url in urls.items():
+        cors = url["Properties"]["Cors"]
+        assert "*" not in cors["AllowOrigins"], f"{name}: wildcard origin"
+        assert any(
+            "BeaconConsoleDistribution.DomainName" in str(o)
+            for o in cors["AllowOrigins"]
+        ), name
+        assert "*" not in cors["AllowMethods"], f"{name}: wildcard methods"
+        assert set(cors["AllowHeaders"]) == {"content-type", "x-beacon-passcode"}
