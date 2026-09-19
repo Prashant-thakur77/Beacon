@@ -9,12 +9,6 @@ Parameters:
     Type: String
     Description: ECR URI for the demo web app image (demo/Dockerfile.demo)
 
-  DBPassword:
-    Type: String
-    Default: beaconDem0Pass
-    NoEcho: true
-    Description: Password for the demo RDS instance
-
   PostgresVersion:
     Type: String
     Default: "16.10"
@@ -147,7 +141,8 @@ Resources:
       AllocatedStorage: 20
       StorageType: gp3
       MasterUsername: demo
-      MasterUserPassword: !Ref DBPassword
+      # RDS generates and rotates the password in Secrets Manager; nothing in git or in env.
+      ManageMasterUserPassword: true
       DBName: demo
       VPCSecurityGroups:
         - !Ref RdsSecurityGroup
@@ -182,6 +177,14 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: DemoDbSecretRead
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !GetAtt DemoDatabase.MasterUserSecret.SecretArn
 
   TaskRole:
     Type: AWS::IAM::Role
@@ -238,10 +241,11 @@ Resources:
               Value: demo
             - Name: DB_USER
               Value: demo
-            - Name: DB_PASSWORD
-              Value: !Ref DBPassword
             - Name: WEDGE_PARAM
               Value: !Ref WedgeFlag
+          Secrets:
+            - Name: DB_PASSWORD
+              ValueFrom: !Sub "${DemoDatabase.MasterUserSecret.SecretArn}:password::"
           LogConfiguration:
             LogDriver: awslogs
             Options:
