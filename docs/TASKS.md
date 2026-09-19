@@ -71,3 +71,11 @@ Ordered by demo risk. Each task is self-contained: file list + definition of don
 - [x] console: 10 s read / 50 s turn timeouts, poll backoff, pause when hidden, error boundary, favicon; `tsc` in the gate
 - [x] README "Production notes"; `tests/test_template_ops.py` proves each infra claim
 - [x] carry the pass to branch `assemblyai` (merged, gate green at 249 tests)
+
+## Make it better for both hackathons (Sat 19 Sep, 12:30–14:00 IST)
+- [x] "Run the night": `?night=1` / board button plays fix → approve → verify → contract → second incident under contract, unattended (Build It judges, video fallback)
+- [x] contract-aware brief (tool fields + prompt rule + scripted agent), verify evidence card so "recovered" is cited, TTS watchdog, sub-minute medians in seconds
+- [x] README: try-it section with screenshot, repo map, dev notes; `make help` default goal; SECURITY.md; CONTRIBUTING.md; project metadata
+- [x] blog §6 (hardening traps), submission.md updated, demo-script fallback take, AssemblyAI deck skeleton (branch)
+- [x] a11y: live region on the transcript, labelled select, status role; meta description/theme-color
+- [ ] cover image `docs/assets/cover.png` from a real run
