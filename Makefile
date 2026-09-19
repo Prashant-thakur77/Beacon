@@ -476,6 +476,8 @@ deploy-console: web-build
 	aws cloudformation validate-template --template-body file://console-template.yaml --region $(REGION) > /dev/null
 	@REMEDIATE_ARN=$$(aws cloudformation describe-stacks --stack-name $(REMEDIATION_STACK) --region $(REGION) \
 		--query 'Stacks[0].Outputs[?OutputKey==`RemediateFunctionArn`].OutputValue' --output text) && \
+	SNS_ARN=$$(aws cloudformation describe-stacks --stack-name $(STACK_NAME) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`BeaconSNSTopicArn`].OutputValue' --output text) && \
 	echo "==> Deploying $(CONSOLE_STACK) (CloudFront creation takes 5-10 min the first time)..." && \
 	aws cloudformation deploy \
 		--template-file console-template.yaml \
@@ -484,6 +486,7 @@ deploy-console: web-build
 		--capabilities CAPABILITY_NAMED_IAM \
 		--parameter-overrides BaseStackName=$(STACK_NAME) AgentImageUri=$(AGENT_IMAGE_URI) \
 			LambdaArchitecture=$(LAMBDA_ARCH) RemediateFunctionArn=$$REMEDIATE_ARN Passcode=$(PASSCODE) \
+			SnsTopicArn=$$SNS_ARN \
 			PollyVoiceId=$(POLLY_VOICE_ID) SttLanguage=$(STT_LANGUAGE) VoiceEngine=$(VOICE_ENGINE) \
 			$(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),) \
 			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),) \

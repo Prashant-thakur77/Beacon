@@ -53,6 +53,8 @@ Resources:
     Properties:
       TableName: !Sub "beacon-incidents-${BaseStackName}"
       BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
       AttributeDefinitions:
         - AttributeName: incident_id
           AttributeType: S
@@ -68,6 +70,8 @@ Resources:
     Properties:
       TableName: !Sub "beacon-approvals-${BaseStackName}"
       BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
       AttributeDefinitions:
         - AttributeName: approval_id
           AttributeType: S
@@ -83,6 +87,8 @@ Resources:
     Properties:
       TableName: !Sub "beacon-contracts-${BaseStackName}"
       BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
       AttributeDefinitions:
         - AttributeName: contract_id
           AttributeType: S
@@ -98,6 +104,8 @@ Resources:
     Properties:
       TableName: !Sub "beacon-changes-${BaseStackName}"
       BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
       AttributeDefinitions:
         - AttributeName: pk
           AttributeType: S
@@ -117,6 +125,8 @@ Resources:
     Properties:
       TableName: !Sub "beacon-idempotency-${BaseStackName}"
       BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
@@ -206,6 +216,12 @@ Resources:
                   - xray:PutTelemetryRecords
                 Resource: "*"
 
+  BeaconRemediateLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/beacon/${BaseStackName}/remediate"
+      RetentionInDays: 14
+
   BeaconRemediateFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -220,6 +236,11 @@ Resources:
       Role: !GetAtt BeaconRemediatorRole.Arn
       MemorySize: 1024
       Timeout: 300
+      # The only function that writes to infrastructure: a handful of loops at once is plenty.
+      ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref BeaconRemediateLogGroup
       TracingConfig:
         Mode: Active
       Environment:
@@ -259,6 +280,12 @@ Resources:
                   - dynamodb:PutItem
                 Resource: !GetAtt BeaconChangesTable.Arn
 
+  BeaconChangesLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/beacon/${BaseStackName}/changes"
+      RetentionInDays: 14
+
   BeaconChangesFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -273,6 +300,9 @@ Resources:
       Role: !GetAtt BeaconChangesRole.Arn
       MemorySize: 512
       Timeout: 30
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref BeaconChangesLogGroup
       Environment:
         Variables:
           CHANGES_TABLE_NAME: !Ref BeaconChangesTable
@@ -478,6 +508,65 @@ Resources:
             }
           }
         - RemediateFunctionArn: !GetAtt BeaconRemediateFunction.Arn
+
+  # ---------- Paging: loop failures and escalations reach the SNS topic ----------
+
+  BeaconRemediateErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "beacon-${BaseStackName}-remediate-errors"
+      AlarmDescription: The remediation loop Lambda raised; the state machine will have escalated
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref BeaconRemediateFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref SnsTopicArn
+
+  BeaconChangesErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "beacon-${BaseStackName}-changes-errors"
+      AlarmDescription: The change-ledger Lambda raised; CHANGE CORRELATION may be missing entries
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref BeaconChangesFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref SnsTopicArn
+
+  BeaconEscalatedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "beacon-${BaseStackName}-escalated"
+      AlarmDescription: A remediation loop escalated to a human (EMF metric from remediate.py)
+      Namespace: Beacon
+      MetricName: Escalated
+      Dimensions:
+        - Name: service
+          Value: beacon-remediate
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref SnsTopicArn
 
 Outputs:
   IncidentsTableName:

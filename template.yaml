@@ -279,6 +279,12 @@ Resources:
 
   # --- Lambda ---
 
+  BeaconLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/beacon/${AWS::StackName}/triage"
+      RetentionInDays: 14
+
   BeaconFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -291,6 +297,9 @@ Resources:
       Role: !GetAtt BeaconFunctionRole.Arn
       MemorySize: !Ref LambdaMemoryMB
       Timeout: !Ref LambdaTimeoutSeconds
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref BeaconLogGroup
       Environment:
         Variables:
           LOG_GROUP_PATTERNS: !Join [",", !Ref LogGroupPatterns]
@@ -314,6 +323,27 @@ Resources:
           REMEDIABLE_ECS_SERVICES: !Ref RemediableEcsServices
           CONNECT_CONFIG_PARAM: !Sub "/beacon/${AWS::StackName}/connect-config"
           LITELLM_LOCAL_MODEL_COST_MAP: "True"
+
+  # --- Paging: a broken triage function must not fail silently at 3 AM ---
+
+  BeaconErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "beacon-${AWS::StackName}-triage-errors"
+      AlarmDescription: Beacon triage Lambda raised; check the /beacon log group
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref BeaconFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref BeaconSNSTopic
 
   # --- Schedule Trigger ---
 

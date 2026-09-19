@@ -23,6 +23,10 @@ Dated, specific, in the order they happened. The "Learning" criterion and the la
 - **02:10 — `!Ref` on a DynamoDB table is its name, not its ARN.** One such line inside an IAM `Resource` list would have failed the remediation stack on first create with a message about ARN format; cfn-lint did not flag it. A template test now asserts every IAM resource is an ARN or `*`.
 - **02:20 — A second allowlisted action needs its own data allowlist.** The golden snapshot protects security-group restores; for `ecs.force_redeploy` the equivalent is `REMEDIABLE_ECS_SERVICES` (filled from the demo stack outputs). A model proposal that names any other service is dropped before it can be proposed, not just refused at dry-run.
 
+- **11:30 — Every EMF dimension you add creates a metric set nothing else can see.** `remediate` emitted `{service, action}`; the dashboard and the new `Escalated` alarm query `{service}`, which in CloudWatch is a different metric entirely. The fix was to keep `service` as the only dimension and move `action` and `incident_id` to EMF metadata, which is still searchable in Logs Insights. A test now asserts the dimension set.
+- **11:45 — CORS belongs in exactly one place.** A Function URL with a CORS config *and* a Powertools resolver with `CORSConfig` both add `Access-Control-Allow-Origin`; duplicated headers are rejected by browsers. The URL config is the right place (it also answers preflights without invoking the function), so the resolvers now carry none.
+- **11:50 — A per-container read cache needs an escape hatch for single-process test modes.** The 2 s dashboard cache was invisible in production (separate Lambdas write and read) but made `make local` show a stale board for one poll after `local-break` and leaked across test apps. The local server clears it before each dashboard request.
+
 ## Sat 19 Sep — workshop (fill in at 11:00–14:00)
 
 - Nova 2 Lite tool use through Strands: recommended temperature / quirks →

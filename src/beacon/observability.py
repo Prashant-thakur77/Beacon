@@ -82,6 +82,16 @@ def metric(name: str, value: float, *, unit: str = "Count") -> None:
         logger.exception("metric %s failed", name)
 
 
+def metadata(key: str, value: str) -> None:
+    """Attach a non-dimension field to the EMF line (searchable in Logs Insights)."""
+    if not _in_scope or not value:
+        return
+    try:
+        _get_metrics().add_metadata(key=key, value=value)
+    except Exception:
+        logger.exception("metadata %s failed", key)
+
+
 def span(name: str) -> Callable[[F], F]:
     """X-Ray subsegment around a function; transparent when tracing is off."""
 

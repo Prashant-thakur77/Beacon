@@ -123,7 +123,7 @@ def _simulate_traffic():
 
     try:
         if wedged:
-            raise RuntimeError("connection pool wedged: no connections can be reclaimed")
+            raise RuntimeError("connection pool wedged: no connections reclaimable")
         conn = _get_connection()
         cur = conn.cursor()
 

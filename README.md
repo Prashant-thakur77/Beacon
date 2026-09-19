@@ -134,6 +134,28 @@ bash scripts/commit.sh "message"   # gate, then commit (refuses on red)
 cd web && npm run dev    # console against a running `make local`
 ```
 
+## Production notes
+
+What "production grade" means here, and where each claim is enforced:
+
+| Concern | Where |
+|---|---|
+| Public endpoints fail closed: constant-time passcode compare, 401 when the passcode is unset, 2 000-char text limit, incident ids validated | `voice_turn.py`, `tests/test_hardening.py` |
+| Every AWS call has a connect/read timeout and bounded retries, so a hung Polly or STS call leaves room for the fallback inside the 45 s turn | `src/beacon/aws.py` |
+| A failed Execute is recorded as the approval's result, so a Lambda retry replays it instead of running the action twice | `remediate.py`, `tests/test_hardening.py` |
+| CORS is set once, on the Function URLs, and only for the console origin | `console-template.yaml`, `tests/test_template_ops.py` |
+| CloudFront sends HSTS, `nosniff`, `X-Frame-Options: DENY` and a CSP that names every origin the console talks to (Function URLs, Transcribe streaming, AssemblyAI) | `BeaconConsoleHeaders` |
+| Every Lambda logs JSON to a named group with 14-day retention (`/beacon/<stack>/{triage,remediate,changes,voice-turn,dashboard}`); EMF metrics carry the incident id as metadata | `LoggingConfig` in all three templates |
+| Lambda `Errors` on every function, and the `Escalated` metric, page the SNS topic | `*ErrorsAlarm`, `BeaconEscalatedAlarm` |
+| Reserved concurrency caps the public voice/dashboard functions and the privileged remediator | `ReservedConcurrentExecutions` |
+| All four tables have point-in-time recovery and TTLs | `remediation-template.yaml` |
+| The demo database password is generated and rotated by RDS in Secrets Manager; the task reads it as an ECS secret, never as an env var | `demo/demo-infra-template.yaml` |
+| The dashboard list is cached for 2 s per container, so many viewers polling every 3 s cost one scan | `dashboard_api._all_incidents` |
+| The console times out reads at 10 s, backs off polling (x2, max 60 s) on errors, pauses polling in hidden tabs, and catches render errors in a boundary | `web/src/api.ts`, `hooks.ts`, `components/ErrorBoundary.tsx` |
+| Container image tags are the git SHA of the last source change; deploy targets refuse a stale or dirty tag | `scripts/image_tag.sh`, `scripts/check_image_tag.sh` |
+
+Known gaps, on purpose for a hackathon: a single passcode instead of per-user identity (Cognito would replace `_passcode_ok` in one place), no WAF in front of the Function URLs (reserved concurrency is the blast-radius limit), and the demo RDS has no backups.
+
 ## Provenance
 
 Beacon started from an open-source Apache-2.0 log-triage project (see `LICENSE`; the git tag `base-upstream` marks the untouched import). Everything from that tag forward — the change ledger, diagnostics, the remediation loop, approvals and Sleep Contracts, the voice agent and its tools, the console, the three-stack deployment and the safety tests — was built for this hackathon. `git log base-upstream..HEAD` is the honest diff.
