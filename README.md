@@ -130,19 +130,27 @@ src/beacon/
   voice_turn.py         Function URL: /session (STS mic creds), /turn (Strands agent + Polly), tool_only
   voice_loop.py         litellm fallback engine, same tools
   dashboard_api.py      read-only Function URL for the console (redacts account ids / ARNs)
-web/                    Vite + React console: Night Board, Talk, Contracts, Safety, replay
+  observability.py      Powertools EMF metrics + X-Ray spans, one dimension set, incident id as metadata
+  aws.py                boto3 clients with bounded timeouts and retries
+web/                    Vite + React console: Night Board, Talk, Contracts, Safety, replay, "Run the night"
 template.yaml           base stack (triage)          remediation-template.yaml   console-template.yaml
-tests/                  204 tests: moto for AWS, FakeAgent for the model, template-safety, local mode
-docs/                   PLAN.md · human-runbook.md · safety.md · demo-script.md · submission.md
+demo/                   the patient: VPC + RDS + Fargate app + alarm, and the sticky-wedge failure mode
+requirements/           pinned image dependencies (triage.txt, agent.txt)
+scripts/                gate.sh · commit.sh · local_server.py (make local) · preflight, capture, replay builders
+tests/                  244 tests: moto for AWS, FakeAgent for the model, template safety + ops, local mode
+docs/                   safety.md · human-runbook.md · demo-script.md · submission.md · blog.md · LEARNINGS.md
 ```
 
 ## Development
 
 ```bash
-bash scripts/gate.sh     # ruff format/check, mypy --strict, cfn-lint, pytest
+make help                # every target, one line each
+bash scripts/gate.sh     # ruff format/check, mypy --strict, cfn-lint, pytest, web tsc
 bash scripts/commit.sh "message"   # gate, then commit (refuses on red)
 cd web && npm run dev    # console against a running `make local`
 ```
+
+Tests are the spec. The safety model is asserted from the real CloudFormation ([`tests/test_template_safety.py`](tests/test_template_safety.py)), the operational claims from the same files ([`tests/test_template_ops.py`](tests/test_template_ops.py)), and the whole product runs against moto in [`tests/test_local_server.py`](tests/test_local_server.py). CI runs the gate and builds the console on every push.
 
 ## Production notes
 
