@@ -42,7 +42,10 @@ async function request<T>(url: string, init: RequestInit = {}, passcode?: string
 export function makeApi(config: Config, passcode: () => string) {
   const dash = trimSlash(config.dashboardUrl);
   const voice = trimSlash(config.voiceUrl);
+  const local = dash.replace(/\/dash$/, "/local");
   return {
+    /** `make local` only: cut the demo's database rule again and run triage. */
+    localBreak: () => request<{ ok: boolean }>(`${local}/break`, { method: "POST", body: "{}" }, passcode()),
     incidents: () => request<{ incidents: Incident[] }>(`${dash}/incidents`),
     incident: (id: string) => request<{ incident: Incident }>(`${dash}/incidents/${id}`),
     execution: (id: string) => request<{ execution_arn: string; status: string | null; events: Array<{ t: string; type: string; state: string | null }> }>(`${dash}/incidents/${id}/execution`),

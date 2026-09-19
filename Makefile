@@ -628,6 +628,7 @@ LOCAL_PASSCODE ?= local
 # real safety checks, scripted agent instead of Bedrock, browser TTS.
 local: web-build
 	@echo "==> http://localhost:$(LOCAL_PORT)  (passcode: $(LOCAL_PASSCODE)). Ctrl-C to stop."
+	@echo "    http://localhost:$(LOCAL_PORT)/?night=1 plays the whole night unattended."
 	BEACON_LOCAL_PASSCODE=$(LOCAL_PASSCODE) PORT=$(LOCAL_PORT) $(PYTHON) scripts/local_server.py
 
 local-break:

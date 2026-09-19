@@ -552,7 +552,11 @@ def _remediate_under_contract(
         incident_id,
         status,
         table_name=config.incidents_table_name,
-        extra={"execution_arn": execution_arn, "handled_by": "contract"},
+        extra={
+            "execution_arn": execution_arn,
+            "handled_by": "contract",
+            "contract_id": str(contract["contract_id"]),
+        },
     )
     store.append_timeline(
         incident_id,
