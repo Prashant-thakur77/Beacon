@@ -1,24 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/** Poll `fn` every `ms` while `enabled`; keeps the last good value across errors. */
+const MAX_BACKOFF_MS = 60_000;
+
+/**
+ * Poll `fn` every `ms` while `enabled`; keeps the last good value across errors.
+ * Consecutive failures back off (x2, capped at 60 s) so a dead API is not
+ * hammered, and polling pauses while the tab is hidden and resumes at once
+ * when it is shown again.
+ */
 export function usePoll<T>(fn: (() => Promise<T>) | null, ms: number, deps: unknown[] = [], enabled = true) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const timer = useRef<number | null>(null);
   const alive = useRef(true);
+  const failures = useRef(0);
+  const inFlight = useRef(false);
 
   const tick = useCallback(async () => {
-    if (!fn) return;
+    if (!fn || inFlight.current) return;
+    inFlight.current = true;
     try {
       const value = await fn();
       if (alive.current) {
         setData(value);
         setError(null);
+        failures.current = 0;
       }
     } catch (e) {
+      failures.current += 1;
       if (alive.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
+      inFlight.current = false;
       if (alive.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -30,11 +43,27 @@ export function usePoll<T>(fn: (() => Promise<T>) | null, ms: number, deps: unkn
       setLoading(false);
       return;
     }
-    void tick();
-    timer.current = window.setInterval(() => void tick(), ms);
+    const schedule = () => {
+      if (!alive.current) return;
+      const delay = Math.min(ms * 2 ** failures.current, MAX_BACKOFF_MS);
+      timer.current = window.setTimeout(run, delay);
+    };
+    const run = async () => {
+      if (document.visibilityState === "hidden") return; // resumed by visibilitychange
+      await tick();
+      schedule();
+    };
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (timer.current) window.clearTimeout(timer.current);
+      void run();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    void run();
     return () => {
       alive.current = false;
-      if (timer.current) window.clearInterval(timer.current);
+      document.removeEventListener("visibilitychange", onVisible);
+      if (timer.current) window.clearTimeout(timer.current);
     };
   }, [tick, ms, enabled, fn]);
 
