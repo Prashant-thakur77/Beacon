@@ -8,6 +8,16 @@ Beacon reads the logs on Amazon Bedrock, finds the CloudTrail change that caused
 
 Built solo in a weekend for the AWS *First Commit* hackathon. Everything below is live code with tests, not a slide.
 
+![The Night Board during a scripted night: brief, propose, approve, verified, contract offered](docs/assets/night-board.png)
+
+## Try it in two minutes, no AWS account
+
+```bash
+make local            # console + FastAPI + in-process moto on http://localhost:8000
+```
+
+Open <http://localhost:8000/?night=1> (or press **▶ Run the night** on the board). Beacon types the engineer's lines for you: *can you fix it* → *approve fix 1* → *yes* → *grant contract for seven days*; then the same fault fires again and is fixed under the contract with **nobody woken**. Every tool call, dry run, verification and contract you see is the production code path against moto — only Bedrock is scripted.
+
 ---
 
 ## What it does, in one incident
@@ -84,7 +94,7 @@ uv pip install --python .venv/bin/python --no-deps cordon && uv pip install --py
 make local            # builds the console, starts http://localhost:8000 (passcode: local)
 ```
 
-Open the URL, enter the passcode, and talk (or type): *what changed* → *can you fix it* → *approve fix 1* → *yes* → *grant contract for seven days*. Then `make local-break` in another terminal: the second outage is handled under the contract and the tally shows **0 humans woken** for it. The AWS calls run against an in-process [moto](https://github.com/getmoto/moto); every safety check is the production code. Bedrock is replaced by a scripted agent.
+Open the URL, enter the passcode, and talk (or type): *what changed* → *can you fix it* → *approve fix 1* → *yes* → *grant contract for seven days*. Then `make local-break` in another terminal: the second outage is handled under the contract and the tally shows **0 humans woken** for it. `?night=1` does all of that for you. The AWS calls run against an in-process [moto](https://github.com/getmoto/moto); every safety check is the production code. Bedrock is replaced by a scripted agent.
 
 ### On AWS (the *Ship It* path)
 

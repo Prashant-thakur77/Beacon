@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { makeApi, type Api } from "./api";
 import { loadConfig, type Config } from "./config";
 import { ArchivedRunCard, IncidentCard, JudgeCard, TallyStrip } from "./components/NightBoard";
@@ -11,6 +11,15 @@ import type { Contract, Incident, Safety as SafetyData, Tally } from "./types";
 import { chooseStt } from "./voice/stt";
 
 type Route = "board" | "contracts" | "safety";
+
+/** "Run the night" (local mode): the engineer's lines for the first incident. */
+const NIGHT_SCRIPT = ["can you fix it", "approve fix 1", "yes", "grant contract for seven days"];
+type Night = null | "first" | "second" | "done";
+const NIGHT_LABEL: Record<Exclude<Night, null>, string> = {
+  first: "night · incident 1: fix, verify, grant a contract",
+  second: "night · incident 2: same fault, handled under the contract",
+  done: "night complete · 2 incidents · 1 human woken",
+};
 
 function useRoute(): [Route, (r: Route) => void] {
   const read = (): Route => {
@@ -56,6 +65,9 @@ export default function App() {
   }, []);
 
   const api: Api | null = useMemo(() => (config && config.dashboardUrl && !replay ? makeApi(config, () => passcode) : null), [config, passcode, replay]);
+  // `make local` only: an API that is always unlocked, for the scripted night.
+  const localApi: Api | null = useMemo(() => (config?.local && !replay ? makeApi(config, () => config.localPasscode) : null), [config, replay]);
+  const [night, setNight] = useState<Night>(null);
 
   const incidentsQ = usePoll<{ incidents: Incident[] }>(api ? api.incidents : null, 3000, [api], !!api);
   const tallyQ = usePoll<Tally>(api ? api.tally : null, 10000, [api], !!api);
@@ -112,6 +124,38 @@ export default function App() {
 
   const connected = !!api && !incidentsQ.error;
 
+  const runNight = async () => {
+    if (!localApi || !config) return;
+    if (!passcode) setPasscode(config.localPasscode);
+    setPinned(false);
+    setOpenId(null);
+    const newest = incidents[0];
+    if (!newest || newest.status === "resolved" || newest.status === "escalated") {
+      await localApi.localBreak().catch(() => undefined);
+      await incidentsQ.refresh();
+    }
+    setNight("first");
+  };
+  // `?night=1` starts the scripted night as soon as the board has loaded (local mode only).
+  const autoNight = useRef(new URLSearchParams(window.location.search).get("night") === "1");
+  useEffect(() => {
+    if (autoNight.current && localApi && incidentsQ.data && night === null) {
+      autoNight.current = false;
+      void runNight();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localApi, incidentsQ.data, night]);
+  const onNightScriptDone = useCallback(() => {
+    if (night !== "first" || !localApi) return;
+    setNight("second");
+    void localApi
+      .localBreak()
+      .then(() => Promise.all([incidentsQ.refresh(), contractsQ.refresh(), tallyQ.refresh()]))
+      .then(() => setNight("done"))
+      .catch(() => setNight("done"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [night, localApi]);
+
   return (
     <div className="shell">
       <header className="topbar">
@@ -121,6 +165,7 @@ export default function App() {
         </div>
         {replay ? <span className="pill lilac">REPLAY of {new Date(replay.recorded_at).toLocaleString()}</span> : null}
         {!replay && api ? <span className={`pill ${connected ? "green" : "red"}`}>{connected ? "live" : "reconnecting…"}</span> : null}
+        {night ? <span className="pill lilac">{NIGHT_LABEL[night]}</span> : null}
         <nav className="nav">
           <a href="#board" className={route === "board" ? "active" : ""}>
             Night Board
@@ -158,7 +203,11 @@ export default function App() {
               </form>
             ) : null}
             {incidentsQ.error && !replay ? <div className="err">Dashboard API: {incidentsQ.error}</div> : null}
-            <JudgeCard hasPasscode={!!passcode} open={new URLSearchParams(window.location.search).get("judge") === "1" || incidents.length === 0} />
+            <JudgeCard
+              hasPasscode={!!passcode}
+              open={new URLSearchParams(window.location.search).get("judge") === "1" || incidents.length === 0}
+              onRunNight={localApi && night !== "first" && night !== "second" ? runNight : undefined}
+            />
             <div className="feed">
               {incidents.length === 0 ? (
                 <div className="panel">
@@ -193,6 +242,8 @@ export default function App() {
                 onIncident={onIncident}
                 unlocked={!!passcode}
                 sttLanguage={config?.sttLanguage}
+                script={night === "first" ? NIGHT_SCRIPT : undefined}
+                onScriptDone={onNightScriptDone}
               />
             </section>
           ) : null}
