@@ -303,12 +303,14 @@ class ScriptedAgent:
         t = text.lower()
         if "brief" in t and "engineer just opened" in t:
             b = self._call("get_incident_brief", {})
-            reply = (
-                f"{b.get('spoken_summary', '')} [E1] I can propose a fix if you ask."
-            )
+            if b.get("handled_by") == "contract":
+                reply = f"{b.get('spoken_summary', '')} [E1] The rule is back and the alarm is OK."
+            else:
+                reply = f"{b.get('spoken_summary', '')} [E1] I can propose a fix if you ask."
         elif "system event" in t and "resolved" in t:
-            self._call("check_recovery", {})
-            reply = "Recovered. The alarm is back to OK after the fix, the error count is zero, and the rule is present. Should I handle this myself next time?"
+            r = self._call("check_recovery", {})
+            tag = f" [{r['evidence'][0]['id']}]" if r.get("evidence") else ""
+            reply = f"Recovered. The alarm is back to OK after the fix, the error count is zero, and the rule is present{tag}. Should I handle this myself next time?"
         elif "system event" in t and "escalated" in t:
             r = self._call("check_recovery", {})
             reply = f"Verification did not pass; status is {r.get('status')}. A human is needed."
@@ -453,6 +455,8 @@ def create_app() -> FastAPI:
             "voiceBackend": "aws",
             "archivedIncidentId": "",
             "local": True,
+            # Local only: lets the console's "Run the night" button unlock itself.
+            "localPasscode": os.environ["PASSCODE"],
         }
 
     @app.api_route("/dash/{rest:path}", methods=["GET", "POST", "DELETE", "OPTIONS"])

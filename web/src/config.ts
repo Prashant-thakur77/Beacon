@@ -7,6 +7,9 @@ export interface Config {
   voiceBackend: "aws" | "assemblyai";
   archivedIncidentId: string;
   replay: boolean;
+  /** `make local`: the whole product against moto in one process. */
+  local: boolean;
+  localPasscode: string;
 }
 
 const DEFAULTS: Config = {
@@ -17,6 +20,8 @@ const DEFAULTS: Config = {
   voiceBackend: "aws",
   archivedIncidentId: "",
   replay: false,
+  local: false,
+  localPasscode: "",
 };
 
 let cached: Config | null = null;

@@ -118,6 +118,8 @@ export function Talk({
   onIncident,
   unlocked,
   sttLanguage = "en-IN",
+  script,
+  onScriptDone,
 }: {
   api: Api | null;
   incident: Incident;
@@ -126,6 +128,9 @@ export function Talk({
   onIncident: (i: Incident) => void;
   unlocked: boolean;
   sttLanguage?: string;
+  /** Lines to type on the engineer's behalf, one per idle gap ("Run the night"). */
+  script?: string[];
+  onScriptDone?: () => void;
 }) {
   const [state, setState] = useState<State>("idle");
   const [partial, setPartial] = useState("");
@@ -263,6 +268,25 @@ export function Talk({
       if (messages.length > 0) void runTurn({ mode: "event", event: incident.status });
     }
   }, [incident.status, incident.incident_id, messages.length, runTurn]);
+
+  // "Run the night": type the next scripted line once Beacon has finished speaking.
+  const scriptIdx = useRef(0);
+  useEffect(() => {
+    scriptIdx.current = 0;
+  }, [script, incident.incident_id]);
+  useEffect(() => {
+    if (!script || state !== "idle" || messages.length === 0) return;
+    if (scriptIdx.current >= script.length) {
+      onScriptDone?.();
+      return;
+    }
+    const id = window.setTimeout(() => {
+      const line = script[scriptIdx.current];
+      scriptIdx.current += 1;
+      send(line, "typed");
+    }, 1800);
+    return () => window.clearTimeout(id);
+  }, [script, state, messages.length, send, onScriptDone]);
 
   const startListening = useCallback(async () => {
     if (state === "listening" || replayTurns) return;

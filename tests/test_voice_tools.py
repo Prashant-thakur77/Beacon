@@ -160,6 +160,23 @@ def test_get_incident_brief_returns_rca_and_evidence_card(env: Any) -> None:
     assert out["evidence"][0]["id"] == "E1" and out["evidence"][0]["kind"] == "rca"
 
 
+def test_get_incident_brief_says_when_a_contract_already_handled_it(env: Any) -> None:
+    """The second alarm of the night: the agent must open with "you were not
+    woken", not with an offer to propose a fix."""
+    store.update_status(
+        env["incident_id"],
+        "resolved",
+        table_name=INCIDENTS,
+        extra={"handled_by": "contract", "woken": False, "contract_id": "c-1"},
+    )
+    with turn_context(_ctx(env["incident_id"], "brief me")):
+        out = voice_tools.get_incident_brief()
+    assert out["incident_status"] == "resolved"
+    assert out["handled_by"] == "contract" and out["woken"] is False
+    assert out["contract_id"] == "c-1"
+    assert "not woken" in out["spoken_summary"].lower()
+
+
 def test_get_evidence_kinds_and_numbering(env: Any) -> None:
     with turn_context(_ctx(env["incident_id"], "what changed")) as ctx:
         changes = voice_tools.get_evidence("changes")
@@ -295,9 +312,13 @@ def test_check_recovery_reports_status_and_verify_checks(env: Any) -> None:
             "checks": [{"name": "alarm_ok_after_fix", "ok": True}],
         },
     )
-    with turn_context(_ctx(env["incident_id"], "is it fixed")):
+    with turn_context(_ctx(env["incident_id"], "is it fixed")) as ctx:
         out = voice_tools.check_recovery()
     assert out["status"] == "resolved" and out["last_verify"]["attempt"] == 2
+    # "recovered" is pinned to the loop's own verify record
+    assert out["evidence"][0]["kind"] == "verify"
+    assert out["evidence"][0]["title"].startswith("Verification 1/1")
+    assert ctx.tool_events[-1]["evidence_id"] == out["evidence"][0]["id"]
 
 
 def test_exported_tools_json_matches_tool_schemas() -> None:

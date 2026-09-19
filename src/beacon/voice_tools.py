@@ -148,13 +148,24 @@ def get_incident_brief() -> dict[str, Any]:
             "next_steps": rca.get("next_steps", []),
         },
     )
+    handled_by = incident.get("handled_by")
+    spoken = str(rca.get("spoken_summary", ""))
+    if handled_by == "contract" and incident.get("status") == "resolved":
+        # The second alarm of the night: lead with the outcome, not the fault.
+        spoken = (
+            "This one was handled under your Sleep Contract; you were not woken. "
+            + spoken
+        )
     out = {
         "incident_id": incident["incident_id"],
         "alarm_name": incident.get("alarm_name"),
         "status": rca.get("status", "Unknown"),
         "incident_status": incident.get("status"),
+        "handled_by": handled_by,
+        "woken": incident.get("woken"),
+        "contract_id": incident.get("contract_id"),
         "summary": rca.get("summary", ""),
-        "spoken_summary": rca.get("spoken_summary", ""),
+        "spoken_summary": spoken,
         "affected_components": rca.get("affected_components", []),
         "change_correlation": rca.get("change_correlation"),
         "suggested_action": beacon_json.get("suggested_action"),
@@ -539,7 +550,7 @@ def check_recovery() -> dict[str, Any]:
         e for e in incident.get("timeline", []) if e.get("event") == "verify_attempt"
     ]
     last = (verifies[-1].get("detail") or {}) if verifies else {}
-    out = {
+    out: dict[str, Any] = {
         "status": incident.get("status"),
         "executed_at": incident.get("executed_at"),
         "resolved_at": incident.get("resolved_at"),
@@ -552,7 +563,23 @@ def check_recovery() -> dict[str, Any]:
         if last
         else None,
     }
-    _tool_event("check_recovery", {}, f"status {out['status']}")
+    evidence_id: str | None = None
+    if last:
+        # "Recovered" is a claim; pin it to the verify record the loop wrote.
+        checks = last.get("checks", [])
+        passed = sum(1 for c in checks if c.get("ok"))
+        card = current().add_evidence(
+            "verify",
+            f"Verification {passed}/{len(checks)} (attempt {last.get('attempt')})",
+            {
+                "executed_at": incident.get("executed_at"),
+                "resolved_at": incident.get("resolved_at"),
+                "checks": checks,
+            },
+        )
+        out["evidence"] = [card]
+        evidence_id = card["id"]
+    _tool_event("check_recovery", {}, f"status {out['status']}", evidence_id)
     return out
 
 

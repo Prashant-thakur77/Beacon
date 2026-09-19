@@ -30,7 +30,7 @@ export function TallyStrip({ tally }: { tally: Tally | null }) {
         <div className="l">incidents resolved</div>
       </div>
       <div className="tile">
-        <div className="n">{median == null ? "–" : `${median} min`}</div>
+        <div className="n">{median == null ? "–" : median < 1 ? `${Math.round(median * 60)} s` : `${Math.round(median * 10) / 10} min`}</div>
         <div className="l">median time to recovery</div>
       </div>
       <div className="tile moon">
@@ -118,11 +118,21 @@ export function ArchivedRunCard({ onReplay }: { onReplay: () => void }) {
 }
 
 /** For a judge opening the URL cold, weeks later: what this is and how to see it work in 90 seconds. */
-export function JudgeCard({ hasPasscode, open }: { hasPasscode: boolean; open: boolean }) {
+export function JudgeCard({ hasPasscode, open, onRunNight }: { hasPasscode: boolean; open: boolean; onRunNight?: () => void }) {
   return (
     <details className="judge" open={open}>
       <summary>How to judge this in 90 seconds</summary>
       <div className="stack small" style={{ paddingTop: 12 }}>
+        {onRunNight ? (
+          <div className="row" style={{ alignItems: "center" }}>
+            <button className="btn primary" type="button" onClick={onRunNight}>
+              ▶ Run the night
+            </button>
+            <span className="faint">
+              Local mode: Beacon types the engineer’s lines for you — fix, approve, grant a Sleep Contract — then the same fault fires again and nobody is woken.
+            </span>
+          </div>
+        ) : null}
         <div>
           <b>What it is.</b> An on-call agent for AWS. An alarm fires → Beacon finds the root cause on Bedrock and the CloudTrail change behind it → you talk to it
           in this browser → it proposes one allowlisted fix, dry-runs it, and applies it only when you say <span className="mono">approve fix one</span> → a Step
