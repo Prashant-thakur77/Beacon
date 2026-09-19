@@ -4,6 +4,9 @@
 # ImageConfig.Command in CloudFormation.
 FROM public.ecr.aws/lambda/python:3.12
 
+# Slow links (home broadband, hackathon wifi) time out pip's default 15 s reads.
+ENV PIP_DEFAULT_TIMEOUT=120
+
 COPY requirements/agent.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
