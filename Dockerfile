@@ -1,5 +1,8 @@
 FROM public.ecr.aws/lambda/python:3.12
 
+# Slow links (home broadband, hackathon wifi) time out pip's default 15 s reads.
+ENV PIP_DEFAULT_TIMEOUT=120
+
 RUN pip install --no-cache-dir \
     "torch==2.14.0" --index-url https://download.pytorch.org/whl/cpu
 
