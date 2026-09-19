@@ -4,13 +4,8 @@
 # ImageConfig.Command in CloudFormation.
 FROM public.ecr.aws/lambda/python:3.12
 
-RUN pip install --no-cache-dir \
-    boto3 \
-    strands-agents \
-    "aws-lambda-powertools[tracer]" \
-    pydantic \
-    litellm \
-    pyyaml
+COPY requirements/agent.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 ENV LITELLM_LOCAL_MODEL_COST_MAP=True
 

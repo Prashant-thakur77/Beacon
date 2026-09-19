@@ -70,4 +70,4 @@ Ordered by demo risk. Each task is self-contained: file list + definition of don
 - [x] demo RDS password managed by Secrets Manager (`ManageMasterUserPassword`), read as an ECS secret
 - [x] console: 10 s read / 50 s turn timeouts, poll backoff, pause when hidden, error boundary, favicon; `tsc` in the gate
 - [x] README "Production notes"; `tests/test_template_ops.py` proves each infra claim
-- [ ] carry the pass to branch `assemblyai` (merge `main`)
+- [x] carry the pass to branch `assemblyai` (merged, gate green at 249 tests)

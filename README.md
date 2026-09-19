@@ -153,6 +153,7 @@ What "production grade" means here, and where each claim is enforced:
 | The dashboard list is cached for 2 s per container, so many viewers polling every 3 s cost one scan | `dashboard_api._all_incidents` |
 | The console times out reads at 10 s, backs off polling (x2, max 60 s) on errors, pauses polling in hidden tabs, and catches render errors in a boundary | `web/src/api.ts`, `hooks.ts`, `components/ErrorBoundary.tsx` |
 | Container image tags are the git SHA of the last source change; deploy targets refuse a stale or dirty tag | `scripts/image_tag.sh`, `scripts/check_image_tag.sh` |
+| Image dependencies are pinned to the versions the suite ran against; a test fails if the pins and the environment drift | `requirements/*.txt`, `tests/test_hardening.py` |
 
 Known gaps, on purpose for a hackathon: a single passcode instead of per-user identity (Cognito would replace `_passcode_ok` in one place), no WAF in front of the Function URLs (reserved concurrency is the blast-radius limit), and the demo RDS has no backups.
 
