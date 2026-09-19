@@ -7,10 +7,24 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(url: string, init: RequestInit = {}, passcode?: string): Promise<T> {
+/** Reads are short; a voice turn can legitimately take most of the Lambda's 45 s. */
+const READ_TIMEOUT_MS = 10_000;
+const TURN_TIMEOUT_MS = 50_000;
+
+async function request<T>(url: string, init: RequestInit = {}, passcode?: string, timeoutMs = READ_TIMEOUT_MS): Promise<T> {
   const headers: Record<string, string> = { "content-type": "application/json", ...(init.headers as Record<string, string>) };
   if (passcode) headers["x-beacon-passcode"] = passcode;
-  const resp = await fetch(url, { ...init, headers });
+  const ctl = new AbortController();
+  const timer = window.setTimeout(() => ctl.abort(), timeoutMs);
+  let resp: Response;
+  try {
+    resp = await fetch(url, { ...init, headers, signal: ctl.signal });
+  } catch (e) {
+    if (ctl.signal.aborted) throw new ApiError(0, `timed out after ${Math.round(timeoutMs / 1000)}s`);
+    throw new ApiError(0, e instanceof Error ? e.message : String(e));
+  } finally {
+    window.clearTimeout(timer);
+  }
   const text = await resp.text();
   let body: unknown = null;
   try {
@@ -44,7 +58,7 @@ export function makeApi(config: Config, passcode: () => string) {
         passcode(),
       ),
     turn: (body: { incident_id: string; session_id: string; text?: string; channel?: string; mode?: "chat" | "brief" | "event"; event?: string; lang?: string }) =>
-      request<TurnResponse>(`${voice}/turn`, { method: "POST", body: JSON.stringify(body) }, passcode()),
+      request<TurnResponse>(`${voice}/turn`, { method: "POST", body: JSON.stringify(body) }, passcode(), TURN_TIMEOUT_MS),
   };
 }
 

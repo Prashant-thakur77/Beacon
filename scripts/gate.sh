@@ -8,4 +8,6 @@ $PY/ruff check src tests scripts
 $PY/mypy src/beacon/
 $PY/cfn-lint template.yaml remediation-template.yaml console-template.yaml demo/demo-infra-template.yaml --ignore-checks W1011
 $PY/python -m pytest -q -p no:warnings
+# The console is part of the product: a type error there is a red gate too.
+if [ -d web/node_modules ]; then (cd web && npx tsc --noEmit -p .); fi
 echo "GATE PASSED"
