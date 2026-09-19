@@ -465,9 +465,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         event.get("action"),
         event.get("incident_id"),
     )
-    with observability.metrics_scope(
-        service="beacon-remediate", action=str(event.get("action", ""))
-    ):
+    # ``service`` is the only dimension: the dashboard and the Escalated alarm
+    # query that dimension set; the action rides along as searchable metadata.
+    with observability.metrics_scope(service="beacon-remediate"):
+        observability.metadata("action", str(event.get("action", "")))
+        observability.metadata("incident_id", str(event.get("incident_id", "")))
         result = fn(event)
         _emit_outcome_metrics(step, event, result)
     return result

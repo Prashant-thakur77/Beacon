@@ -57,11 +57,19 @@ Parameters:
     Default: en-IN
     Description: Transcribe streaming language code used by the browser
 
+  SnsTopicArn:
+    Type: String
+    Default: ""
+    Description: Base-stack SNS topic for Lambda error alarms (blank = no alarms)
+
   VoiceEngine:
     Type: String
     Default: strands
     AllowedValues: [strands, litellm]
     Description: strands = Strands Agents SDK loop; litellm = fallback tool-calling loop with the same schemas
+
+Conditions:
+  PageOnErrors: !Not [!Equals [!Ref SnsTopicArn, ""]]
 
 Resources:
 
@@ -86,6 +94,51 @@ Resources:
         SigningBehavior: always
         SigningProtocol: sigv4
 
+  BeaconConsoleHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "beacon-console-${BaseStackName}"
+        Comment: HSTS, nosniff, no framing, and a CSP that names every origin the console talks to
+        SecurityHeadersConfig:
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Preload: true
+            Override: true
+          ContentTypeOptions:
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: true
+          ContentSecurityPolicy:
+            Override: true
+            # connect-src: the two Function URLs, Transcribe streaming (mic), AssemblyAI (phase 2).
+            # media-src data:  Polly audio arrives base64 in the turn response.
+            # style-src 'unsafe-inline': React inline style attributes; scripts stay strict.
+            ContentSecurityPolicy: !Sub >-
+              default-src 'self';
+              script-src 'self';
+              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+              font-src 'self' https://fonts.gstatic.com;
+              img-src 'self' data:;
+              media-src 'self' blob: data:;
+              worker-src 'self' blob:;
+              connect-src 'self' https://*.lambda-url.${AWS::Region}.on.aws
+              wss://transcribestreaming.${AWS::Region}.amazonaws.com:8443
+              wss://agents.assemblyai.com https://api.assemblyai.com;
+              frame-ancestors 'none';
+              base-uri 'self';
+              form-action 'self'
+        CustomHeadersConfig:
+          Items:
+            - Header: Permissions-Policy
+              Value: microphone=(self), camera=(), geolocation=()
+              Override: true
+
   BeaconConsoleDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -108,6 +161,7 @@ Resources:
           CachedMethods: [GET, HEAD]
           Compress: true
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # Managed-CachingOptimized
+          ResponseHeadersPolicyId: !Ref BeaconConsoleHeaders
         CacheBehaviors:
           - PathPattern: /config.json
             TargetOriginId: console-s3
@@ -116,6 +170,7 @@ Resources:
             CachedMethods: [GET, HEAD]
             Compress: true
             CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # Managed-CachingDisabled
+            ResponseHeadersPolicyId: !Ref BeaconConsoleHeaders
           - PathPattern: /replay/*
             TargetOriginId: console-s3
             ViewerProtocolPolicy: redirect-to-https
@@ -123,6 +178,7 @@ Resources:
             CachedMethods: [GET, HEAD]
             Compress: true
             CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # Managed-CachingDisabled
+            ResponseHeadersPolicyId: !Ref BeaconConsoleHeaders
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 200
@@ -267,6 +323,12 @@ Resources:
             Action: lambda:InvokeFunction
             Resource: !Ref RemediateFunctionArn
 
+  BeaconVoiceTurnLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/beacon/${BaseStackName}/voice-turn"
+      RetentionInDays: 14
+
   BeaconVoiceTurnFunction:
     Type: AWS::Lambda::Function
     DependsOn: BeaconVoiceTurnAssumePolicy
@@ -282,6 +344,11 @@ Resources:
       Role: !GetAtt BeaconVoiceTurnRole.Arn
       MemorySize: 2048
       Timeout: 45
+      # Public URL behind a passcode: cap the blast radius of a flood (each turn is a Bedrock call).
+      ReservedConcurrentExecutions: 10
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref BeaconVoiceTurnLogGroup
       TracingConfig:
         Mode: Active
       Environment:
@@ -393,6 +460,12 @@ Resources:
                 Action: cloudwatch:GetMetricStatistics
                 Resource: "*"
 
+  BeaconDashboardLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/beacon/${BaseStackName}/dashboard"
+      RetentionInDays: 14
+
   BeaconDashboardFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -407,6 +480,10 @@ Resources:
       Role: !GetAtt BeaconDashboardRole.Arn
       MemorySize: 512
       Timeout: 15
+      ReservedConcurrentExecutions: 20
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref BeaconDashboardLogGroup
       Environment:
         Variables:
           PASSCODE: !Ref Passcode
@@ -437,6 +514,48 @@ Resources:
       Action: lambda:InvokeFunctionUrl
       Principal: "*"
       FunctionUrlAuthType: NONE
+
+  # ---------- Paging: a broken voice or dashboard function reaches the SNS topic ----------
+
+  BeaconVoiceTurnErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: PageOnErrors
+    Properties:
+      AlarmName: !Sub "beacon-${BaseStackName}-voice-turn-errors"
+      AlarmDescription: The voice-turn Lambda raised; the console will show "reconnecting"
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref BeaconVoiceTurnFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref SnsTopicArn
+
+  BeaconDashboardErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: PageOnErrors
+    Properties:
+      AlarmName: !Sub "beacon-${BaseStackName}-dashboard-errors"
+      AlarmDescription: The dashboard API Lambda raised
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref BeaconDashboardFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref SnsTopicArn
 
 Outputs:
   ConsoleUrl:

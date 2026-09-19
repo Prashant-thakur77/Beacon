@@ -75,3 +75,24 @@ def test_remediate_emits_loop_metrics() -> None:
     from beacon import remediate
 
     assert hasattr(remediate, "_emit_outcome_metrics")
+
+
+def test_remediate_metrics_use_only_the_service_dimension(
+    emf: Any, monkeypatch: Any
+) -> None:
+    """The dashboard and the Escalated alarm query ``{service}``; an extra
+    dimension would put the metrics in a set nothing reads."""
+    from beacon import remediate
+
+    monkeypatch.setitem(remediate._STEPS, "escalate", lambda e: {"ok": True})
+    remediate.handler(
+        {"step": "escalate", "action": "sg.restore_ingress", "incident_id": "inc-1"},
+        None,
+    )
+    blob = _emf_blobs(emf.readouterr().out)[0]
+    assert blob["_aws"]["CloudWatchMetrics"][0]["Dimensions"] == [["service"]]
+    assert blob["service"] == "beacon-remediate"
+    assert blob["action"] == "sg.restore_ingress" and blob["incident_id"] == "inc-1"
+    assert "Escalated" in {
+        m["Name"] for m in blob["_aws"]["CloudWatchMetrics"][0]["Metrics"]
+    }
