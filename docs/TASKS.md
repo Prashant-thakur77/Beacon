@@ -57,3 +57,17 @@ Ordered by demo risk. Each task is self-contained: file list + definition of don
 - [x] Step Functions definition walked against the real handler (`tests/test_asl_walk.py`)
 - [x] image tags track the last commit touching image inputs (docs commits no longer invalidate built images)
 - [ ] cover image `docs/assets/cover.png` (AssemblyAI submission; from a real Night Board screenshot)
+
+## Production-grade pass (Sat 19 Sep, 11:00–12:00 IST; committed on `main`)
+- [x] `voice_turn`: constant-time passcode that fails closed, text/id limits, `/health` version
+- [x] `src/beacon/aws.py` bounded boto3 clients (3 s connect / 15 s read / standard retries) on every voice-path call
+- [x] `remediate` execute failures recorded as the approval result (retries replay, never re-run)
+- [x] dashboard incident cache (2 s / container); `make local` bypasses it
+- [x] named JSON log groups (14 d) for all five functions; `Errors` alarms + `Escalated` alarm → SNS; reserved concurrency; PITR
+- [x] `remediate` EMF metrics use only the `service` dimension (the `action` dimension was hiding them from the dashboard)
+- [x] CloudFront ResponseHeadersPolicy (HSTS, nosniff, DENY, CSP naming Function URLs + Transcribe + AssemblyAI)
+- [x] Function URL CORS scoped to the console origin; resolvers no longer add their own CORS headers
+- [x] demo RDS password managed by Secrets Manager (`ManageMasterUserPassword`), read as an ECS secret
+- [x] console: 10 s read / 50 s turn timeouts, poll backoff, pause when hidden, error boundary, favicon; `tsc` in the gate
+- [x] README "Production notes"; `tests/test_template_ops.py` proves each infra claim
+- [ ] carry the pass to branch `assemblyai` (merge `main`)

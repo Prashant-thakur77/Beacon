@@ -5,9 +5,9 @@
 # Usage: scripts/check_reduction.sh <stack> <region> [since]
 set -euo pipefail
 STACK="${1:-beacon}"; REGION="${2:-us-east-1}"; SINCE="${3:-30m}"
-LINES="$(aws logs tail "/aws/lambda/beacon-${STACK}" --since "$SINCE" --region "$REGION" --format short 2>/dev/null | grep -i "Cordon reduced" || true)"
+LINES="$(aws logs tail "/beacon/${STACK}/triage" --since "$SINCE" --region "$REGION" --format short 2>/dev/null | grep -i "Cordon reduced" || true)"
 if [ -z "$LINES" ]; then
-    echo "NO REDUCTION LINE in /aws/lambda/beacon-${STACK} (last ${SINCE})."
+    echo "NO REDUCTION LINE in /beacon/${STACK}/triage (last ${SINCE})."
     echo "Either the logs fit the TOKEN_BUDGET (lower it: make deploy TOKEN_BUDGET=3000) or no triage ran yet."
     exit 1
 fi

@@ -1,10 +1,11 @@
-# Status — Sat 19 Sep 2026, 01:30 IST
+# Status — Sat 19 Sep 2026, 12:00 IST
 
 ## What works (verified in the sandbox)
 
 | Area | Evidence |
 |---|---|
-| Backend, all three stacks, safety model | 228 tests; `bash scripts/gate.sh` green (ruff, mypy --strict, cfn-lint, pytest) |
+| Backend, all three stacks, safety model | 242 tests; `bash scripts/gate.sh` green (ruff, mypy --strict, cfn-lint, pytest, web `tsc`) |
+| Production hardening | `tests/test_hardening.py` (fail-closed passcode, limits, bounded clients, recorded execute failures) and `tests/test_template_ops.py` (log groups, alarms, concurrency, PITR, CSP, CORS, Secrets Manager); README "Production notes" |
 | The Step Functions loop against the real handler | `tests/test_asl_walk.py` drives the real ASL through `remediate.handler` |
 | The whole product with no AWS account | `make local LOCAL_PORT=8765`: both incident cycles driven over HTTP, second one "not woken" |
 | Console (minimal redesign) | screenshots at 1440 and 400 px: board, replay, safety; no horizontal scroll |

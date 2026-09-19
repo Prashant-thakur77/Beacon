@@ -220,6 +220,6 @@ Paste **verbatim** into chat:
 ```bash
 aws cloudformation describe-stack-events --stack-name <stack> --max-items 25 --region us-east-1 \
   --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED`].[LogicalResourceId,ResourceStatusReason]' --output table
-aws logs tail /aws/lambda/<function> --since 15m --region us-east-1
+aws logs tail /beacon/beacon/<triage|remediate|changes|voice-turn|dashboard> --since 15m --region us-east-1
 ```
 plus the browser console / network tab error for UI problems. The agent never asks you to click around consoles except where this runbook says so.

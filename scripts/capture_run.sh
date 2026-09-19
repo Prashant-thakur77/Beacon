@@ -7,7 +7,7 @@ STACK="${1:-beacon}"; REGION="${2:-us-east-1}"; SINCE="${3:-30m}"
 TS="$(date +%Y%m%dT%H%M%S)"
 DIR="tests/fixtures/real"; mkdir -p "$DIR"
 
-aws logs tail "/aws/lambda/beacon-${STACK}" --since "$SINCE" --region "$REGION" --format short > "$DIR/triage-${TS}.log" || true
+aws logs tail "/beacon/${STACK}/triage" --since "$SINCE" --region "$REGION" --format short > "$DIR/triage-${TS}.log" || true
 aws logs tail /ecs/beacon-demo --since "$SINCE" --region "$REGION" --format short | tail -300 > "$DIR/demo-logs-${TS}.log" || true
 
 PY="${PYTHON:-.venv/bin/python}"
