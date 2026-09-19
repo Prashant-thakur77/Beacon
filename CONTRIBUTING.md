@@ -35,3 +35,13 @@ the same gate.
   and run the gate (a test checks the pins match the environment).
 - Docs live next to the code they describe; `docs/LEARNINGS.md` gets a dated
   entry for anything that surprised you.
+
+## Looking at the console without a browser window
+
+`scripts/dev/shoot.py` drives headless Chromium over CDP and screenshots a URL
+at chosen seconds — the way "Run the night" is verified end to end:
+
+```bash
+make local LOCAL_PORT=8765 &
+.venv/bin/python scripts/dev/shoot.py "http://localhost:8765/?night=1" ~/shots/night 30 60 95
+```

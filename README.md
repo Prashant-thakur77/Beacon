@@ -13,6 +13,7 @@ Built solo in a weekend for the AWS *First Commit* hackathon. Everything below i
 ## Try it in two minutes, no AWS account
 
 ```bash
+make setup            # once: uv venv, CPU torch, the package, npm ci
 make local            # console + FastAPI + in-process moto on http://localhost:8000
 ```
 
@@ -89,10 +90,11 @@ Details: [`docs/safety.md`](docs/safety.md).
 
 ```bash
 git clone <this repo> && cd beacon
-uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python torch --index-url https://download.pytorch.org/whl/cpu
-uv pip install --python .venv/bin/python --no-deps cordon && uv pip install --python .venv/bin/python -e ".[agent,dev]"
+make setup            # uv venv + CPU torch + cordon (no CUDA) + the package with [agent,dev]; npm ci
 make local            # builds the console, starts http://localhost:8000 (passcode: local)
 ```
+
+Needs Python 3.12, [uv](https://docs.astral.sh/uv/) and Node 20. No Docker, no AWS credentials.
 
 Open the URL, enter the passcode, and talk (or type): *what changed* → *can you fix it* → *approve fix 1* → *yes* → *grant contract for seven days*. Then `make local-break` in another terminal: the second outage is handled under the contract and the tally shows **0 humans woken** for it. `?night=1` does all of that for you. The AWS calls run against an in-process [moto](https://github.com/getmoto/moto); every safety check is the production code. Bedrock is replaced by a scripted agent.
 
@@ -171,7 +173,7 @@ What "production grade" means here, and where each claim is enforced:
 | The dashboard list is cached for 2 s per container, so many viewers polling every 3 s cost one scan | `dashboard_api._all_incidents` |
 | The console times out reads at 10 s, backs off polling (x2, max 60 s) on errors, pauses polling in hidden tabs, and catches render errors in a boundary | `web/src/api.ts`, `hooks.ts`, `components/ErrorBoundary.tsx` |
 | Container image tags are the git SHA of the last source change; deploy targets refuse a stale or dirty tag | `scripts/image_tag.sh`, `scripts/check_image_tag.sh` |
-| Image dependencies are pinned to the versions the suite ran against; a test fails if the pins and the environment drift | `requirements/*.txt`, `tests/test_hardening.py` |
+| Image dependencies are pinned to the versions the suite ran against; a test fails if the pins drift a minor version from the environment | `requirements/*.txt`, `tests/test_hardening.py` |
 
 Known gaps, on purpose for a hackathon: a single passcode instead of per-user identity (Cognito would replace `_passcode_ok` in one place), no WAF in front of the Function URLs (reserved concurrency is the blast-radius limit), and the demo RDS has no backups.
 

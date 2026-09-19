@@ -371,10 +371,10 @@ export function Talk({
               {state === "speaking" ? "◉" : "🎙"}
             </button>
             <div className="stack" style={{ gap: 4 }}>
-              <div className={`state ${state}`}>{stateLabel[state]}</div>
+              <div className={`state ${state}`} role="status">{stateLabel[state]}</div>
               <div className="partial">{partial || (state === "listening" ? "…" : unlocked || replayTurns ? "hold the mic and speak, or type below" : "enter the passcode on the left to talk")}</div>
               <div className="row small">
-                <label className="faint small">mic</label>
+                <label className="faint small" htmlFor="stt-select">mic</label>
                 <select className="input" style={{ width: "auto", padding: "4px 8px" }} value={activeStt} onChange={(e) => setActiveStt(e.target.value as SttChoice)} id="stt-select">
                   <option value="transcribe">Transcribe</option>
                   <option value="webspeech">Browser</option>
@@ -385,7 +385,7 @@ export function Talk({
           </div>
           {error ? <div className="err">{error}</div> : null}
 
-          <div className="bubbles">
+          <div className="bubbles" aria-live="polite" aria-label="Conversation with Beacon">
             {messages.map((m, mi) =>
               m.role === "user" ? (
                 <div key={mi} className="bubble user">
