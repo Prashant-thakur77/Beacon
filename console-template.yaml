@@ -380,9 +380,12 @@ Resources:
       TargetFunctionArn: !Ref BeaconVoiceTurnFunction
       AuthType: NONE
       Cors:
-        AllowOrigins: ["*"]
+        # Only the console (and a local Vite dev server) may call this from a browser.
+        AllowOrigins:
+          - !Sub "https://${BeaconConsoleDistribution.DomainName}"
+          - http://localhost:5173
         AllowHeaders: ["content-type", "x-beacon-passcode"]
-        AllowMethods: ["*"]
+        AllowMethods: [GET, POST]
         MaxAge: 300
 
   BeaconVoiceTurnUrlPermission:
@@ -502,9 +505,11 @@ Resources:
       TargetFunctionArn: !Ref BeaconDashboardFunction
       AuthType: NONE
       Cors:
-        AllowOrigins: ["*"]
+        AllowOrigins:
+          - !Sub "https://${BeaconConsoleDistribution.DomainName}"
+          - http://localhost:5173
         AllowHeaders: ["content-type", "x-beacon-passcode"]
-        AllowMethods: ["*"]
+        AllowMethods: [GET, POST, DELETE]
         MaxAge: 300
 
   BeaconDashboardUrlPermission:

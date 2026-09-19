@@ -48,6 +48,7 @@ def test_full_loop_runs_against_moto(client: Any) -> None:
         json={"incident_id": inc, "session_id": "s", "mode": "brief"},
         headers=headers,
     ).json()
+    assert "reply_text" in brief, brief
     assert (
         brief["reply_text"] and brief["tool_events"][0]["name"] == "get_incident_brief"
     )

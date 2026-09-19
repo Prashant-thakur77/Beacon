@@ -18,7 +18,6 @@ from typing import Any
 
 import boto3
 from aws_lambda_powertools.event_handler import (
-    CORSConfig,
     LambdaFunctionUrlResolver,
     Response,
 )
@@ -48,9 +47,9 @@ SAFETY_RULES = [
 ]
 
 
-app = LambdaFunctionUrlResolver(
-    cors=CORSConfig(allow_origin="*", allow_headers=["x-beacon-passcode"])
-)
+# CORS lives on the Function URL (console-template.yaml), scoped to the console
+# origin; setting it here too would duplicate the headers in every response.
+app = LambdaFunctionUrlResolver()
 
 
 def _env(name: str, default: str = "") -> str:
