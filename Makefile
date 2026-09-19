@@ -4,10 +4,42 @@
        snapshot-sg tag-remediable dry-run changes incidents lint-templates remediable-ecs break-demo-deploy fix-demo-deploy \
        deploy-console teardown-console web-build set-passcode console-config \
        check-reduction capture-run propose approve replay-approval demo-alarm demo-reset \
-       demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix preflight dashboard build-replay
+       demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix preflight dashboard build-replay help
 
 # Deploy variables persisted by earlier runs (IMAGE_URI, EMAIL, ...). Gitignored.
 -include .beacon.env
+
+.DEFAULT_GOAL := help
+
+help:  ## every target with a "##" comment, grouped as the runbook uses them
+	@echo "Beacon Night Shift — make targets"
+	@echo
+	@echo "Try it without AWS:"
+	@echo "  local              build the console and run the whole product against moto (?night=1 plays a full night)"
+	@echo "  local-break        cut the demo's database rule again (second incident, handled under a contract)"
+	@echo "  local-fix          restore the rule by hand"
+	@echo "  test / lint        pytest · ruff + mypy + cfn-lint     (bash scripts/gate.sh runs everything)"
+	@echo
+	@echo "Deploy (in this order; docs/human-runbook.md has expected outputs):"
+	@echo "  deploy-demo        the patient: VPC + RDS + Fargate app + alarm"
+	@echo "  setup-image        build + push the triage image (torch)      setup-agent-image  the slim agent image"
+	@echo "  deploy-remediation tables, remediator role, Step Functions, change ledger"
+	@echo "  deploy             the triage stack (EMAIL=, LOG_GROUP_PATTERNS=, ENABLE_ALARM=true ...)"
+	@echo "  snapshot-sg        golden security-group snapshot           tag-remediable   tag demo resources"
+	@echo "  remediable-ecs     allowlist the demo ECS service           dry-run          must print DRY RUN PASSED"
+	@echo "  set-passcode       PASSCODE=<word>                          deploy-console   S3 + CloudFront + Function URLs"
+	@echo "  preflight          every check before recording"
+	@echo
+	@echo "Operate the demo:"
+	@echo "  break-demo / fix-demo            revoke / restore the RDS ingress rule"
+	@echo "  break-demo-deploy / fix-demo-deploy   the sticky-wedge failure (ecs.force_redeploy path)"
+	@echo "  propose · approve FIX=1 · replay-approval APPROVAL=<id>   the loop from the terminal"
+	@echo "  demo-alarm · demo-reset · demo-sleep · demo-rehearse       alarm state, clean slate, contract night, full cycle"
+	@echo "  apply-off / apply-on             the kill switch on all three functions"
+	@echo "  incidents · changes · latest-incident · dashboard · warm · check-reduction"
+	@echo "  capture-run → build-replay → console-config   archive a real run for the judges' replay"
+	@echo
+	@echo "Tear down:  teardown-console · teardown-remediation · teardown · teardown-demo · teardown-all"
 
 STACK_NAME ?= beacon
 REGION     ?= us-east-1

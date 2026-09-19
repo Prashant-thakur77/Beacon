@@ -45,3 +45,4 @@ Terminal `make break-demo-deploy`; Fix Card shows `ecs.force_redeploy` on `beaco
 | Verify keeps failing after the rule is back | the app needs ~60 s of 200s; wait one more attempt; if it escalates, `make demo-reset` and retake |
 | Alarm will not re-enter ALARM on the second cycle | `make demo-alarm` (caption it) |
 | Cold-start pause on the first turn | `make warm` before the take; keep-warm runs every 4 min anyway |
+| AWS is unusable on recording day (quota, outage, account) | record the *Build It* take: `make local` then `http://localhost:8000/?night=1` plays the whole night unattended in ~90 s; caption it "local mode: moto, scripted model, production code path"; keep the AWS console B-roll from `make preflight` day |

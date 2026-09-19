@@ -24,7 +24,8 @@ The tally on the board is the outcome: incidents resolved, median minutes to rec
 - **Five Lambdas** from two container images (a torch image for triage, a slim one for the rest), **three CloudFormation stacks**, one `make` target each; images tagged with the git SHA and deploys refuse a stale tag.
 - **AWS open source:** Strands Agents SDK runs the voice agent; Powertools for AWS Lambda handles the Function URL routing and tracing.
 - **The safety model is code and IAM, not prompt text**, and `tests/test_template_safety.py` parses the real templates to prove the two-role split (read-only agent, write-only executor scoped by `aws:ResourceTag`, plus the untaggable `security-group-rule/*` statement).
-- **204 tests** (moto for AWS, a fake agent for the model) and a `make local` mode that runs the entire product against in-process moto with no AWS account — the Build It path — which found two real bugs the unit tests had not.
+- **244 tests** (moto for AWS, a fake agent for the model) and a `make local` mode that runs the entire product against in-process moto with no AWS account — the Build It path — which found two real bugs the unit tests had not. `http://localhost:8000/?night=1` plays a whole night unattended: fix, approve, verify, grant a contract, then the same fault handled with nobody woken.
+- **Production grade, not a demo shell:** fail-closed passcode, bounded AWS clients, idempotent execute even on failure, named JSON log groups, Lambda error and escalation alarms to SNS, reserved concurrency, point-in-time recovery, CloudFront security headers with a CSP, origin-scoped CORS, the demo database password in Secrets Manager, pinned image dependencies. Each claim has a test in `tests/test_template_ops.py`; the table is in the README.
 - Full architecture, hour plan and risk register: `docs/PLAN.md`.
 
 ## Where AWS fits (and where it is visible in the video)
@@ -60,6 +61,8 @@ Beacon started from an Apache-2.0 open-source log-triage project (git tag `base-
 - Lambda container images on `:latest` do not redeploy; git-SHA tags with a deploy guard do. Copy source last so rebuilds push kilobytes.
 - Transcribe streaming from a browser works with 15-minute STS credentials scoped to one action — no identity pool needed — and Vite needs Node polyfills for the SDK's event stream.
 - Running the whole product against moto (`make local`) found two status-race bugs that 200 unit tests had not.
+- Every EMF dimension you add creates a metric set nothing else reads: the remediate Lambda's `{service, action}` metrics were invisible to a dashboard querying `{service}`. One dimension, metadata for the rest.
+- CORS belongs in exactly one place: a Function URL CORS config plus a Powertools `CORSConfig` produce duplicated headers that browsers reject.
 
 ## Roadmap
 
