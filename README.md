@@ -177,10 +177,6 @@ What "production grade" means here, and where each claim is enforced:
 
 Known gaps, on purpose for a hackathon: a single passcode instead of per-user identity (Cognito would replace `_passcode_ok` in one place), no WAF in front of the Function URLs (reserved concurrency is the blast-radius limit), and the demo RDS has no backups.
 
-## Provenance
-
-Beacon started from an open-source Apache-2.0 log-triage project (see `LICENSE`; the git tag `base-upstream` marks the untouched import). Everything from that tag forward — the change ledger, diagnostics, the remediation loop, approvals and Sleep Contracts, the voice agent and its tools, the console, the three-stack deployment and the safety tests — was built for this hackathon. `git log base-upstream..HEAD` is the honest diff.
-
 ## License
 
 Apache 2.0.

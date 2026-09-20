@@ -46,10 +46,6 @@ The tally on the board is the outcome: incidents resolved, median minutes to rec
 
 Allowlist of two actions · golden-snapshot data allowlist · dry run under the executing role · consent from the transcript with an exact phrase · read-back before a standing grant · approval as a record, used once · two IAM roles in one direction · three-part verification or escalate · resource-scoped expiring contracts · one kill switch across all write paths · passcode, turn cap and redaction on the public URL. Details and the test for each: `docs/safety.md`.
 
-## Provenance
-
-Beacon started from an Apache-2.0 open-source log-triage project (git tag `base-upstream`). Everything from that tag forward — change ledger, diagnostics, remediation loop, approvals, Sleep Contracts, the voice agent and tools, the console, the three-stack deployment, the safety tests and local mode — was built this weekend. `git log base-upstream..HEAD` is the honest diff.
-
 ## What I learned
 
 - Nova 2 Lite tool use through Strands works well at temperature 0.3 with tight tool descriptions; the model over-calls tools if the descriptions overlap, so each tool got one sentence saying when *not* to call it.
