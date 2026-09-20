@@ -114,9 +114,11 @@ def _morning_report(event: dict[str, Any], config: BeaconConfig) -> dict[str, An
     """The 07:00 IST schedule: summarise last night and email it via SNS."""
     import boto3
 
-    from beacon import contracts, dashboard_api, reports
+    from beacon import contracts, reports
 
-    rows = dashboard_api._scan_incidents(config.incidents_table_name)
+    # contracts._scan, not dashboard_api: the triage image has no Powertools.
+    rows = contracts._scan(config.incidents_table_name, boto3.client("dynamodb"))
+    rows.sort(key=lambda r: str(r.get("timestamp", "")), reverse=True)
     live = contracts.list_active(table_name=os.environ.get("CONTRACTS_TABLE_NAME", ""))
     report = reports.morning_report(
         rows, contracts=live, night_of=event.get("night_of")
