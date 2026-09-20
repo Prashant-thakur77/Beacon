@@ -8,7 +8,8 @@
 | Production hardening | `tests/test_hardening.py` (fail-closed passcode, limits, bounded clients, recorded execute failures) and `tests/test_template_ops.py` (log groups, alarms, concurrency, PITR, CSP, CORS, Secrets Manager); README "Production notes" |
 | The Step Functions loop against the real handler | `tests/test_asl_walk.py` drives the real ASL through `remediate.handler` |
 | The whole product with no AWS account | `make local LOCAL_PORT=8765`: both incident cycles driven over HTTP, second one "not woken"; `?night=1` plays the whole night in the browser unattended (verified headless via CDP: 9 turns, 2 incidents, 1 human woken, contract listed) |
-| Console (minimal redesign) | screenshots at 1440 and 400 px: board, replay, safety; no horizontal scroll |
+| Console (light editorial theme, 20 Sep) | Wispr-Flow-inspired design system in `web/src/theme.css` (cream ground, EB Garamond statements, Figtree body, lavender CTA, coral/amber/deep-green/pink state); screenshots at 1440, 1024 and 400 px of board, analytics, contracts, safety in `~/beacon-shots/ui-*.png`; no horizontal scroll at any width (probed via CDP) |
+| Analytics view (`#analytics`) | `GET /analytics` on the dashboard API (`tests/test_dashboard_api.py`: nights, p50/p90 recovery, woken vs contract, cost per incident + cumulative, alarm-to-first-proposal, outcomes, top alarms, contract usage); the console falls back to the same maths in the browser for replay bundles and for a deployed API that predates the route; every chart has an empty state and a skeleton |
 | Both container images | `docker build` of `Dockerfile` and `Dockerfile.agent` succeed; imports smoke-tested |
 | Voice protocol facts | Nova 2 Sonic, Transcribe, Polly, AssemblyAI Voice Agent event shapes fetched from the docs on 18 Sep |
 

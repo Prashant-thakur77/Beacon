@@ -141,10 +141,10 @@ src/beacon/
   turn_context.py       the raw transcript of the current turn; consent is decided here
   voice_turn.py         Function URL: /session (STS mic creds), /turn (Strands agent + Polly), tool_only
   voice_loop.py         litellm fallback engine, same tools
-  dashboard_api.py      read-only Function URL for the console (redacts account ids / ARNs)
+  dashboard_api.py      read-only Function URL for the console (redacts account ids / ARNs); GET /analytics aggregates nights, recovery percentiles, cost
   observability.py      Powertools EMF metrics + X-Ray spans, one dimension set, incident id as metadata
   aws.py                boto3 clients with bounded timeouts and retries
-web/                    Vite + React console: Night Board, Talk, Contracts, Safety, replay, "Run the night"
+web/                    Vite + React console: Night Board, Talk, Analytics, Contracts, Safety, replay, "Run the night"
 template.yaml           base stack (triage)          remediation-template.yaml   console-template.yaml
 demo/                   the patient: VPC + RDS + Fargate app + alarm, and the sticky-wedge failure mode
 requirements/           pinned image dependencies (triage.txt, agent.txt)

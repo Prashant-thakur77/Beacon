@@ -318,6 +318,7 @@ table.t th { color: var(--dim); font-weight: 600; font-size: 12px; letter-spacin
 .chart-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
 .chart-h h3 { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 400; letter-spacing: -0.02em; line-height: 1.1; color: var(--ink); }
 .chart-h .meta { margin-left: auto; color: var(--faint); font-size: 12px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 560px) { .chart-h { flex-direction: column; align-items: flex-start; gap: 4px; } .chart-h .meta { margin-left: 0; } .chart { padding: 16px 18px 14px; } }
 .plot { display: block; width: 100%; height: 150px; overflow: visible; }
 .plot text { font-family: var(--font-mono); font-size: 10.5px; fill: var(--faint); }
 .plot .axis text, .plot text.axis { fill: var(--faint); }
