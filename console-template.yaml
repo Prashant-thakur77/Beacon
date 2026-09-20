@@ -68,8 +68,16 @@ Parameters:
     AllowedValues: [strands, litellm]
     Description: strands = Strands Agents SDK loop; litellm = fallback tool-calling loop with the same schemas
 
+  ReservedConcurrency:
+    Type: Number
+    Default: 0
+    Description: >
+      Reserved concurrency for the voice-turn and dashboard Lambdas (0 = none). New
+      accounts have a 10-execution unreserved minimum that makes any reservation fail.
+
 Conditions:
   PageOnErrors: !Not [!Equals [!Ref SnsTopicArn, ""]]
+  ReserveConcurrency: !Not [!Equals [!Ref ReservedConcurrency, 0]]
 
 Resources:
 
@@ -345,7 +353,7 @@ Resources:
       MemorySize: 2048
       Timeout: 45
       # Public URL behind a passcode: cap the blast radius of a flood (each turn is a Bedrock call).
-      ReservedConcurrentExecutions: 10
+      ReservedConcurrentExecutions: !If [ReserveConcurrency, !Ref ReservedConcurrency, !Ref AWS::NoValue]
       LoggingConfig:
         LogFormat: JSON
         LogGroup: !Ref BeaconVoiceTurnLogGroup
@@ -483,7 +491,7 @@ Resources:
       Role: !GetAtt BeaconDashboardRole.Arn
       MemorySize: 512
       Timeout: 15
-      ReservedConcurrentExecutions: 20
+      ReservedConcurrentExecutions: !If [ReserveConcurrency, !Ref ReservedConcurrency, !Ref AWS::NoValue]
       LoggingConfig:
         LogFormat: JSON
         LogGroup: !Ref BeaconDashboardLogGroup
