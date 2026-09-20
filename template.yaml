@@ -154,6 +154,18 @@ Parameters:
     Default: ""
     Description: On-call engineer phone number (E.164 format)
 
+  WebhookUrl:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Slack-compatible incoming webhook; every page/resolve/escalation/undo/morning report is posted there with a deep link (blank = off)
+
+  PagerDutyRoutingKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: PagerDuty Events v2 routing key; pages open an incident keyed by the Beacon incident id and resolutions close it (blank = off)
+
 Conditions:
   ScheduleEnabled: !Equals [!Ref EnableSchedule, "true"]
   AlarmEnabled: !Equals [!Ref EnableAlarmTrigger, "true"]
@@ -316,6 +328,8 @@ Resources:
           INCIDENTS_ENABLED: !Ref IncidentsEnabled
           APPLY_ENABLED: !Ref ApplyEnabled
           DASHBOARD_URL: !Ref DashboardUrl
+          WEBHOOK_URL: !Ref WebhookUrl
+          PAGERDUTY_ROUTING_KEY: !Ref PagerDutyRoutingKey
           APPROVALS_TABLE_NAME: !Sub "beacon-approvals-${AWS::StackName}"
           CONTRACTS_TABLE_NAME: !Sub "beacon-contracts-${AWS::StackName}"
           CHANGES_TABLE_NAME: !Sub "beacon-changes-${AWS::StackName}"

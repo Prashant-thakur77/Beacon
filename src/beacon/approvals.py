@@ -208,6 +208,27 @@ def mark_used(
     return True
 
 
+def list_for_incident(
+    incident_id: str, *, table_name: str, dynamodb_client: Any | None = None
+) -> list[dict[str, Any]]:
+    """Every approval row for one incident, oldest first (a scan; rows are few)."""
+    client = _client(dynamodb_client)
+    rows: list[dict[str, Any]] = []
+    kwargs: dict[str, Any] = {
+        "TableName": table_name,
+        "FilterExpression": "incident_id = :i",
+        "ExpressionAttributeValues": {":i": {"S": incident_id}},
+    }
+    while True:
+        resp = client.scan(**kwargs)
+        rows.extend(_deserialize_item(raw) for raw in resp.get("Items", []))
+        if not resp.get("LastEvaluatedKey"):
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    rows.sort(key=lambda r: str(r.get("granted_at") or r.get("created_at") or ""))
+    return rows
+
+
 def record_execution(
     approval_id: str,
     result: dict[str, Any],

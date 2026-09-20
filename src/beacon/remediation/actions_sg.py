@@ -95,6 +95,60 @@ def execute(params: dict[str, Any], *, ec2_client: Any | None = None) -> ActionR
     return ActionResult(ok=True, code="Authorized", detail="rule added")
 
 
+def revoke_dry_run(
+    params: dict[str, Any], *, ec2_client: Any | None = None
+) -> ActionResult:
+    """Ask EC2 whether the caller may revoke this rule, without doing it."""
+    try:
+        _ec2(ec2_client).revoke_security_group_ingress(
+            GroupId=params["group_id"],
+            IpPermissions=[ip_permission(params)],
+            DryRun=True,
+        )
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code", "Unknown")
+        message = exc.response.get("Error", {}).get("Message", "")
+        return ActionResult(
+            ok=code in ("DryRunOperation", "InvalidPermission.NotFound"),
+            code=code,
+            detail=message,
+        )
+    return ActionResult(ok=True, code="Succeeded", detail="DryRun flag was ignored")
+
+
+def revoke_execute(
+    params: dict[str, Any], *, ec2_client: Any | None = None
+) -> ActionResult:
+    """Remove the rule again (the inverse of ``execute``); an absent rule is success."""
+    try:
+        _ec2(ec2_client).revoke_security_group_ingress(
+            GroupId=params["group_id"], IpPermissions=[ip_permission(params)]
+        )
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code", "Unknown")
+        message = exc.response.get("Error", {}).get("Message", "")
+        if code == "InvalidPermission.NotFound":
+            return ActionResult(ok=True, code=code, detail="rule was already absent")
+        logger.warning("revoke_security_group_ingress failed: %s %s", code, message)
+        return ActionResult(ok=False, code=code, detail=message)
+    return ActionResult(ok=True, code="Revoked", detail="rule removed")
+
+
+def revoke_blast_radius(params: dict[str, Any]) -> str:
+    return (
+        f"1 ingress rule removed from 1 security group: {params['ip_protocol']}/"
+        f"{params['from_port']}-{params['to_port']} from {params['source_group_id']} "
+        f"on {params['group_id']}. The fault it fixed will return."
+    )
+
+
+def revoke_postcondition(
+    params: dict[str, Any], *, ec2_client: Any | None = None
+) -> bool:
+    """True when the rule is gone."""
+    return not postcondition(params, ec2_client=ec2_client)
+
+
 def postcondition(params: dict[str, Any], *, ec2_client: Any | None = None) -> bool:
     """True when the rule is present on the group right now."""
     resp = _ec2(ec2_client).describe_security_groups(GroupIds=[params["group_id"]])

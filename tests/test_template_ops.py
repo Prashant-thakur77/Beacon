@@ -193,3 +193,22 @@ def test_morning_report_is_scheduled_at_seven_ist(
     assert '"mode": "morning_report"' in target["Input"]
     perm = base["BeaconMorningReportPermission"]["Properties"]
     assert perm["Principal"] == "events.amazonaws.com"
+
+
+def test_paging_channels_are_wired_into_every_function_that_pages(
+    stacks: dict[str, dict[str, Any]],
+) -> None:
+    """WEBHOOK_URL / PAGERDUTY_ROUTING_KEY (NoEcho) reach triage, remediate and
+    voice-turn, and each has DASHBOARD_URL for the deep link."""
+    for name, fn in (
+        ("template.yaml", "BeaconFunction"),
+        ("remediation-template.yaml", "BeaconRemediateFunction"),
+        ("console-template.yaml", "BeaconVoiceTurnFunction"),
+    ):
+        t = stacks[name]
+        for param in ("WebhookUrl", "PagerDutyRoutingKey"):
+            assert t["Parameters"][param].get("NoEcho") is True, f"{name}: {param}"
+        env = t["Resources"][fn]["Properties"]["Environment"]["Variables"]
+        assert env["WEBHOOK_URL"] == {"Fn::Ref": "WebhookUrl"}, name
+        assert env["PAGERDUTY_ROUTING_KEY"] == {"Fn::Ref": "PagerDutyRoutingKey"}, name
+        assert "DASHBOARD_URL" in env, name

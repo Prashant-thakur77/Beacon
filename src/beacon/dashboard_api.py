@@ -60,7 +60,7 @@ SAFETY_CONTROLS: list[dict[str, str]] = [
         "rule": SAFETY_RULES[0],
         "file": "src/beacon/remediation/registry.py",
         "test": "tests/test_registry.py::"
-        "test_registry_has_exactly_the_two_allowlisted_actions",
+        "test_registry_has_exactly_the_allowlisted_actions",
     },
     {
         "id": "golden",

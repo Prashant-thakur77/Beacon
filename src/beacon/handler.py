@@ -9,7 +9,7 @@ os.environ.setdefault("TQDM_DISABLE", "1")  # noqa: E402
 
 from typing import Any  # noqa: E402
 
-from beacon import changes, rca
+from beacon import changes, channels, rca
 from beacon.analyzer import analyze_logs
 from beacon.budget import SourcePlan, compute_available_tokens, plan_token_budget
 from beacon.config import BeaconConfig
@@ -133,6 +133,7 @@ def _morning_report(event: dict[str, Any], config: BeaconConfig) -> dict[str, An
         report["night_of"],
         report["incidents"],
     )
+    channels.send("morning_report", report["subject"], report["text"])
     return {
         "mode": "morning_report",
         **{k: v for k, v in report.items() if k != "text"},
@@ -242,6 +243,14 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         )
         if incident_id:
             result["incident_id"] = incident_id
+            # the page itself, where the on-call actually is (Slack/PagerDuty),
+            # with a deep link that opens straight onto this incident
+            channels.send(
+                "page",
+                f"Beacon: {trigger.alarm_name or 'incident'} needs you",
+                parsed.summary or analysis[:400],
+                incident_id=incident_id,
+            )
 
     logger.info("Analysis complete and published to SNS")
     return result
@@ -602,6 +611,13 @@ def _remediate_under_contract(
         link=_dashboard_link(config),
         variant="contract",
         contract=contract,
+    )
+    channels.send(
+        "contract",
+        f"Handled under your Sleep Contract: {trigger.alarm_name or 'incident'}",
+        f"You were not woken. Beacon is applying {action} under contract "
+        f"{contract['contract_id']} and will verify recovery.",
+        incident_id=incident_id,
     )
     return {
         "incident_id": incident_id,

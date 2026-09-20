@@ -56,7 +56,7 @@ CloudWatch alarm fires ──▶ Lambda (Nova 2 Lite on Bedrock)   RCA + change 
                      DynamoDB incident ──▶ Night Board (S3 + CloudFront)
                                                 │
               you, in the browser ◀────────────▶ Strands agent on Nova 2 Lite
-              (Transcribe streaming STT,          six tools · every sentence cites its evidence
+              (Transcribe streaming STT,          seven tools · every sentence cites its evidence
                Polly TTS with speech marks)       "can you fix it?"  → propose_fix (dry run, blast radius)
                                                   "approve fix one"  → approve_fix (checked against YOUR transcript)
                                                                          │
@@ -94,7 +94,7 @@ The second incident under a contract runs the same loop with `source: contract` 
 
 Auto-remediation is only worth shipping if it cannot do the wrong thing. Beacon's controls are in code and IAM, not in a prompt:
 
-1. **Allowlist by code.** Exactly two actions exist: `sg.restore_ingress` and `ecs.force_redeploy` (`src/beacon/remediation/registry.py`). Params must match the schema exactly.
+1. **Allowlist by code.** Exactly three actions exist: `sg.restore_ingress`, its inverse `sg.revoke_ingress` ("undo fix 1", only for a rule Beacon itself restored) and `ecs.force_redeploy` (`src/beacon/remediation/registry.py`). Params must match the schema exactly.
 2. **Allowlist by data.** A security-group restore must exist in the *golden snapshot* taken on a healthy stack (`make snapshot-sg`).
 3. **Dry run first, under the executing role.** EC2 only tells the truth about permissions to the caller that will execute, so `propose_fix` dry-runs through the remediator Lambda, and the loop dry-runs again before Execute.
 4. **Consent is checked against your transcript, never the model's claim.** `approve_fix` reads the raw text of the current turn and requires the exact phrase `approve fix <n>` (`src/beacon/turn_context.py`). A Sleep Contract needs a read-back turn *and then* `grant contract for <n> days` (or the Hinglish equivalent); "yes" alone never grants.
@@ -151,7 +151,7 @@ src/beacon/
   store.py / approvals.py / contracts.py   DynamoDB: incidents, approvals, Sleep Contracts
   remediation/          registry (the allowlist), actions_sg, actions_ecs, verify (three checks)
   remediate.py          remediate Lambda: dryrun · require_approval · execute · verify · resolve · escalate · all
-  voice_tools.py        six tools + TOOL_SCHEMAS (shared across voice backends)
+  voice_tools.py        seven tools + TOOL_SCHEMAS (shared across voice backends)
   turn_context.py       the raw transcript of the current turn; consent is decided here
   voice_turn.py         Function URL: /session (STS mic creds), /turn (Strands agent + Polly), tool_only
   voice_loop.py         litellm fallback engine, same tools

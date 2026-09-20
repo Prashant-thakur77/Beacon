@@ -148,6 +148,8 @@ endif
 ifneq ($(REMEDIABLE_ECS_SERVICES),)
 	OVERRIDES += RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES)
 endif
+# Paging channels (optional; both NoEcho). Shared by all three stacks.
+CHANNELS = $(if $(WEBHOOK_URL),WebhookUrl=$(WEBHOOK_URL),) $(if $(PAGERDUTY_ROUTING_KEY),PagerDutyRoutingKey=$(PAGERDUTY_ROUTING_KEY),) $(if $(DASHBOARD_URL),DashboardUrl=$(DASHBOARD_URL),)
 REMEDIABLE_ECS_SERVICES ?=
 
 # Console stack
@@ -222,7 +224,7 @@ deploy: check-image-tags
 		--stack-name $(STACK_NAME) \
 		--region $(REGION) \
 		--capabilities CAPABILITY_IAM \
-		--parameter-overrides $(OVERRIDES) LambdaArchitecture=$(LAMBDA_ARCH)
+		--parameter-overrides $(OVERRIDES) LambdaArchitecture=$(LAMBDA_ARCH) $(CHANNELS)
 	$(call save_env,EMAIL,$(EMAIL))
 	$(call save_env,LOG_GROUP_PATTERNS,$(LOG_GROUP_PATTERNS))
 	$(call save_env,REGION,$(REGION))
@@ -407,7 +409,7 @@ deploy-remediation:
 		--parameter-overrides BaseStackName=$(STACK_NAME) AgentImageUri=$(AGENT_IMAGE_URI) \
 			SnsTopicArn=$$SNS_ARN CreateIncidentsTable=$(CREATE_INCIDENTS_TABLE) \
 			LambdaArchitecture=$(LAMBDA_ARCH) $(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),) \
-			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),)
+			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),) $(CHANNELS)
 	$(call save_env,AGENT_IMAGE_URI,$(AGENT_IMAGE_URI))
 	@echo "Done. Next: make snapshot-sg && make tag-remediable && make dry-run"
 
@@ -495,6 +497,8 @@ incidents:
 set-passcode:
 	$(call check_param,PASSCODE)
 	$(call save_env,PASSCODE,$(PASSCODE))
+	$(if $(WEBHOOK_URL),$(call save_env,WEBHOOK_URL,$(WEBHOOK_URL)),)
+	$(if $(PAGERDUTY_ROUTING_KEY),$(call save_env,PAGERDUTY_ROUTING_KEY,$(PAGERDUTY_ROUTING_KEY)),)
 	@echo "Passcode saved to .beacon.env"
 
 # Builds web/dist if the Vite app exists; otherwise uses the placeholder page.
@@ -519,7 +523,7 @@ deploy-console: web-build
 		--capabilities CAPABILITY_NAMED_IAM \
 		--parameter-overrides BaseStackName=$(STACK_NAME) AgentImageUri=$(AGENT_IMAGE_URI) \
 			LambdaArchitecture=$(LAMBDA_ARCH) RemediateFunctionArn=$$REMEDIATE_ARN Passcode=$(PASSCODE) \
-			SnsTopicArn=$$SNS_ARN UseCloudFront=$(USE_CLOUDFRONT) \
+			SnsTopicArn=$$SNS_ARN UseCloudFront=$(USE_CLOUDFRONT) $(CHANNELS) \
 			PollyVoiceId=$(POLLY_VOICE_ID) SttLanguage=$(STT_LANGUAGE) VoiceEngine=$(VOICE_ENGINE) \
 			$(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),) \
 			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),)

@@ -6,7 +6,7 @@ Routes (JSON; CORS is configured on the Function URL):
 * ``POST /session`` (passcode) -> 15-minute STS credentials for the browser
   mic, scoped to Transcribe streaming only (``BeaconMicRole``).
 * ``POST /turn`` (passcode) -> one agent turn: the Strands agent on Nova 2
-  Lite calls the six tools, the reply is spoken by Polly, and every tool
+  Lite calls the seven tools, the reply is spoken by Polly, and every tool
   event / evidence card is returned for the UI.
 * direct invoke ``{"mode": "tool_only", ...}`` -> run one tool (CLI targets,
   and the AssemblyAI phase's tool route).
@@ -141,7 +141,7 @@ def _synthesize(text: str) -> dict[str, Any]:
 
 
 def _build_agent(*, history: list[dict[str, Any]]) -> Any:
-    """A Strands Agent on Nova 2 Lite with the six tools (or the litellm loop)."""
+    """A Strands Agent on Nova 2 Lite with the seven tools (or the litellm loop)."""
     if _env("VOICE_ENGINE", "strands") == "litellm":
         from beacon.voice_loop import LiteLLMAgent
 

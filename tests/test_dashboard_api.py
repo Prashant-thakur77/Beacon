@@ -194,7 +194,7 @@ def test_safety_lists_allowlist_and_kill_switch_state(env: Any, mocker: Any) -> 
     out = _get("/safety")
     assert out["status"] == 200
     ids = [a["id"] for a in out["body"]["allowlist"]]
-    assert ids == ["sg.restore_ingress", "ecs.force_redeploy"]
+    assert ids == ["sg.restore_ingress", "sg.revoke_ingress", "ecs.force_redeploy"]
     assert out["body"]["allowlist"][0]["iam_actions"] == [
         "ec2:AuthorizeSecurityGroupIngress"
     ]

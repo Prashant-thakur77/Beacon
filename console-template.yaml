@@ -84,6 +84,23 @@ Parameters:
       accounts still under AWS's new-account verification, which blocks CloudFront creation;
       the mic needs HTTPS, typed input works either way. Redeploy with true once verified.
 
+  DashboardUrl:
+    Type: String
+    Default: ""
+    Description: Console URL used for deep links in pages (blank = no links)
+
+  WebhookUrl:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Slack-compatible incoming webhook; every page/resolve/escalation/undo/morning report is posted there with a deep link (blank = off)
+
+  PagerDutyRoutingKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: PagerDuty Events v2 routing key; pages open an incident keyed by the Beacon incident id and resolutions close it (blank = off)
+
 Conditions:
   PageOnErrors: !Not [!Equals [!Ref SnsTopicArn, ""]]
   UseCloudFront: !Equals [!Ref UseCloudFront, "true"]
@@ -493,6 +510,9 @@ Resources:
           REMEDIABLE_ECS_SERVICES: !Ref RemediableEcsServices
           SESSION_CAP_TURNS: "30"
           POWERTOOLS_SERVICE_NAME: beacon-voice-turn
+          DASHBOARD_URL: !Ref DashboardUrl
+          WEBHOOK_URL: !Ref WebhookUrl
+          PAGERDUTY_ROUTING_KEY: !Ref PagerDutyRoutingKey
           BEACON_VERSION: "0.2.0"
           POWERTOOLS_METRICS_NAMESPACE: Beacon
           LITELLM_LOCAL_MODEL_COST_MAP: "True"
