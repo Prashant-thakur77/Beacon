@@ -16,7 +16,15 @@ Beacon reads the logs on Amazon Bedrock, finds the CloudTrail change that caused
 
 Built solo in a weekend for the AWS *First Commit* hackathon. Everything below is live code with tests, not a slide.
 
-![The Night Board during a scripted night: brief, propose, approve, verified, contract offered](docs/assets/night-board.png)
+![Beacon Night Shift landing page](docs/assets/landing.png)
+
+<table><tr>
+<td><img src="docs/assets/night-board.png" alt="Night Board" /></td>
+<td><img src="docs/assets/analytics.png" alt="Analytics" /></td>
+</tr><tr>
+<td align="center"><sub>Night Board: the incident, the conversation, the evidence</sub></td>
+<td align="center"><sub>Analytics: recovery, sleep and cost across nights</sub></td>
+</tr></table>
 
 ## Try it in two minutes, no AWS account
 
@@ -71,7 +79,7 @@ The second incident under a contract runs the same loop with `source: contract` 
 | **AWS Lambda** + Function URLs | triage, voice turn, remediate, change ledger, dashboard | all five functions |
 | **Amazon DynamoDB** | incidents, approvals, contracts (TTL), change ledger, idempotency | `store.py`, `approvals.py`, `contracts.py` |
 | **Amazon SNS** | pages, "not woken" emails, resolved / escalated | `notifier.py`, `remediate.py` |
-| **Amazon S3 + CloudFront** | the Night Board console (HTTPS for the mic) | `console-template.yaml` |
+| **Amazon S3 + CloudFront** (or a Lambda Function URL proxy while a new account is under verification) | the Night Board console over HTTPS | `console-template.yaml`, `static_site.py` |
 | **Amazon CloudWatch** (alarms, metrics, logs) | the trigger and the verification oracle | `events.py`, `remediation/verify.py` |
 | **Amazon EC2 / ECS / RDS** | the patient: a real Fargate app behind a security group | `demo/` |
 | **AWS IAM** | two roles, one direction (see Safety) | all three templates |

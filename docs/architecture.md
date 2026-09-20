@@ -30,7 +30,7 @@ flowchart LR
   end
 
   subgraph console["Console stack (beacon-console)"]
-    S3["S3 (+ CloudFront)<br/>Night Board"] --> YOU(("you, 3 AM"))
+    S3["S3 bucket<br/>Night Board build"] --> EDGE["CloudFront, or the<br/>static_site Lambda URL (HTTPS)"] --> YOU(("you, 3 AM"))
     YOU --> VOICE["Lambda · voice-turn<br/>Strands on Nova 2 Lite"]
     VOICE --> BR
     VOICE -->|dry run via| REMED
