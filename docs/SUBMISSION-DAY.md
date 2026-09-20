@@ -8,7 +8,7 @@ State at 11:10: nothing deployed (credits untouched: $100), repo has no GitHub r
 
 | When | Do | Done when |
 |---|---|---|
-| 11:10–11:25 | **Non-negotiables first.** (1) Builder Center: verify student profile ("required to compete"). (2) Create the GitHub repo, then `git remote add origin <url> && git push -u origin main && git push origin assemblyai base-upstream`. | Repo public on GitHub; profile verified. |
+| 11:10–11:25 | **Non-negotiables first.** (1) Builder Center: verify student profile ("required to compete"). (2) Create the GitHub repo, then `git remote add origin <url> && git push -u origin main && git push origin assemblyai`. | Repo public on GitHub; profile verified. |
 | 11:25–11:45 | **Record the Build It take now.** `make local` → `http://localhost:8000/?night=1` at 1440×900, screen-record ~2 min (OBS or `ffmpeg -f x11grab`). Also record 20 s each of: `bash scripts/gate.sh` finishing green, `tests/test_template_safety.py` in the editor, the Safety tab. | A raw clip that could be submitted as-is. |
 | 11:45–12:15 | Runbook **§0** steps 1–7: AWS CLI, credentials (us-east-1), Bedrock model access for Nova 2 Lite + Nova 2 Multimodal Embeddings, a CloudTrail trail, ECR login. Then §0 step 8 in two terminals: `make deploy-demo` and `make setup-image` (20–40 min, unattended). | Both terminals running. |
 | 12:15–12:45 | While they run: publish the blog on Builder Center from `docs/blog.md` (add the Night Board screenshot `docs/assets/night-board.png`). Fill the submission form draft from `docs/submission.md`. | Blog URL in hand. |

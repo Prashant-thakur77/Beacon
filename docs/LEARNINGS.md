@@ -5,7 +5,7 @@ Dated, specific, in the order they happened. The "Learning" criterion and the la
 ## Fri 18 Sep
 
 - **20:30 — `cordon` pulls the full CUDA build of torch.** A plain `pip install -e .` tried to download ~2 GB of `cuda-bindings`. The Dockerfile already knew this (CPU torch first, then `cordon --no-deps`); the dev install and CI now do the same.
-- **21:10 — The upstream RDS engine version (16.4) was already deprecated for new instances.** cfn-lint caught it; the demo template now takes `PostgresVersion` as a parameter and the runbook checks availability with `describe-db-engine-versions` before deploying.
+- **21:10 — The template's original RDS engine version (16.4) was already deprecated for new instances.** cfn-lint caught it; the demo template now takes `PostgresVersion` as a parameter and the runbook checks availability with `describe-db-engine-versions` before deploying.
 - **21:40 — Lambda container images on `:latest` never redeploy.** CloudFormation sees the same URI string and does nothing. Images are tagged with the short SHA of the last commit that touched `src/beacon`, the Dockerfiles or `pyproject.toml`, and every deploy target refuses a stale tag. Docs-only commits do not invalidate a built image.
 - **22:05 — `cloudtrail:LookupEvents` lags minutes.** The "what changed" card would have been empty on a live take. Replaced with an EventBridge rule on `AWS API Call via CloudTrail` writing to DynamoDB; the card re-reads the ledger on every poll. Needs a trail to exist in the region.
 - **22:30 — EC2 `DryRun=True` only tells the truth to the caller that will execute.** A read-only agent role always gets `UnauthorizedOperation`. So the proposal-time dry run runs inside the remediator Lambda, and the UI shows which role answered.

@@ -83,5 +83,5 @@ Plus the deliverables that hackathon requires and First Commit did not: a 10-sli
 - Video: every one of the five criteria has a shot a judge can point at (checklist in `docs/demo-script.md`).
 - Live URL: opens to a working product with no instructions, in a fresh browser, two weeks later.
 - `make preflight` all green before the recording starts.
-- `bash scripts/gate.sh` green at every commit; `git log base-upstream..HEAD` tells the honest story.
+- `bash scripts/gate.sh` green at every commit.
 - `docs/LEARNINGS.md` has at least eight dated entries by Sunday noon.
