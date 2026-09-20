@@ -12,7 +12,7 @@ import { Contracts } from "./components/Contracts";
 import { Safety } from "./components/Safety";
 import { Talk } from "./components/Talk";
 import { useClock, useLocalState, usePoll } from "./hooks";
-import { useNavIndicator, useReveal, useScrolled } from "./motion";
+import { useNavIndicator, useReveal, useScrolled, useCursorMotion } from "./motion";
 import { loadReplay, type ReplayBundle } from "./replay";
 import { computeAnalytics } from "./analytics";
 import type { Analytics as AnalyticsData, AuditRow, Contract, Health, Incident, MorningReport, Safety as SafetyData, Tally } from "./types";
@@ -203,6 +203,7 @@ export default function App() {
   }, [deepId, incidents, contracts, replay]);
   useNavIndicator(navRef, `${route}:${contracts.length}`);
   useReveal(mainRef, [route, incidents.length, contracts.length, !!safety, !!replay]);
+  useCursorMotion();
   // Analytics: the API's aggregation when it has it; otherwise the same maths in the browser
   // (replay bundles, and a deployed API that predates GET /analytics).
   const analytics = useMemo<{ data: AnalyticsData | null; loading: boolean; source: "api" | "computed" | "replay" }>(() => {
