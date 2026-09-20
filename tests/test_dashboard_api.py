@@ -370,3 +370,17 @@ def test_night_of_turns_over_at_noon_ist() -> None:
         dashboard_api._night_of("2026-09-19T08:00:00+00:00") == "2026-09-19"
     )  # 13:30 IST
     assert dashboard_api._night_of("garbage") is None
+
+
+def test_safety_controls_name_real_files_and_tests(env: Any, mocker: Any) -> None:
+    from pathlib import Path
+
+    mocker.patch("beacon.dashboard_api._apply_flags", return_value={})
+    controls = _get("/safety")["body"]["controls"]
+    assert len(controls) == 9
+    root = Path(__file__).resolve().parent.parent
+    for c in controls:
+        assert (root / c["file"]).exists(), c["file"]
+        test_file, test_name = c["test"].split("::")
+        assert f"def {test_name}(" in (root / test_file).read_text(), c["test"]
+    assert [c["rule"] for c in controls[:8]] == dashboard_api.SAFETY_RULES

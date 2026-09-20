@@ -3,6 +3,8 @@ import { makeApi, type Api } from "./api";
 import { loadConfig, type Config } from "./config";
 import { ArchivedRunCard, IncidentCard, JudgeCard, TallyStrip } from "./components/NightBoard";
 import { Analytics } from "./components/Analytics";
+import { Announce, Footer, HelpFab, Toasts, useToasts } from "./components/Chrome";
+import { Marquee } from "./components/Marquee";
 import { Contracts } from "./components/Contracts";
 import { Safety } from "./components/Safety";
 import { Talk } from "./components/Talk";
@@ -50,6 +52,41 @@ export default function App() {
   const navRef = useRef<HTMLElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const stt = useMemo(() => chooseStt(), []);
+  const { toasts, push: toast, dismiss } = useToasts();
+  // mobile menu: the nav card itself expands downwards
+  const [menuOpen, setMenuOpen] = useState(false);
+  const topbarRef = useRef<HTMLElement>(null);
+  useEffect(() => setMenuOpen(false), [route]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const bar = topbarRef.current;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        bar?.querySelector<HTMLElement>(".burger")?.focus();
+      }
+      if (e.key === "Tab" && bar) {
+        const items = Array.from(bar.querySelectorAll<HTMLElement>("a, button, select")).filter((el) => el.offsetParent !== null);
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    bar?.querySelector<HTMLElement>(".nav a")?.focus();
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+  // route change: back to the top; the main content rises in (CSS)
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [route]);
   // In replay, ages are relative to the recording (the last event), not to today.
   const now = useMemo(() => {
     if (!replay) return wall;
@@ -136,6 +173,7 @@ export default function App() {
     try {
       await api.revoke(id);
       await contractsQ.refresh();
+      toast("Contract revoked", "ok");
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
     }
@@ -170,19 +208,44 @@ export default function App() {
     void localApi
       .localBreak()
       .then(() => Promise.all([incidentsQ.refresh(), contractsQ.refresh(), tallyQ.refresh()]))
-      .then(() => setNight("done"))
+      .then(() => {
+        setNight("done");
+        toast("Night complete · 2 incidents · 1 human woken", "ok");
+      })
       .catch(() => setNight("done"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [night, localApi]);
 
   return (
     <div className={`shell${scrolled ? " scrolled" : ""}`} ref={mainRef}>
-      <header className="topbar">
+      {replay ? (
+        <Announce text={`Replay of ${new Date(replay.recorded_at).toLocaleDateString([], { day: "2-digit", month: "long", year: "numeric" })}`} href="#board" />
+      ) : config?.local ? (
+        <Announce
+          text="Local mode · moto · Press Run the night"
+          onClick={() => {
+            if (route !== "board") window.location.hash = "board";
+            window.setTimeout(() => {
+              const el = document.querySelector<HTMLElement>(".judge");
+              el?.setAttribute("open", "");
+              el?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 60);
+          }}
+        />
+      ) : config ? (
+        <Announce text={`Live on AWS · ${config.region}${healthQ.data?.version ? ` · v${healthQ.data.version}` : ""} · Judge passcode in the submission`} href="#safety" />
+      ) : null}
+      <header className={`topbar${menuOpen ? " open" : ""}`} ref={topbarRef}>
         <a className="brand" href="#board" aria-label="Beacon Night Shift, Night Board">
           <span className="dot" />
           Beacon <span className="sub">Night Shift</span>
         </a>
-        <nav className="nav" aria-label="Sections" ref={navRef}>
+        <button type="button" className={`burger${menuOpen ? " x" : ""}`} aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} aria-controls="site-nav" onClick={() => setMenuOpen((o) => !o)}>
+          <span />
+          <span />
+          <span />
+        </button>
+        <nav className="nav" id="site-nav" aria-label="Sections" ref={navRef}>
           <a href="#board" className={route === "board" ? "active" : ""} aria-current={route === "board" ? "page" : undefined}>
             Night Board
           </a>
@@ -210,7 +273,7 @@ export default function App() {
       </header>
 
       {route === "board" ? (
-        <main className={`main${current ? " two-col" : ""}`}>
+        <main key="board" className={`main route-in${current ? " two-col" : ""}`}>
           <section className="stack">
             <TallyStrip tally={tally} />
             {!replay && !passcode ? (
@@ -220,6 +283,7 @@ export default function App() {
                   e.preventDefault();
                   const v = (new FormData(e.currentTarget).get("passcode") as string) ?? "";
                   setPasscode(v.trim());
+                  if (v.trim()) toast("Passcode saved for this tab", "ok");
                 }}
               >
                 <div className="row">
@@ -279,11 +343,11 @@ export default function App() {
           ) : null}
         </main>
       ) : route === "analytics" ? (
-        <main className="main">
+        <main key="analytics" className="main route-in">
           <Analytics data={analytics.data} loading={analytics.loading} source={analytics.source} now={now} />
         </main>
       ) : route === "contracts" ? (
-        <main className="main">
+        <main key="contracts" className="main route-in">
           <div className="page-h">
             <h1 className="display">
               Standing approvals, <em>in your own words.</em>
@@ -292,7 +356,7 @@ export default function App() {
           <Contracts contracts={contracts} now={now} onRevoke={revoke} canRevoke={!!api && !!passcode} />
         </main>
       ) : (
-        <main className="main">
+        <main key="safety" className="main route-in">
           <div className="page-h">
             <h1 className="display">
               Two roles, <em>one direction.</em>
@@ -302,6 +366,14 @@ export default function App() {
           <Safety safety={safety} />
         </main>
       )}
+      {route === "board" || route === "safety" ? (
+        <div className="band">
+          <Marquee label="Built on" />
+        </div>
+      ) : null}
+      <Footer version={healthQ.data?.version} />
+      <Toasts items={toasts} onDismiss={dismiss} />
+      <HelpFab onBoard={route === "board"} hasPasscode={!!passcode} />
     </div>
   );
 }

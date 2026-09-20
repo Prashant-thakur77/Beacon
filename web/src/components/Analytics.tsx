@@ -110,6 +110,7 @@ function Empty({ text = "No nights recorded yet", w }: { text?: string; w: numbe
         ))}
       </svg>
       <div className="chart-empty-text">
+        <span className="beacon-dot" aria-hidden="true" />
         <span>{text}</span>
         <span className="faint">Run a night and this fills in.</span>
       </div>

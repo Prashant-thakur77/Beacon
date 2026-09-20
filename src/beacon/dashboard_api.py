@@ -49,6 +49,82 @@ SAFETY_RULES = [
 ]
 
 
+# The same rules as controls the console can walk through: the plain-language
+# rule, the file that enforces it, and the test that proves it.
+SAFETY_CONTROLS: list[dict[str, str]] = [
+    {
+        "id": "allowlist",
+        "title": "Only allowlisted actions",
+        "rule": SAFETY_RULES[0],
+        "file": "src/beacon/remediation/registry.py",
+        "test": "tests/test_registry.py::"
+        "test_registry_has_exactly_the_two_allowlisted_actions",
+    },
+    {
+        "id": "golden",
+        "title": "Restores must match the golden snapshot",
+        "rule": SAFETY_RULES[1],
+        "file": "src/beacon/remediation/actions_sg.py",
+        "test": "tests/test_remediate.py::"
+        "test_dryrun_step_rejects_rule_outside_golden_snapshot",
+    },
+    {
+        "id": "dry-run",
+        "title": "Dry run under the remediator role",
+        "rule": SAFETY_RULES[2],
+        "file": "src/beacon/remediate.py",
+        "test": "tests/test_voice_tools.py::"
+        "test_propose_fix_dry_runs_under_remediator_and_stores_proposal",
+    },
+    {
+        "id": "transcript",
+        "title": "Approval checked against the raw transcript",
+        "rule": SAFETY_RULES[3],
+        "file": "src/beacon/voice_tools.py",
+        "test": "tests/test_voice_tools.py::"
+        "test_approve_fix_requires_exact_phrase_in_the_raw_transcript",
+    },
+    {
+        "id": "once",
+        "title": "One approval executes exactly once",
+        "rule": SAFETY_RULES[4],
+        "file": "src/beacon/approvals.py",
+        "test": "tests/test_remediate_steps.py::"
+        "test_execute_restores_rule_once_and_is_idempotent_on_retry",
+    },
+    {
+        "id": "verify",
+        "title": "Three-part verification",
+        "rule": SAFETY_RULES[5],
+        "file": "src/beacon/remediation/verify.py",
+        "test": "tests/test_remediate_steps.py::"
+        "test_verify_counts_attempts_and_needs_all_three_checks",
+    },
+    {
+        "id": "contracts",
+        "title": "Sleep Contracts are scoped and expire",
+        "rule": SAFETY_RULES[6],
+        "file": "src/beacon/contracts.py",
+        "test": "tests/test_contracts.py::"
+        "test_match_is_scoped_to_alarm_action_and_exact_params",
+    },
+    {
+        "id": "kill-switch",
+        "title": "Kill switch",
+        "rule": SAFETY_RULES[7],
+        "file": "src/beacon/remediate.py",
+        "test": "tests/test_remediate_steps.py::test_execute_honours_the_kill_switch",
+    },
+    {
+        "id": "two-roles",
+        "title": "Two roles, one direction",
+        "rule": "The agent you talk to runs under a read-only role; only the executor, under a write-only role scoped by resource tag, can change anything.",  # noqa: E501
+        "file": "console-template.yaml",
+        "test": "tests/test_template_safety.py::test_voice_role_has_no_write_actions",
+    },
+]
+
+
 # CORS lives on the Function URL (console-template.yaml), scoped to the console
 # origin; setting it here too would duplicate the headers in every response.
 app = LambdaFunctionUrlResolver()
@@ -577,6 +653,7 @@ def safety() -> Response[str]:
             "allowlist": allowlist,
             "apply_enabled": _apply_flags(),
             "rules": SAFETY_RULES,
+            "controls": SAFETY_CONTROLS,
         },
     )
 

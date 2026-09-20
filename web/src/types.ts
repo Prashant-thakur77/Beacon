@@ -109,6 +109,7 @@ export interface Safety {
   allowlist: Array<{ id: string; description: string; params: Record<string, string>; iam_actions: string[] }>;
   apply_enabled: Record<string, boolean | null>;
   rules: string[];
+  controls?: Array<{ id: string; title: string; rule: string; file: string; test: string }>;
 }
 
 export interface Message {
