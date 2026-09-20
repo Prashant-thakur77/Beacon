@@ -152,3 +152,23 @@ def test_function_urls_only_accept_the_console_origin(
         ), name
         assert "*" not in cors["AllowMethods"], f"{name}: wildcard methods"
         assert set(cors["AllowHeaders"]) == {"content-type", "x-beacon-passcode"}
+
+
+def test_public_function_urls_have_both_permissions(
+    stacks: dict[str, dict[str, Any]],
+) -> None:
+    """AuthType NONE needs InvokeFunctionUrl and InvokeFunction via the URL."""
+    console = stacks["console-template.yaml"]
+    perms = _resources(console, "AWS::Lambda::Permission")
+    for fn in ("BeaconVoiceTurnFunction", "BeaconDashboardFunction"):
+        mine = [
+            p["Properties"]
+            for p in perms.values()
+            if _ref_name(p["Properties"]["FunctionName"]) == fn
+        ]
+        actions = {
+            (p["Action"], p.get("FunctionUrlAuthType"), p.get("InvokedViaFunctionUrl"))
+            for p in mine
+        }
+        assert ("lambda:InvokeFunctionUrl", "NONE", None) in actions, fn
+        assert ("lambda:InvokeFunction", None, True) in actions, fn

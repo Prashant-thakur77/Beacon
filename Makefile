@@ -519,7 +519,7 @@ deploy-console: web-build
 		--capabilities CAPABILITY_NAMED_IAM \
 		--parameter-overrides BaseStackName=$(STACK_NAME) AgentImageUri=$(AGENT_IMAGE_URI) \
 			LambdaArchitecture=$(LAMBDA_ARCH) RemediateFunctionArn=$$REMEDIATE_ARN Passcode=$(PASSCODE) \
-			SnsTopicArn=$$SNS_ARN \
+			SnsTopicArn=$$SNS_ARN UseCloudFront=$(USE_CLOUDFRONT) \
 			PollyVoiceId=$(POLLY_VOICE_ID) SttLanguage=$(STT_LANGUAGE) VoiceEngine=$(VOICE_ENGINE) \
 			$(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),) \
 			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),)
@@ -657,6 +657,7 @@ warm:
 # ---------- Local / Build It mode (no AWS account) ----------
 
 LOCAL_PORT     ?= 8000
+USE_CLOUDFRONT ?= true
 LOCAL_PASSCODE ?= local
 
 # The whole product on localhost against an in-process moto AWS: real tools,
