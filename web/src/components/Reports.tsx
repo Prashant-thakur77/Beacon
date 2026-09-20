@@ -345,7 +345,10 @@ export function Report({ report, loading, night, onNight, onReplay, replay }: { 
               ))}
             </div>
           ) : null}
-          <div className="faint small">Model cost for the night: ₹{report.cost_inr.toFixed(2)} · generated {formatStamp(report.generated_at)}</div>
+          <div className="faint small">
+            Model cost for the night: ₹{report.cost_inr.toFixed(2)} · generated {formatStamp(report.generated_at)}
+            {report.incidents === 0 && !night ? " · the night in progress is reported after 07:00 IST; use “next night →” to peek." : ""}
+          </div>
         </div>
       ) : !loading && onReplay ? (
         <div className="empty">
