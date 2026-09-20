@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — 20 Sep 2026 evening sprint
+
+- Console: Wispr-Flow-inspired editorial theme and motion, landing page, Analytics, Safety Controls/Proof, mobile nav, deep links, filters, keyboard shortcuts, 404/meta, archived-night on empty deployments.
+- Postmortem generator (`GET /incidents/{id}/postmortem`, `#postmortem/<id>`), audit log (`GET /audit`, `#audit`, CSV/JSON), morning report (`GET /report/latest`, `#report`, 07:00 IST SNS email).
+- HTTPS console via a Function URL proxy while CloudFront is unavailable; redactor no longer eats numeric UUID segments; triage image import-graph test.
+
 ## v0.2.0 — 20 Sep 2026 (First Commit submission)
 
 Added
