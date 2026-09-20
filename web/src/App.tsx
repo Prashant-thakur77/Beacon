@@ -16,7 +16,9 @@ import { computeAnalytics } from "./analytics";
 import type { Analytics as AnalyticsData, Contract, Health, Incident, Safety as SafetyData, Tally } from "./types";
 import { chooseStt } from "./voice/stt";
 
-type Route = "home" | "board" | "analytics" | "contracts" | "safety";
+type Route = "home" | "board" | "analytics" | "contracts" | "safety" | "notfound";
+const ROUTES = ["home", "board", "analytics", "contracts", "safety"] as const;
+const KEY_ROUTES: Record<string, Route> = { h: "home", b: "board", a: "analytics", c: "contracts", s: "safety" };
 
 /** "Run the night" (local mode): the engineer's lines for the first incident. */
 const NIGHT_SCRIPT = ["can you fix it", "approve fix 1", "yes", "grant contract for seven days"];
@@ -27,28 +29,33 @@ const NIGHT_LABEL: Record<Exclude<Night, null>, string> = {
   done: "night complete · 2 incidents · 1 human woken",
 };
 
-function useRoute(): [Route, (r: Route) => void] {
-  const read = (): Route => {
-    const h = window.location.hash.replace("#", "");
-    if (h === "contracts" || h === "safety" || h === "analytics" || h === "board") return h;
-    // the scripted demo (`?night=1`) opens the board directly; everything else lands on the home page
-    if (h === "" && new URLSearchParams(window.location.search).get("night") === "1") return "board";
-    return h === "" || h === "home" ? "home" : "board";
-  };
-  const [route, setRoute] = useState<Route>(read);
+/** `#board/<incident_id>` deep-links an incident; unknown hashes get the 404 card. */
+function parseHash(): { route: Route; deepId: string | null } {
+  const h = window.location.hash.replace("#", "");
+  const [head, ...rest] = h.split("/");
+  if (head === "board") return { route: "board", deepId: rest[0] ? decodeURIComponent(rest[0]) : null };
+  if ((ROUTES as readonly string[]).includes(head)) return { route: head as Route, deepId: null };
+  if (h === "" && new URLSearchParams(window.location.search).get("night") === "1") return { route: "board", deepId: null };
+  if (h === "") return { route: "home", deepId: null };
+  return { route: "notfound", deepId: null };
+}
+
+function useRoute(): [Route, string | null] {
+  const [state, setState] = useState(parseHash);
   useEffect(() => {
-    const on = () => setRoute(read());
+    const on = () => setState(parseHash());
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
-  return [route, (r) => (window.location.hash = r)];
+  return [state.route, state.deepId];
 }
 
 export default function App() {
   const [config, setConfig] = useState<Config | null>(null);
   const [replay, setReplay] = useState<ReplayBundle | null>(null);
   const [passcode, setPasscode] = useLocalState("beacon.passcode", "");
-  const [route] = useRoute();
+  const [route, deepId] = useRoute();
+  const [filter, setFilter] = useState<"all" | "needs" | "progress" | "resolved" | "contract">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const wall = useClock();
@@ -87,6 +94,41 @@ export default function App() {
     bar?.querySelector<HTMLElement>(".nav a")?.focus();
     return () => document.removeEventListener("keydown", onKey);
   }, [menuOpen]);
+  // keyboard: g then h/b/a/c/s routes, "/" focuses the message box, "?" opens help, Esc closes
+  useEffect(() => {
+    let pendingG = 0;
+    const typing = (el: Element | null) => !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || (el as HTMLElement).isContentEditable);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape") {
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        return;
+      }
+      if (typing(document.activeElement)) return;
+      if (e.key === "g") {
+        pendingG = Date.now();
+        return;
+      }
+      if (pendingG && Date.now() - pendingG < 1500 && KEY_ROUTES[e.key]) {
+        pendingG = 0;
+        window.location.hash = KEY_ROUTES[e.key];
+        return;
+      }
+      pendingG = 0;
+      if (e.key === "/") {
+        const box = document.querySelector<HTMLElement>(".composer input, .composer textarea");
+        if (box) {
+          e.preventDefault();
+          box.focus();
+        }
+      } else if (e.key === "?") {
+        e.preventDefault();
+        document.querySelector<HTMLElement>(".fab")?.click();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
   // route change: back to the top; the main content rises in (CSS)
   useEffect(() => {
     window.scrollTo({ top: 0 });
@@ -96,6 +138,7 @@ export default function App() {
       analytics: "Analytics · Beacon Night Shift",
       contracts: "Sleep Contracts · Beacon Night Shift",
       safety: "Safety · Beacon Night Shift",
+      notfound: "Nothing here · Beacon Night Shift",
     };
     document.title = titles[route];
   }, [route]);
@@ -153,6 +196,13 @@ export default function App() {
     if (!pinned && incidents.length && incidents[0].incident_id !== selectedId) setSelectedId(incidents[0].incident_id);
   }, [incidents, pinned, selectedId]);
 
+  useEffect(() => {
+    if (!deepId) return;
+    setPinned(true);
+    setSelectedId(deepId);
+    setOpenId(deepId);
+    window.setTimeout(() => document.querySelector<HTMLElement>(".card.selected")?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+  }, [deepId]);
   const selected = incidents.find((i) => i.incident_id === selectedId) ?? null;
   const [live, setLive] = useState<Incident | null>(null);
   const detailQ = usePoll<{ incident: Incident }>(
@@ -332,27 +382,67 @@ export default function App() {
               open={new URLSearchParams(window.location.search).get("judge") === "1" || incidents.length === 0}
               onRunNight={localApi && night !== "first" && night !== "second" ? runNight : undefined}
             />
+            {incidents.length > 1 ? (
+              <div className="chips" role="group" aria-label="Filter incidents">
+                {(
+                  [
+                    ["all", "All"],
+                    ["needs", "needs you"],
+                    ["progress", "in progress"],
+                    ["resolved", "resolved"],
+                    ["contract", "handled by contract"],
+                  ] as const
+                ).map(([k, label]) => (
+                  <button key={k} type="button" className={`chip-btn${filter === k ? " on" : ""}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {incidents.length > 0 ? (
+              <div className="row small feed-tools">
+                <button type="button" className="btn ghost small" onClick={() => setOpenId(openId === "*" ? null : "*")} aria-pressed={openId === "*"}>
+                  {openId === "*" ? "Collapse timelines" : "Expand all timelines"}
+                </button>
+              </div>
+            ) : null}
             <div className="feed">
               {incidents.length === 0 ? (
                 <div className="panel">
                   <ArchivedRunCard onReplay={startReplay} />
                 </div>
               ) : (
-                incidents.map((i, idx) => (
+                incidents
+                  .filter((i) =>
+                    filter === "all"
+                      ? true
+                      : filter === "needs"
+                        ? i.status === "awaiting_engineer"
+                        : filter === "progress"
+                          ? ["remediating", "auto_remediating", "triaging"].includes(i.status)
+                          : filter === "resolved"
+                            ? i.status === "resolved"
+                            : i.handled_by === "contract" || i.woken === false,
+                  )
+                  .map((i, idx) => (
                   <IncidentCard
                     key={i.incident_id}
                     index={idx}
                     incident={i.incident_id === current?.incident_id ? current : i}
                     now={now}
                     selected={i.incident_id === selectedId}
-                    open={openId === i.incident_id}
+                    open={openId === "*" || openId === i.incident_id}
                     onSelect={() => {
                       setPinned(true);
                       setSelectedId(i.incident_id);
                     }}
                     onToggle={() => setOpenId(openId === i.incident_id ? null : i.incident_id)}
+                    onCopyLink={() => {
+                      const url = `${window.location.origin}${window.location.pathname}#board/${encodeURIComponent(i.incident_id)}`;
+                      void navigator.clipboard?.writeText(url).then(() => toast("Link copied", "ok")).catch(() => toast(url, "info"));
+                    }}
                   />
-                ))
+                  ))
               )}
             </div>
           </section>
@@ -385,6 +475,32 @@ export default function App() {
             </h1>
           </div>
           <Contracts contracts={contracts} now={now} onRevoke={revoke} canRevoke={!!api && !!passcode} onReplay={!replay ? startReplay : undefined} />
+        </main>
+      ) : route === "notfound" ? (
+        <main key="notfound" className="main route-in">
+          <div className="empty notfound">
+            <h3>Nothing here.</h3>
+            <p>
+              There is no page at <code className="mono">#{window.location.hash.replace("#", "")}</code>. The night is elsewhere:
+            </p>
+            <div className="row">
+              <a className="btn primary" href="#board">
+                Night Board
+              </a>
+              <a className="btn" href="#analytics">
+                Analytics
+              </a>
+              <a className="btn" href="#contracts">
+                Contracts
+              </a>
+              <a className="btn" href="#safety">
+                Safety
+              </a>
+              <a className="btn ghost" href="#home">
+                Home
+              </a>
+            </div>
+          </div>
         </main>
       ) : (
         <main key="safety" className="main route-in">

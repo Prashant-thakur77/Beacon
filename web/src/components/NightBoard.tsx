@@ -78,6 +78,7 @@ export function IncidentCard({
   open,
   onSelect,
   onToggle,
+  onCopyLink,
   index = 0,
 }: {
   incident: Incident;
@@ -86,6 +87,7 @@ export function IncidentCard({
   open: boolean;
   onSelect: () => void;
   onToggle: () => void;
+  onCopyLink?: () => void;
   index?: number;
 }) {
   const rca = incident.rca_json ?? {};
@@ -130,6 +132,18 @@ export function IncidentCard({
         <span className="stamp" title={absolute(incident.timestamp)}>
           {formatStamp(incident.timestamp)}
         </span>
+        {onCopyLink ? (
+          <button
+            className="btn ghost small copy"
+            title="Copy a link to this incident"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCopyLink();
+            }}
+          >
+            Copy link
+          </button>
+        ) : null}
         {incident.resolved_at ? (
           <span className="stamp" title={`resolved ${absolute(incident.resolved_at)}`}>
             recovered in {recoveredIn(incident.timestamp, incident.resolved_at)}

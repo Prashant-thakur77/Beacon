@@ -302,6 +302,10 @@ function Lines({
                       <text className="val" x={cx(i) + (i === labels.length - 1 && labels.length > 1 ? -9 : 9)} y={y(v) + 4} textAnchor={i === labels.length - 1 && labels.length > 1 ? "end" : "start"}>
                         {unit ? unit(v) : v}
                       </text>
+                    ) : series.length > 1 && labels.length === 1 ? (
+                      <text className="val" x={cx(i) - 9} y={y(v) + 4} textAnchor="end">
+                        {unit ? unit(v) : v}
+                      </text>
                     ) : (
                       <text className="val" x={cx(i)} y={y(v) - 8} textAnchor={i === labels.length - 1 && labels.length > 1 ? "end" : "middle"}>
                         {unit ? unit(v) : v}

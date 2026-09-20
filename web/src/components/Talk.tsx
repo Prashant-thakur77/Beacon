@@ -448,7 +448,7 @@ export function Talk({
             <input
               id="typed-input"
               className="input"
-              placeholder={proposal && incident.status === "awaiting_engineer" ? `type: approve fix ${proposal.fix_id}` : "type instead of speaking…"}
+              placeholder={proposal && incident.status === "awaiting_engineer" ? `type: approve fix ${proposal.fix_id}` : "try: what changed · can you fix it · approve fix 1"}
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               disabled={!!replayTurns || state === "thinking"}
