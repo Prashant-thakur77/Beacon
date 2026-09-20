@@ -1,6 +1,6 @@
 # Voice-approved remediation on AWS: Strands, Step Functions, EC2 DryRun, and why the transcript is a safety artifact
 
-*For AWS Builder Center. Repo: https://github.com/Prashant-thakur77/Beacon · Demo film: https://github.com/Prashant-thakur77/Beacon/releases/tag/v0.2.0 · Live console: http://beacon-console-283146810291-us-east-1.s3-website-us-east-1.amazonaws.com*
+*For AWS Builder Center. Repo: https://github.com/Prashant-thakur77/Beacon · Demo film: https://github.com/Prashant-thakur77/Beacon/releases/tag/v0.2.0 · Live console: https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/*
 
 ![The Night Board mid-incident](https://raw.githubusercontent.com/Prashant-thakur77/Beacon/main/docs/assets/night-board.png)
 
