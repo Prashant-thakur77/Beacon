@@ -360,6 +360,12 @@ export function Analytics({ data, loading, source, now }: { data: AnalyticsData 
 
   return (
     <div className="stack analytics">
+      <div className="page-h">
+        <h1 className="display">
+          The night, <em>in numbers.</em>
+        </h1>
+        <p className="lede">Recovery, sleep and cost across every night Beacon has worked, computed from the same incidents the board shows.</p>
+      </div>
       <div className="panel-h">
         <h2>Operations analytics</h2>
         <span className="meta">

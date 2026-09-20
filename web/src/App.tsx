@@ -277,10 +277,21 @@ export default function App() {
         </main>
       ) : route === "contracts" ? (
         <main className="main">
+          <div className="page-h">
+            <h1 className="display">
+              Standing approvals, <em>in your own words.</em>
+            </h1>
+          </div>
           <Contracts contracts={contracts} now={now} onRevoke={revoke} canRevoke={!!api && !!passcode} />
         </main>
       ) : (
         <main className="main">
+          <div className="page-h">
+            <h1 className="display">
+              Two roles, <em>one direction.</em>
+            </h1>
+            <p className="lede">What Beacon is allowed to do, proven by tests, and the switch that stops every write path.</p>
+          </div>
           <Safety safety={safety} />
         </main>
       )}

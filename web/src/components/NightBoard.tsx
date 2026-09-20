@@ -122,7 +122,7 @@ export function IncidentCard({
         </span>
         {incident.resolved_at ? (
           <span className="stamp" title={`resolved ${absolute(incident.resolved_at)}`}>
-            · recovered in {recoveredIn(incident.timestamp, incident.resolved_at)}
+            recovered in {recoveredIn(incident.timestamp, incident.resolved_at)}
           </span>
         ) : null}
       </div>
