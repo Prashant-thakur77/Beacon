@@ -13,7 +13,9 @@ import os
 import re
 import statistics
 import time
+from collections import Counter
 from datetime import UTC, datetime, timedelta
+from importlib import metadata
 from typing import Any
 
 import boto3
@@ -172,6 +174,188 @@ def _is_night_ist(iso: str) -> bool:
     return hour >= 22 or hour < 7
 
 
+def _parse(iso: Any) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(iso).replace("Z", "+00:00")).astimezone(UTC)
+    except ValueError:
+        return None
+
+
+def _night_of(iso: Any) -> str | None:
+    """Label the night an incident belongs to: IST date, with the day turning
+    over at noon so 23:30 and 03:00 the next morning are the same night."""
+    when = _parse(iso)
+    if when is None:
+        return None
+    return (when + timedelta(hours=5, minutes=30) - timedelta(hours=12)).strftime(
+        "%Y-%m-%d"
+    )
+
+
+def _percentile(values: list[float], pct: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    idx = (len(ordered) - 1) * pct
+    lo, hi = int(idx), min(int(idx) + 1, len(ordered) - 1)
+    return round(ordered[lo] + (ordered[hi] - ordered[lo]) * (idx - lo), 2)
+
+
+def _seconds_to_first_proposal(row: dict[str, Any]) -> float | None:
+    """Alarm to the first dry-run fix on the table, from the timeline."""
+    start = _parse(row.get("timestamp"))
+    if start is None:
+        return None
+    for ev in row.get("timeline") or []:
+        if ev.get("event") == "fix_proposed":
+            at = _parse(ev.get("t"))
+            if at is not None:
+                return max(0.0, round((at - start).total_seconds(), 1))
+    return None
+
+
+def _version() -> str:
+    explicit = _env("BEACON_VERSION")
+    if explicit:
+        return explicit
+    try:
+        return metadata.version("beacon")
+    except metadata.PackageNotFoundError:
+        return "dev"
+
+
+def build_analytics(
+    rows: list[dict[str, Any]], live_contracts: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Operations analytics from the incident rows and the live contracts.
+
+    Pure, so the console can mirror it client-side in replay mode and the
+    tests can pin the numbers without a table.
+    """
+    nights: dict[str, dict[str, Any]] = {}
+    per_incident: list[dict[str, Any]] = []
+    ttr_all: list[float] = []
+    proposal_secs: list[float] = []
+    cumulative = 0.0
+    for row in sorted(rows, key=lambda r: str(r.get("timestamp", ""))):
+        night = _night_of(row.get("timestamp")) or "unknown"
+        bucket = nights.setdefault(
+            night,
+            {
+                "night": night,
+                "incidents": 0,
+                "resolved": 0,
+                "escalated": 0,
+                "woken": 0,
+                "under_contract": 0,
+                "cost_inr": 0.0,
+                "_ttr": [],
+            },
+        )
+        status = str(row.get("status", ""))
+        ttr = (
+            _minutes(row.get("timestamp"), row.get("resolved_at"))
+            if status == "resolved" and row.get("resolved_at")
+            else None
+        )
+        cost = cost_inr(row.get("usage"))
+        cumulative = round(cumulative + cost, 4)
+        under_contract = row.get("handled_by") == "contract"
+        woken = bool(row.get("woken", True))
+        bucket["incidents"] += 1
+        bucket["resolved"] += status == "resolved"
+        bucket["escalated"] += status == "escalated"
+        bucket["woken"] += woken
+        bucket["under_contract"] += under_contract
+        bucket["cost_inr"] = round(bucket["cost_inr"] + cost, 4)
+        if ttr is not None:
+            bucket["_ttr"].append(ttr)
+            ttr_all.append(ttr)
+        first = _seconds_to_first_proposal(row)
+        if first is not None:
+            proposal_secs.append(first)
+        per_incident.append(
+            {
+                "incident_id": row.get("incident_id"),
+                "alarm_name": row.get("alarm_name"),
+                "timestamp": row.get("timestamp"),
+                "night": night,
+                "status": status,
+                "woken": woken,
+                "under_contract": under_contract,
+                "minutes_to_recovery": ttr,
+                "seconds_to_first_proposal": first,
+                "cost_inr": cost,
+                "cost_inr_cumulative": cumulative,
+            }
+        )
+    night_rows = []
+    for bucket in nights.values():
+        ttrs = bucket.pop("_ttr")
+        bucket["median_minutes_to_recovery"] = _percentile(ttrs, 0.5)
+        bucket["p90_minutes_to_recovery"] = _percentile(ttrs, 0.9)
+        night_rows.append(bucket)
+    night_rows.sort(key=lambda b: b["night"])
+    alarms = Counter(str(r.get("alarm_name") or "unknown") for r in rows)
+    outcomes = Counter(str(r.get("status", "")) for r in rows)
+    now = datetime.now(tz=UTC)
+    contract_rows = []
+    for c in live_contracts:
+        expires = _parse(c.get("expires_at"))
+        contract_rows.append(
+            {
+                "contract_id": c.get("contract_id"),
+                "alarm_name": c.get("alarm_name"),
+                "action": c.get("action"),
+                "uses": int(c.get("uses") or 0),
+                "max_uses": int(c.get("max_uses") or 0),
+                "uses_left": max(
+                    0, int(c.get("max_uses") or 0) - int(c.get("uses") or 0)
+                ),
+                "expires_at": c.get("expires_at"),
+                "hours_left": round((expires - now).total_seconds() / 3600, 1)
+                if expires
+                else None,
+            }
+        )
+    return {
+        "generated_at": now.isoformat(),
+        "nights": night_rows,
+        "incidents": per_incident,
+        "recovery": {
+            "count": len(ttr_all),
+            "p50_minutes": _percentile(ttr_all, 0.5),
+            "p90_minutes": _percentile(ttr_all, 0.9),
+            "max_minutes": max(ttr_all) if ttr_all else None,
+        },
+        "first_proposal": {
+            "count": len(proposal_secs),
+            "mean_seconds": round(statistics.fmean(proposal_secs), 1)
+            if proposal_secs
+            else None,
+        },
+        "outcomes": {
+            "resolved": outcomes.get("resolved", 0),
+            "escalated": outcomes.get("escalated", 0),
+            "in_progress": sum(
+                v for k, v in outcomes.items() if k not in ("resolved", "escalated")
+            ),
+        },
+        "humans": {
+            "woken": sum(1 for r in rows if r.get("woken", True)),
+            "under_contract": sum(1 for r in rows if r.get("handled_by") == "contract"),
+        },
+        "cost": {
+            "total_inr": cumulative,
+            "per_incident_inr": round(cumulative / len(rows), 4) if rows else 0.0,
+        },
+        "top_alarms": [
+            {"alarm_name": name, "count": n} for name, n in alarms.most_common(5)
+        ],
+        "contracts": contract_rows,
+    }
+
+
 def _alarm_metric_series(alarm_name: str, minutes: int = 30) -> list[dict[str, Any]]:
     """Datapoints of the alarm's own metric (what Verify looks at), oldest first."""
     cw = boto3.client("cloudwatch")
@@ -226,7 +410,13 @@ def _apply_flags() -> dict[str, bool | None]:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": SERVICE}
+    return {
+        "ok": True,
+        "service": SERVICE,
+        "version": _version(),
+        "region": _env("AWS_REGION", _env("AWS_DEFAULT_REGION", "")),
+        "stack": _env("BASE_STACK_NAME", ""),
+    }
 
 
 @app.get("/incidents")
@@ -332,6 +522,12 @@ def tally() -> Response[str]:
             "sleep_protected_hours": round(len(night_not_woken) * per_page, 1),
         },
     )
+
+
+@app.get("/analytics")
+def analytics() -> Response[str]:
+    live = contracts.list_active(table_name=_env("CONTRACTS_TABLE_NAME"))
+    return _json(200, build_analytics(_all_incidents(), live))
 
 
 @app.get("/contracts")
