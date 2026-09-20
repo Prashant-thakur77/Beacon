@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Tally } from "../types";
+import { loadReplay } from "../replay";
 import { Marquee } from "./Marquee";
 
 /* The product landing page (`#home`). Everything here is the product's own
@@ -155,13 +156,23 @@ function Features() {
   );
 }
 
-export function Landing({ tally, local, onRunNight }: { tally: Tally | null; local: boolean; onRunNight?: () => void }) {
+export function Landing({ tally, replay, local, onRunNight }: { tally: Tally | null; replay: boolean; local: boolean; onRunNight?: () => void }) {
   const live = !!tally && tally.resolved > 0;
-  const stats = live
+  // on a deployment with nothing resolved yet, the archived night's tally stands in (and says so)
+  const [archived, setArchived] = useState<Tally | null>(null);
+  useEffect(() => {
+    if (live || archived) return;
+    void loadReplay()
+      .then((b) => setArchived(b.tally))
+      .catch(() => undefined);
+  }, [live, archived]);
+  const shown = live ? tally : archived;
+  const label = replay ? "From the archived night (replay)." : live ? "Live numbers from this deployment's tally." : archived ? "From the archived night; this deployment has no resolved incidents yet." : "From the scripted night in local mode.";
+  const stats = shown
     ? [
-        { n: String(tally.resolved), l: "incidents resolved" },
-        { n: minutes(tally.median_minutes_to_recovery), l: "median time to recovery" },
-        { n: String(tally.humans_woken), l: "humans woken" },
+        { n: String(shown.resolved), l: "incidents resolved" },
+        { n: minutes(shown.median_minutes_to_recovery), l: "median time to recovery" },
+        { n: String(shown.humans_woken), l: shown.humans_woken === 1 ? "human woken" : "humans woken" },
       ]
     : [
         { n: "2", l: "incidents resolved" },
@@ -219,7 +230,7 @@ export function Landing({ tally, local, onRunNight }: { tally: Tally | null; loc
         <h2 className="display">
           <em>Nobody</em> woken the second time.
         </h2>
-        <p className="lede">{live ? "Live numbers from this deployment's tally." : "From the scripted night in local mode."}</p>
+        <p className="lede">{label}</p>
         <div className="stats reveal">
           {stats.map((s) => (
             <div key={s.l} className="stat">

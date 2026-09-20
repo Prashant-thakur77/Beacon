@@ -175,10 +175,17 @@ export default function App() {
       setReplay(bundle);
       setPinned(false);
       setSelectedId(null);
+      toast("Showing the archived night (replay)", "info");
     } catch {
-      /* nothing recorded yet */
+      toast("No archived night in this build", "info");
     }
   };
+  const exitReplay = () => {
+    setReplay(null);
+    setPinned(false);
+    setSelectedId(null);
+  };
+  const freshDeployment = !replay && !!api && !incidentsQ.error && !!incidentsQ.data && incidents.length === 0;
 
   const revoke = async (id: string) => {
     if (!api) return;
@@ -244,6 +251,8 @@ export default function App() {
             }, 60);
           }}
         />
+      ) : freshDeployment ? (
+        <Announce text="No incidents tonight · view the archived night" onClick={() => void startReplay()} />
       ) : config ? (
         <Announce text={`Live on AWS · ${config.region}${healthQ.data?.version ? ` · v${healthQ.data.version}` : ""} · Judge passcode in the submission`} href="#safety" />
       ) : null}
@@ -276,6 +285,11 @@ export default function App() {
         </nav>
         <div className="status" role="status" aria-live="polite">
           {replay ? <span className="pill lilac">REPLAY of {new Date(replay.recorded_at).toLocaleString()}</span> : null}
+          {replay && config?.dashboardUrl && !config.replay ? (
+            <button type="button" className="btn ghost small" onClick={exitReplay}>
+              back to live
+            </button>
+          ) : null}
           {!replay && api ? <span className={`pill ${connected ? "green" : "red"}${connected ? "" : " pulse"}`}>{connected ? "live" : "reconnecting…"}</span> : null}
           {!replay && !api && config ? <span className="pill dim">no API configured</span> : null}
           {night ? <span className="pill lilac">{NIGHT_LABEL[night]}</span> : null}
@@ -288,7 +302,7 @@ export default function App() {
       </header>
 
       {route === "home" ? (
-        <Landing tally={tally} local={!!config?.local} onRunNight={localApi ? () => (window.location.href = `${window.location.pathname}?night=1#board`) : undefined} />
+        <Landing tally={tally} replay={!!replay} local={!!config?.local} onRunNight={localApi ? () => (window.location.href = `${window.location.pathname}?night=1#board`) : undefined} />
       ) : route === "board" ? (
         <main key="board" className={`main route-in${current ? " two-col" : ""}`}>
           <section className="stack">
@@ -361,7 +375,7 @@ export default function App() {
         </main>
       ) : route === "analytics" ? (
         <main key="analytics" className="main route-in">
-          <Analytics data={analytics.data} loading={analytics.loading} source={analytics.source} now={now} />
+          <Analytics data={analytics.data} loading={analytics.loading} source={analytics.source} now={now} onReplay={!replay ? startReplay : undefined} />
         </main>
       ) : route === "contracts" ? (
         <main key="contracts" className="main route-in">
@@ -370,7 +384,7 @@ export default function App() {
               Standing approvals, <em>in your own words.</em>
             </h1>
           </div>
-          <Contracts contracts={contracts} now={now} onRevoke={revoke} canRevoke={!!api && !!passcode} />
+          <Contracts contracts={contracts} now={now} onRevoke={revoke} canRevoke={!!api && !!passcode} onReplay={!replay ? startReplay : undefined} />
         </main>
       ) : (
         <main key="safety" className="main route-in">

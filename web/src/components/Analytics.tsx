@@ -353,7 +353,7 @@ function Meter({ used, max }: { used: number; max: number }) {
 
 /* ---------- the page ---------- */
 
-export function Analytics({ data, loading, source, now }: { data: AnalyticsData | null; loading: boolean; source: "api" | "computed" | "replay"; now: Date }) {
+export function Analytics({ data, loading, source, now, onReplay }: { data: AnalyticsData | null; loading: boolean; source: "api" | "computed" | "replay"; now: Date; onReplay?: () => void }) {
   const nights = data?.nights ?? [];
   const labels = nights.map((n) => nightLabel(n.night));
   const has = nights.length > 0;
@@ -382,6 +382,17 @@ export function Analytics({ data, loading, source, now }: { data: AnalyticsData 
         </span>
       </div>
 
+      {!loading && data && data.incidents.length === 0 && onReplay ? (
+        <div className="empty-cta rise">
+          <div>
+            <h3>No nights recorded yet.</h3>
+            <p>A real night from an earlier run is archived in this build: two incidents, one Sleep Contract, nobody woken the second time.</p>
+          </div>
+          <button type="button" className="btn primary" onClick={onReplay}>
+            ▶ View the archived night
+          </button>
+        </div>
+      ) : null}
       <div className="kpis rise">
         <div className="tile">
           <div className="n">{minutes(data?.recovery.p50_minutes)}</div>

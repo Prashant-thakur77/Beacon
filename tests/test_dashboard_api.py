@@ -384,3 +384,19 @@ def test_safety_controls_name_real_files_and_tests(env: Any, mocker: Any) -> Non
         test_file, test_name = c["test"].split("::")
         assert f"def {test_name}(" in (root / test_file).read_text(), c["test"]
     assert [c["rule"] for c in controls[:8]] == dashboard_api.SAFETY_RULES
+
+
+def test_redact_leaves_uuids_with_numeric_segments_alone() -> None:
+    uuid = "94399b40-6161-474b-97ee-658469239225"
+    data = {
+        "contract_id": uuid,
+        "arn": "arn:aws:states:us-east-1:123456789012:execution:x:" + uuid,
+        "note": "account 123456789012 and id 658469239225a and 658469239225-1",
+        "sg": "sg-058469239225",
+    }
+    out = dashboard_api.redact(data)
+    assert out["contract_id"] == uuid
+    assert out["arn"].endswith(uuid)
+    assert "123456789012" not in out["arn"] and "123456789012" not in out["note"]
+    assert "658469239225a" in out["note"] and "658469239225-1" in out["note"]
+    assert out["sg"] == "sg-058469239225"

@@ -585,3 +585,12 @@ html { scroll-behavior: smooth; }
   .ribbon-tag { font-size: 16px; padding: 8px 14px; }
   .feature-card .shot { height: 200px; }
 }
+
+/* round 4 */
+.empty-cta { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-card); padding: 22px 24px; }
+.empty-cta h3 { margin: 0 0 6px; font-family: var(--font-display); font-weight: 400; font-size: 28px; letter-spacing: -0.03em; }
+.empty-cta h3::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--coral); margin-right: 12px; vertical-align: middle; animation: beacon 1.8s ease-out infinite; }
+.empty-cta p { margin: 0; color: var(--dim); max-width: 60ch; }
+.contract-alarm { margin-top: 10px; font-family: var(--font-display); font-size: 22px; letter-spacing: -0.02em; }
+.contract { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.contract:hover { border-color: var(--line-strong); box-shadow: var(--shadow); }

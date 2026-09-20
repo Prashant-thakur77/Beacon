@@ -31,7 +31,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 SERVICE = "beacon-dashboard"
-_ACCOUNT_RE = re.compile(r"\b\d{12}\b")
+# A 12-digit token that is not part of a UUID or hex id: no "-" or hex letter
+# on either side (UUID tails like "...-658469239225" must survive).
+_ACCOUNT_RE = re.compile(r"(?<![0-9A-Fa-f-])\d{12}(?![0-9A-Fa-f-])")
 _ARN_RE = re.compile(
     r"arn:aws:(?:iam|sts)::\d{12}:(assumed-role/([^/\s\"]+)/[^\s\"]*|[^\s\"]+)"
 )
