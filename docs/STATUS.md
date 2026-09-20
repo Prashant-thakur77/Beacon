@@ -1,4 +1,4 @@
-# Status — Sat 19 Sep 2026, 14:00 IST
+# Status — Sun 20 Sep 2026, 22:30 IST (submitted)
 
 ## What works (verified in the sandbox)
 
@@ -12,6 +12,17 @@
 | Analytics view (`#analytics`) | `GET /analytics` on the dashboard API (`tests/test_dashboard_api.py`: nights, p50/p90 recovery, woken vs contract, cost per incident + cumulative, alarm-to-first-proposal, outcomes, top alarms, contract usage); the console falls back to the same maths in the browser for replay bundles and for a deployed API that predates the route; every chart has an empty state and a skeleton |
 | Both container images | `docker build` of `Dockerfile` and `Dockerfile.agent` succeed; imports smoke-tested |
 | Voice protocol facts | Nova 2 Sonic, Transcribe, Polly, AssemblyAI Voice Agent event shapes fetched from the docs on 18 Sep |
+
+## Deployed on the account (20 Sep)
+
+| Stack | State | Evidence |
+|---|---|---|
+| `beacon-demo-infra` | up | Fargate app healthy against RDS via a Secrets Manager password; real alarm fired at 12:39 after `make break-demo` |
+| `beacon` | up | triage Lambda ran on the real alarm to the Bedrock call (JSON logs in `/beacon/beacon/triage`) |
+| `beacon-remediation` | up | `make dry-run` → `DryRunOperation` under `beacon-remediator-beacon` |
+| `beacon-console` | up, `UseCloudFront=false` | HTTPS via the `static_site` Function URL; `/health` reports 0.2.0; `/analytics`, `/safety` controls answer |
+
+Blocked by AWS's new-account verification, not by code: Bedrock model access (`NOT_AUTHORIZED`) and CloudFront creation. Support case is the only lever.
 
 ## What is NOT verified, because it needs AWS or a person
 
