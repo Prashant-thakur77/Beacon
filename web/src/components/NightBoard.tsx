@@ -79,6 +79,7 @@ export function IncidentCard({
   onSelect,
   onToggle,
   onCopyLink,
+  onPostmortem,
   index = 0,
 }: {
   incident: Incident;
@@ -88,6 +89,7 @@ export function IncidentCard({
   onSelect: () => void;
   onToggle: () => void;
   onCopyLink?: () => void;
+  onPostmortem?: () => void;
   index?: number;
 }) {
   const rca = incident.rca_json ?? {};
@@ -132,6 +134,18 @@ export function IncidentCard({
         <span className="stamp" title={absolute(incident.timestamp)}>
           {formatStamp(incident.timestamp)}
         </span>
+        {onPostmortem && (incident.status === "resolved" || incident.status === "escalated") ? (
+          <button
+            className="btn ghost small"
+            title="Open the postmortem"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPostmortem();
+            }}
+          >
+            Postmortem
+          </button>
+        ) : null}
         {onCopyLink ? (
           <button
             className="btn ghost small copy"

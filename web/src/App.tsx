@@ -3,6 +3,8 @@ import { makeApi, type Api } from "./api";
 import { loadConfig, type Config } from "./config";
 import { ArchivedRunCard, IncidentCard, JudgeCard, TallyStrip } from "./components/NightBoard";
 import { Analytics } from "./components/Analytics";
+import { Audit, Postmortem, Report } from "./components/Reports";
+import { auditRows, morningReport, postmortemMd } from "./reports";
 import { Landing } from "./components/Landing";
 import { Announce, Footer, HelpFab, Toasts, useToasts } from "./components/Chrome";
 import { Marquee } from "./components/Marquee";
@@ -13,12 +15,12 @@ import { useClock, useLocalState, usePoll } from "./hooks";
 import { useNavIndicator, useReveal, useScrolled } from "./motion";
 import { loadReplay, type ReplayBundle } from "./replay";
 import { computeAnalytics } from "./analytics";
-import type { Analytics as AnalyticsData, Contract, Health, Incident, Safety as SafetyData, Tally } from "./types";
+import type { Analytics as AnalyticsData, AuditRow, Contract, Health, Incident, MorningReport, Safety as SafetyData, Tally } from "./types";
 import { chooseStt } from "./voice/stt";
 
-type Route = "home" | "board" | "analytics" | "contracts" | "safety" | "notfound";
-const ROUTES = ["home", "board", "analytics", "contracts", "safety"] as const;
-const KEY_ROUTES: Record<string, Route> = { h: "home", b: "board", a: "analytics", c: "contracts", s: "safety" };
+type Route = "home" | "board" | "analytics" | "contracts" | "audit" | "report" | "safety" | "postmortem" | "notfound";
+const ROUTES = ["home", "board", "analytics", "contracts", "audit", "report", "safety"] as const;
+const KEY_ROUTES: Record<string, Route> = { h: "home", b: "board", a: "analytics", c: "contracts", u: "audit", p: "report", s: "safety" };
 
 /** "Run the night" (local mode): the engineer's lines for the first incident. */
 const NIGHT_SCRIPT = ["can you fix it", "approve fix 1", "yes", "grant contract for seven days"];
@@ -34,6 +36,7 @@ function parseHash(): { route: Route; deepId: string | null } {
   const h = window.location.hash.replace("#", "");
   const [head, ...rest] = h.split("/");
   if (head === "board") return { route: "board", deepId: rest[0] ? decodeURIComponent(rest[0]) : null };
+  if (head === "postmortem" && rest[0]) return { route: "postmortem", deepId: decodeURIComponent(rest[0]) };
   if ((ROUTES as readonly string[]).includes(head)) return { route: head as Route, deepId: null };
   if (h === "" && new URLSearchParams(window.location.search).get("night") === "1") return { route: "board", deepId: null };
   if (h === "") return { route: "home", deepId: null };
@@ -138,6 +141,9 @@ export default function App() {
       analytics: "Analytics · Beacon Night Shift",
       contracts: "Sleep Contracts · Beacon Night Shift",
       safety: "Safety · Beacon Night Shift",
+      audit: "Audit · Beacon Night Shift",
+      report: "Morning report · Beacon Night Shift",
+      postmortem: "Postmortem · Beacon Night Shift",
       notfound: "Nothing here · Beacon Night Shift",
     };
     document.title = titles[route];
@@ -173,11 +179,21 @@ export default function App() {
   const safetyQ = usePoll<SafetyData>(api ? api.safety : null, 30000, [api], !!api && route === "safety");
   const analyticsQ = usePoll<AnalyticsData>(api ? api.analytics : null, 15000, [api], !!api && route === "analytics");
   const healthQ = usePoll<Health>(api ? api.health : null, 60000, [api], !!api);
+  const auditQ = usePoll<{ rows: AuditRow[]; count: number }>(api ? api.audit : null, 15000, [api], !!api && route === "audit");
+  const [reportNight, setReportNight] = useState<string | null>(null);
+  const reportQ = usePoll<MorningReport>(api ? () => api.report(reportNight ?? undefined) : null, 60000, [api, reportNight], !!api && route === "report");
 
   const incidents: Incident[] = replay ? replay.incidents : incidentsQ.data?.incidents ?? [];
   const tally: Tally | null = replay ? replay.tally : tallyQ.data;
   const contracts: Contract[] = replay ? replay.contracts : contractsQ.data?.contracts ?? [];
   const safety: SafetyData | null = replay ? replay.safety : safetyQ.data;
+  const audit: AuditRow[] | null = replay ? auditRows(replay.incidents, replay.contracts) : auditQ.data?.rows ?? (auditQ.error ? auditRows(incidents, contracts) : null);
+  const report: MorningReport | null = replay ? morningReport(replay.incidents, replay.contracts, reportNight ?? undefined) : reportQ.data ?? (reportQ.error ? morningReport(incidents, contracts, reportNight ?? undefined) : null);
+  const postmortemFallback = useCallback(() => {
+    if (!deepId) return null;
+    const inc = incidents.find((i) => i.incident_id === deepId);
+    return inc ? postmortemMd(inc, contracts) : null;
+  }, [deepId, incidents, contracts]);
   useNavIndicator(navRef, `${route}:${contracts.length}`);
   useReveal(mainRef, [route, incidents.length, contracts.length, !!safety, !!replay]);
   // Analytics: the API's aggregation when it has it; otherwise the same maths in the browser
@@ -197,12 +213,12 @@ export default function App() {
   }, [incidents, pinned, selectedId]);
 
   useEffect(() => {
-    if (!deepId) return;
+    if (!deepId || route !== "board") return;
     setPinned(true);
     setSelectedId(deepId);
     setOpenId(deepId);
     window.setTimeout(() => document.querySelector<HTMLElement>(".card.selected")?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
-  }, [deepId]);
+  }, [deepId, route]);
   const selected = incidents.find((i) => i.incident_id === selectedId) ?? null;
   const [live, setLive] = useState<Incident | null>(null);
   const detailQ = usePoll<{ incident: Incident }>(
@@ -329,6 +345,12 @@ export default function App() {
           <a href="#contracts" className={route === "contracts" ? "active" : ""} aria-current={route === "contracts" ? "page" : undefined}>
             Contracts{contracts.length ? <span className="count">{contracts.length}</span> : null}
           </a>
+          <a href="#audit" className={route === "audit" ? "active" : ""} aria-current={route === "audit" ? "page" : undefined}>
+            Audit
+          </a>
+          <a href="#report" className={route === "report" ? "active" : ""} aria-current={route === "report" ? "page" : undefined}>
+            Report
+          </a>
           <a href="#safety" className={route === "safety" ? "active" : ""} aria-current={route === "safety" ? "page" : undefined}>
             Safety
           </a>
@@ -437,6 +459,7 @@ export default function App() {
                       setSelectedId(i.incident_id);
                     }}
                     onToggle={() => setOpenId(openId === i.incident_id ? null : i.incident_id)}
+                    onPostmortem={() => (window.location.hash = `postmortem/${encodeURIComponent(i.incident_id)}`)}
                     onCopyLink={() => {
                       const url = `${window.location.origin}${window.location.pathname}#board/${encodeURIComponent(i.incident_id)}`;
                       void navigator.clipboard?.writeText(url).then(() => toast("Link copied", "ok")).catch(() => toast(url, "info"));
@@ -475,6 +498,18 @@ export default function App() {
             </h1>
           </div>
           <Contracts contracts={contracts} now={now} onRevoke={revoke} canRevoke={!!api && !!passcode} onReplay={!replay ? startReplay : undefined} />
+        </main>
+      ) : route === "audit" ? (
+        <main key="audit" className="main route-in">
+          <Audit rows={audit} loading={!!api && auditQ.loading && !audit} csvUrl={api?.auditCsvUrl} onReplay={!replay ? startReplay : undefined} replay={!!replay} />
+        </main>
+      ) : route === "report" ? (
+        <main key="report" className="main route-in">
+          <Report report={report} loading={!!api && !report && !reportQ.error} night={reportNight} onNight={setReportNight} onReplay={!replay && (!report || report.incidents === 0) ? startReplay : undefined} replay={!!replay} />
+        </main>
+      ) : route === "postmortem" && deepId ? (
+        <main key="postmortem" className="main route-in">
+          <Postmortem id={deepId} api={api} fallback={postmortemFallback} onToast={(t) => toast(t, "ok")} />
         </main>
       ) : route === "notfound" ? (
         <main key="notfound" className="main route-in">

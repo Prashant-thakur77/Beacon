@@ -179,3 +179,38 @@ export interface Analytics {
   top_alarms: Array<{ alarm_name: string; count: number }>;
   contracts: AnalyticsContract[];
 }
+
+export interface AuditRow {
+  at?: string | null;
+  kind: "approval" | "contract";
+  id?: string | null;
+  incident_id?: string | null;
+  alarm_name?: string | null;
+  action?: string | null;
+  quote?: string;
+  channel?: string | null;
+  source?: string | null;
+  executed?: boolean;
+  executed_at?: string | null;
+  result?: string | null;
+  contract_id?: string | null;
+  status?: string | null;
+  uses?: string | null;
+  expires_at?: string | null;
+}
+
+export interface MorningReport {
+  night_of: string;
+  generated_at: string;
+  incidents: number;
+  resolved: number;
+  escalated: number;
+  humans_woken: number;
+  handled_by_contract: number;
+  median_minutes_to_recovery: number | null;
+  cost_inr: number;
+  contracts_used: Array<{ contract_id?: string | null; alarm_name?: string | null; uses?: string | null }>;
+  incident_ids: string[];
+  subject: string;
+  text: string;
+}

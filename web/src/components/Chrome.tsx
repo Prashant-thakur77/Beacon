@@ -12,6 +12,8 @@ const FOOTER: Array<{ label: string; links: Array<{ text: string; href: string; 
       { text: "Night Board", href: "#board" },
       { text: "Analytics", href: "#analytics" },
       { text: "Contracts", href: "#contracts" },
+      { text: "Audit log", href: "#audit" },
+      { text: "Morning report", href: "#report" },
       { text: "Safety", href: "#safety" },
     ],
   },
@@ -62,7 +64,7 @@ export function Footer({ version }: { version?: string }) {
       <div className="footer-line">
         <span>© Beacon Night Shift · built on AWS for First Commit 2026</span>
         <span className="kbd-hint" title="Keyboard shortcuts">
-          <kbd>g</kbd> <kbd>b</kbd> board · <kbd>g</kbd> <kbd>a</kbd> analytics · <kbd>g</kbd> <kbd>c</kbd> contracts · <kbd>g</kbd> <kbd>s</kbd> safety · <kbd>g</kbd> <kbd>h</kbd> home · <kbd>/</kbd> talk · <kbd>?</kbd> help · <kbd>esc</kbd> close
+          <kbd>g</kbd> <kbd>b</kbd> board · <kbd>g</kbd> <kbd>a</kbd> analytics · <kbd>g</kbd> <kbd>c</kbd> contracts · <kbd>g</kbd> <kbd>u</kbd> audit · <kbd>g</kbd> <kbd>p</kbd> report · <kbd>g</kbd> <kbd>s</kbd> safety · <kbd>g</kbd> <kbd>h</kbd> home · <kbd>/</kbd> talk · <kbd>?</kbd> help · <kbd>esc</kbd> close
         </span>
         <span className="mono">{version ? `v${version}` : ""}</span>
       </div>

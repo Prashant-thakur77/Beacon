@@ -116,7 +116,7 @@ h1.display { font-size: 48px; }
   .burger.x span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
   /* the same card expands downwards: route rows between hairlines */
   .nav { order: 4; width: 100%; margin: 0; padding: 0; background: transparent; border-radius: 0; flex-direction: column; gap: 0; max-height: 0; overflow: hidden; opacity: 0; transform: translateY(-6px); transition: max-height 0.4s ease, opacity 0.4s ease, transform 0.4s ease, margin 0.4s ease; }
-  .topbar.open .nav { max-height: 320px; opacity: 1; transform: none; margin-top: 10px; }
+  .topbar.open .nav { max-height: 440px; opacity: 1; transform: none; margin-top: 10px; }
   .nav a { padding: 14px 4px; border-radius: 0; border-top: 1px solid var(--line); font-size: 16px; font-weight: 500; color: var(--ink); }
   .nav a.active { background: transparent; box-shadow: none; font-weight: 600; }
   .nav a:last-child { border-bottom: 1px solid var(--line); }
@@ -606,3 +606,26 @@ html { scroll-behavior: smooth; }
 kbd { font-family: var(--font-mono); font-size: 10.5px; padding: 0 5px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px; background: var(--paper); color: var(--ink); }
 .notfound { max-width: 64ch; }
 .notfound .row { margin-top: 6px; }
+
+/* round 5: postmortem / audit / report */
+.letter { background: var(--paper); border: 1px solid var(--line); border-radius: 24px; padding: 28px 32px 32px; }
+.letter-tools { margin-bottom: 4px; }
+.letter-subject { font-size: clamp(28px, 3.6vw, 44px); }
+.letter-body { font-size: 16px; line-height: 1.5; max-width: 72ch; }
+.letter-body p { margin: 0 0 10px; }
+.letter-body .letter-item { padding-left: 16px; border-left: 2px solid var(--pink); color: var(--dim); }
+.letter .kpis { margin-bottom: 20px; }
+.md h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(30px, 4vw, 44px); letter-spacing: -0.03em; line-height: 1.05; margin: 0 0 12px; }
+.md h2 { font-family: var(--font-display); font-weight: 400; font-size: 26px; letter-spacing: -0.02em; margin: 28px 0 8px; }
+.md h3 { font-family: var(--font-display); font-weight: 400; font-size: 20px; margin: 20px 0 6px; }
+.md p { margin: 0 0 10px; max-width: 78ch; line-height: 1.5; }
+.md ul { margin: 0 0 10px; padding-left: 20px; color: var(--dim); }
+.md li { margin: 3px 0; }
+.md code { background: var(--cream); padding: 1px 5px; border-radius: 4px; }
+.md-table { font-family: var(--font-mono); font-size: 12px; }
+.md-table td, .md-table th { padding: 6px 12px 6px 0; }
+.audit td { vertical-align: top; }
+.audit .quote-cell { font-family: var(--font-display); font-style: italic; font-size: 17px; letter-spacing: -0.01em; max-width: 36ch; }
+.nowrap { white-space: nowrap; }
+.audit a { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 760px) { .letter { padding: 20px 18px 24px; } }
