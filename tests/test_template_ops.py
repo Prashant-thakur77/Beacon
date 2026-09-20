@@ -59,7 +59,15 @@ def test_public_and_privileged_functions_have_bounded_concurrency(
     dashboard = stacks["console-template.yaml"]["Resources"]["BeaconDashboardFunction"]
     for fn in (remediate, voice, dashboard):
         limit = fn["Properties"].get("ReservedConcurrentExecutions")
-        assert isinstance(limit, int) and 1 <= limit <= 50
+        # Conditional: a reservation when the account quota allows it, NoValue otherwise
+        # (new accounts have a 10-execution unreserved minimum; any reservation fails).
+        assert isinstance(limit, dict) and "Fn::If" in limit, (
+            "concurrency must be conditional"
+        )
+        cond, value, off = limit["Fn::If"]
+        assert cond == "ReserveConcurrency"
+        assert value == {"Fn::Ref": "ReservedConcurrency"}
+        assert off == {"Fn::Ref": "AWS::NoValue"}
 
 
 def test_lambda_errors_and_escalations_page_the_sns_topic(

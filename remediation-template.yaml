@@ -40,8 +40,17 @@ Parameters:
     AllowedValues: ["true", "false"]
     Description: Kill switch. When false the Execute step refuses to run any action.
 
+  ReservedConcurrency:
+    Type: Number
+    Default: 0
+    Description: >
+      Reserved concurrency for the remediate Lambda (0 = none). New accounts have a
+      10-execution unreserved minimum, which makes any reservation fail; raise once the
+      account's Lambda concurrency quota is above the default.
+
 Conditions:
   CreateIncidents: !Equals [!Ref CreateIncidentsTable, "true"]
+  ReserveConcurrency: !Not [!Equals [!Ref ReservedConcurrency, 0]]
 
 Resources:
 
@@ -237,7 +246,7 @@ Resources:
       MemorySize: 1024
       Timeout: 300
       # The only function that writes to infrastructure: a handful of loops at once is plenty.
-      ReservedConcurrentExecutions: 5
+      ReservedConcurrentExecutions: !If [ReserveConcurrency, !Ref ReservedConcurrency, !Ref AWS::NoValue]
       LoggingConfig:
         LogFormat: JSON
         LogGroup: !Ref BeaconRemediateLogGroup

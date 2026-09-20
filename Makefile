@@ -463,7 +463,8 @@ dry-run:
 	PAYLOAD="{\"step\":\"dryrun\",\"action\":\"sg.restore_ingress\",\"params\":$$PARAMS}" && \
 	echo "==> invoking beacon-remediate-$(STACK_NAME) with $$PAYLOAD" && \
 	aws lambda invoke --function-name beacon-remediate-$(STACK_NAME) --region $(REGION) \
-		--cli-binary-format raw-in-base64-out --payload "$$PAYLOAD" /dev/stdout | $(PYTHON) -c 'import json,sys; d=json.loads(sys.stdin.read().split("\n")[0]); print(json.dumps(d, indent=1)); sys.exit(0 if d.get("ok") else 1)' \
+		--cli-binary-format raw-in-base64-out --payload "$$PAYLOAD" /tmp/beacon-dryrun.json > /dev/null && \
+	$(PYTHON) -c 'import json,sys; d=json.load(open("/tmp/beacon-dryrun.json")); print(json.dumps(d, indent=1)); sys.exit(0 if d.get("ok") else 1)' \
 		&& echo "DRY RUN PASSED" || (echo "DRY RUN FAILED (see error above)"; exit 1)
 
 # Proof that Cordon/Nova Embeddings ran on the last triage (greps the Lambda log).
@@ -578,7 +579,8 @@ replay-approval:
 	PARAMS=$$(REGION=$(REGION) bash scripts/demo_params.sh) && \
 	PAYLOAD="{\"step\":\"execute\",\"approval_id\":\"$(APPROVAL)\",\"incident_id\":\"$$INC\",\"action\":\"sg.restore_ingress\",\"params\":$$PARAMS}" && \
 	aws lambda invoke --function-name beacon-remediate-$(STACK_NAME) --region $(REGION) \
-		--cli-binary-format raw-in-base64-out --payload "$$PAYLOAD" /dev/stdout | head -1 | $(PYTHON) -m json.tool && \
+		--cli-binary-format raw-in-base64-out --payload "$$PAYLOAD" /tmp/beacon-replay.json > /dev/null && \
+	$(PYTHON) -m json.tool /tmp/beacon-replay.json && \
 	echo "(idempotent_replay: true means the stored result was returned and nothing was re-executed)"
 
 # Force the alarm into ALARM without waiting for metric evaluation (retakes only; the recorded take uses the real alarm).

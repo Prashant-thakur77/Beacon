@@ -73,7 +73,8 @@ done
 if aws ssm get-parameter --name "/beacon/$STACK/golden-sg" --region "$REGION" >/dev/null 2>&1; then ok "golden snapshot" "/beacon/$STACK/golden-sg"; else bad "golden snapshot" "missing (make snapshot-sg on a healthy stack)"; fi
 if PARAMS=$(REGION="$REGION" bash scripts/demo_params.sh 2>/dev/null); then
   PAYLOAD="{\"step\":\"dryrun\",\"action\":\"sg.restore_ingress\",\"params\":$PARAMS}"
-  DR=$(aws lambda invoke --function-name "beacon-remediate-$STACK" --region "$REGION" --cli-binary-format raw-in-base64-out --payload "$PAYLOAD" /dev/stdout 2>/dev/null | head -1)
+  aws lambda invoke --function-name "beacon-remediate-$STACK" --region "$REGION" --cli-binary-format raw-in-base64-out --payload "$PAYLOAD" /tmp/beacon-preflight-dryrun.json >/dev/null 2>&1
+  DR=$(cat /tmp/beacon-preflight-dryrun.json 2>/dev/null)
   if echo "$DR" | "$PY" -c 'import json,sys; d=json.loads(sys.stdin.read()); sys.exit(0 if d.get("ok") else 1)' 2>/dev/null; then
     ok "dry run under remediator role" "$(echo "$DR" | "$PY" -c 'import json,sys; print(json.loads(sys.stdin.read()).get("code"))')"
   else
