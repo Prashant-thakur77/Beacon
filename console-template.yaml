@@ -413,6 +413,7 @@ Resources:
           REMEDIABLE_ECS_SERVICES: !Ref RemediableEcsServices
           SESSION_CAP_TURNS: "30"
           POWERTOOLS_SERVICE_NAME: beacon-voice-turn
+          BEACON_VERSION: "0.2.0"
           POWERTOOLS_METRICS_NAMESPACE: Beacon
           LITELLM_LOCAL_MODEL_COST_MAP: "True"
 
@@ -551,6 +552,7 @@ Resources:
           CHANGES_TABLE_NAME: !Sub "beacon-changes-${BaseStackName}"
           STATE_MACHINE_ARN: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:beacon-remediate-${BaseStackName}"
           POWERTOOLS_SERVICE_NAME: beacon-dashboard
+          BEACON_VERSION: "0.2.0"
           LITELLM_LOCAL_MODEL_COST_MAP: "True"
 
   BeaconDashboardUrl:
