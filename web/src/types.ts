@@ -53,6 +53,7 @@ export interface Incident {
   contract_id?: string;
   contract_readback_pending?: Record<string, unknown> | null;
   turn_count?: number;
+  usage?: { input_tokens?: number; output_tokens?: number; embedding_tokens?: number };
 }
 
 export interface Contract {
@@ -118,4 +119,62 @@ export interface Message {
   speechMarks?: Array<{ time: number; value: string }>;
   channel?: string;
   at: string;
+}
+
+export interface Health {
+  ok: boolean;
+  service: string;
+  version?: string;
+  region?: string;
+  stack?: string;
+}
+
+export interface AnalyticsNight {
+  night: string;
+  incidents: number;
+  resolved: number;
+  escalated: number;
+  woken: number;
+  under_contract: number;
+  cost_inr: number;
+  median_minutes_to_recovery: number | null;
+  p90_minutes_to_recovery: number | null;
+}
+
+export interface AnalyticsIncident {
+  incident_id: string;
+  alarm_name?: string | null;
+  timestamp?: string;
+  night: string;
+  status: string;
+  woken: boolean;
+  under_contract: boolean;
+  minutes_to_recovery: number | null;
+  seconds_to_first_proposal: number | null;
+  cost_inr: number;
+  cost_inr_cumulative: number;
+}
+
+export interface AnalyticsContract {
+  contract_id: string;
+  alarm_name?: string | null;
+  action?: string | null;
+  uses: number;
+  max_uses: number;
+  uses_left: number;
+  expires_at?: string | null;
+  hours_left: number | null;
+}
+
+export interface Analytics {
+  generated_at: string;
+  nights: AnalyticsNight[];
+  incidents: AnalyticsIncident[];
+  recovery: { count: number; p50_minutes: number | null; p90_minutes: number | null; max_minutes: number | null };
+  first_proposal: { count: number; mean_seconds: number | null };
+  outcomes: { resolved: number; escalated: number; in_progress: number };
+  humans: { woken: number; under_contract: number };
+  cost: { total_inr: number; per_incident_inr: number };
+  top_alarms: Array<{ alarm_name: string; count: number }>;
+  contracts: AnalyticsContract[];
 }

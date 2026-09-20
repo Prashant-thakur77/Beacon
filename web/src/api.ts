@@ -1,5 +1,5 @@
 import { trimSlash, type Config } from "./config";
-import type { Contract, Incident, MetricSeries, Safety, Tally, TurnResponse } from "./types";
+import type { Analytics, Contract, Health, Incident, MetricSeries, Safety, Tally, TurnResponse } from "./types";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -50,6 +50,8 @@ export function makeApi(config: Config, passcode: () => string) {
     incident: (id: string) => request<{ incident: Incident }>(`${dash}/incidents/${id}`),
     execution: (id: string) => request<{ execution_arn: string; status: string | null; events: Array<{ t: string; type: string; state: string | null }> }>(`${dash}/incidents/${id}/execution`),
     tally: () => request<Tally>(`${dash}/tally`),
+    analytics: () => request<Analytics>(`${dash}/analytics`),
+    health: () => request<Health>(`${dash}/health`),
     metric: (id: string) => request<MetricSeries>(`${dash}/incidents/${id}/metric`),
     contracts: () => request<{ contracts: Contract[] }>(`${dash}/contracts`),
     revoke: (id: string) => request<{ ok: boolean }>(`${dash}/contracts/${id}`, { method: "DELETE" }, passcode()),

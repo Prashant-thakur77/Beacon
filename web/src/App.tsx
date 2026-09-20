@@ -2,15 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { makeApi, type Api } from "./api";
 import { loadConfig, type Config } from "./config";
 import { ArchivedRunCard, IncidentCard, JudgeCard, TallyStrip } from "./components/NightBoard";
+import { Analytics } from "./components/Analytics";
 import { Contracts } from "./components/Contracts";
 import { Safety } from "./components/Safety";
 import { Talk } from "./components/Talk";
 import { useClock, useLocalState, usePoll } from "./hooks";
 import { loadReplay, type ReplayBundle } from "./replay";
-import type { Contract, Incident, Safety as SafetyData, Tally } from "./types";
+import { computeAnalytics } from "./analytics";
+import type { Analytics as AnalyticsData, Contract, Health, Incident, Safety as SafetyData, Tally } from "./types";
 import { chooseStt } from "./voice/stt";
 
-type Route = "board" | "contracts" | "safety";
+type Route = "board" | "analytics" | "contracts" | "safety";
 
 /** "Run the night" (local mode): the engineer's lines for the first incident. */
 const NIGHT_SCRIPT = ["can you fix it", "approve fix 1", "yes", "grant contract for seven days"];
@@ -24,7 +26,7 @@ const NIGHT_LABEL: Record<Exclude<Night, null>, string> = {
 function useRoute(): [Route, (r: Route) => void] {
   const read = (): Route => {
     const h = window.location.hash.replace("#", "");
-    return h === "contracts" || h === "safety" ? h : "board";
+    return h === "contracts" || h === "safety" || h === "analytics" ? h : "board";
   };
   const [route, setRoute] = useState<Route>(read);
   useEffect(() => {
@@ -73,11 +75,22 @@ export default function App() {
   const tallyQ = usePoll<Tally>(api ? api.tally : null, 10000, [api], !!api);
   const contractsQ = usePoll<{ contracts: Contract[] }>(api ? api.contracts : null, 10000, [api], !!api);
   const safetyQ = usePoll<SafetyData>(api ? api.safety : null, 30000, [api], !!api && route === "safety");
+  const analyticsQ = usePoll<AnalyticsData>(api ? api.analytics : null, 15000, [api], !!api && route === "analytics");
+  const healthQ = usePoll<Health>(api ? api.health : null, 60000, [api], !!api);
 
   const incidents: Incident[] = replay ? replay.incidents : incidentsQ.data?.incidents ?? [];
   const tally: Tally | null = replay ? replay.tally : tallyQ.data;
   const contracts: Contract[] = replay ? replay.contracts : contractsQ.data?.contracts ?? [];
   const safety: SafetyData | null = replay ? replay.safety : safetyQ.data;
+  // Analytics: the API's aggregation when it has it; otherwise the same maths in the browser
+  // (replay bundles, and a deployed API that predates GET /analytics).
+  const analytics = useMemo<{ data: AnalyticsData | null; loading: boolean; source: "api" | "computed" | "replay" }>(() => {
+    if (replay) return { data: computeAnalytics(replay.incidents, replay.contracts, now), loading: false, source: "replay" };
+    if (analyticsQ.data && !analyticsQ.error) return { data: analyticsQ.data, loading: false, source: "api" };
+    if (api && (analyticsQ.error || incidentsQ.data)) return { data: computeAnalytics(incidents, contracts, now), loading: false, source: "computed" };
+    // nothing has answered yet (neither /analytics nor the incidents poll): skeletons, not empty states
+    return { data: null, loading: !!api && !incidentsQ.error, source: "computed" };
+  }, [replay, analyticsQ.data, analyticsQ.error, api, incidentsQ.data, incidentsQ.error, incidents, contracts, now]);
 
   // follow the newest incident automatically until the user picks one
   const [pinned, setPinned] = useState(false);
@@ -159,25 +172,35 @@ export default function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <div className="brand">
+        <a className="brand" href="#board" aria-label="Beacon Night Shift, Night Board">
           <span className="dot" />
           Beacon <span className="sub">Night Shift</span>
-        </div>
-        {replay ? <span className="pill lilac">REPLAY of {new Date(replay.recorded_at).toLocaleString()}</span> : null}
-        {!replay && api ? <span className={`pill ${connected ? "green" : "red"}`}>{connected ? "live" : "reconnecting…"}</span> : null}
-        {night ? <span className="pill lilac">{NIGHT_LABEL[night]}</span> : null}
-        <nav className="nav">
-          <a href="#board" className={route === "board" ? "active" : ""}>
+        </a>
+        <nav className="nav" aria-label="Sections">
+          <a href="#board" className={route === "board" ? "active" : ""} aria-current={route === "board" ? "page" : undefined}>
             Night Board
           </a>
-          <a href="#contracts" className={route === "contracts" ? "active" : ""}>
-            Contracts {contracts.length ? `(${contracts.length})` : ""}
+          <a href="#analytics" className={route === "analytics" ? "active" : ""} aria-current={route === "analytics" ? "page" : undefined}>
+            Analytics
           </a>
-          <a href="#safety" className={route === "safety" ? "active" : ""}>
+          <a href="#contracts" className={route === "contracts" ? "active" : ""} aria-current={route === "contracts" ? "page" : undefined}>
+            Contracts{contracts.length ? <span className="count">{contracts.length}</span> : null}
+          </a>
+          <a href="#safety" className={route === "safety" ? "active" : ""} aria-current={route === "safety" ? "page" : undefined}>
             Safety
           </a>
         </nav>
-        <span className="clock">{wall.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+        <div className="status" role="status" aria-live="polite">
+          {replay ? <span className="pill lilac">REPLAY of {new Date(replay.recorded_at).toLocaleString()}</span> : null}
+          {!replay && api ? <span className={`pill ${connected ? "green" : "red"}${connected ? "" : " pulse"}`}>{connected ? "live" : "reconnecting…"}</span> : null}
+          {!replay && !api && config ? <span className="pill dim">no API configured</span> : null}
+          {night ? <span className="pill lilac">{NIGHT_LABEL[night]}</span> : null}
+          <span className="status-meta mono" title={healthQ.data?.stack ? `stack ${healthQ.data.stack}` : undefined}>
+            {config?.local ? "local · moto" : config?.region ?? ""}
+            {healthQ.data?.version ? <span className="ver"> · v{healthQ.data.version}</span> : null}
+          </span>
+          <span className="clock">{wall.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+        </div>
       </header>
 
       {route === "board" ? (
@@ -247,6 +270,10 @@ export default function App() {
               />
             </section>
           ) : null}
+        </main>
+      ) : route === "analytics" ? (
+        <main className="main">
+          <Analytics data={analytics.data} loading={analytics.loading} source={analytics.source} now={now} />
         </main>
       ) : route === "contracts" ? (
         <main className="main">

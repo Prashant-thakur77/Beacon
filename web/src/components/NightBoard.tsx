@@ -15,6 +15,21 @@ export function StatusPill({ status }: { status: string }) {
   return <span className={`pill ${s.cls}${s.pulse ? " pulse" : ""}`}>{s.label}</span>;
 }
 
+/** Full local date-time for hover titles; the visible text stays relative. */
+function absolute(iso: string | undefined): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString([], { dateStyle: "medium", timeStyle: "medium" });
+}
+
+function recoveredIn(start: string, end: string): string {
+  const s = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000);
+  if (Number.isNaN(s) || s < 0) return "–";
+  if (s < 1) return "< 1 s";
+  if (s < 90) return `${s} s`;
+  return `${Math.round((s / 60) * 10) / 10} min`;
+}
+
 function inr(v: number | undefined): string {
   if (v == null) return "–";
   if (v >= 1) return `₹${v.toFixed(2)}`;
@@ -76,26 +91,40 @@ export function IncidentCard({
       onKeyDown={(e) => e.key === "Enter" && onSelect()}
     >
       <div className="title">
-        <span className={`pill ${sevCls}`}>{sev}</span>
-        <span className="alarm">{incident.alarm_name ?? "incident"}</span>
-        <StatusPill status={incident.status} />
-        {incident.handled_by === "contract" || incident.woken === false ? <span className="moon">☾ handled while you slept</span> : null}
-        <span className="age" title={incident.timestamp}>
-          {formatAge(incident.timestamp, now)}
+        <span className={`pill ${sevCls}`} title={`severity ${sev}`}>
+          {sev}
+        </span>
+        <span className="alarm" title={incident.alarm_name ?? undefined}>
+          {incident.alarm_name ?? "incident"}
+        </span>
+        <span className="state-col">
+          <StatusPill status={incident.status} />
+          {incident.handled_by === "contract" || incident.woken === false ? <span className="moon">☾ handled while you slept</span> : null}
+          <time className="age" dateTime={incident.timestamp} title={absolute(incident.timestamp)}>
+            {formatAge(incident.timestamp, now)}
+          </time>
         </span>
       </div>
       <div className="summary">{rca.summary ?? ""}</div>
-      <div className="row" style={{ marginTop: 8 }}>
+      <div className="foot">
         <button
           className="btn ghost small"
+          aria-expanded={open}
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
           }}
         >
-          {open ? "Hide timeline" : "Timeline"}
+          {open ? "Hide timeline" : `Timeline${incident.timeline?.length ? ` · ${incident.timeline.length}` : ""}`}
         </button>
-        <span className="faint small mono">{formatStamp(incident.timestamp)}</span>
+        <span className="stamp" title={absolute(incident.timestamp)}>
+          {formatStamp(incident.timestamp)}
+        </span>
+        {incident.resolved_at ? (
+          <span className="stamp" title={`resolved ${absolute(incident.resolved_at)}`}>
+            · recovered in {recoveredIn(incident.timestamp, incident.resolved_at)}
+          </span>
+        ) : null}
       </div>
       {open ? <Timeline events={incident.timeline ?? []} /> : null}
     </div>
