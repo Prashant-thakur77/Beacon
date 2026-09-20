@@ -17,7 +17,7 @@ const FEATURES = [
   {
     id: "talk",
     title: "Talk to it",
-    text: "Hold the mic. Beacon briefs you on the alarm, the CloudTrail change behind it and the root cause, and every sentence it speaks is pinned to an evidence chip you can open.",
+    text: "Hold the mic. Beacon briefs you on the alarm, the CloudTrail change behind it and the root cause, and every sentence it speaks is pinned to an evidence chip you can open. Pages where you are: Slack and PagerDuty, deep-linked to the incident.",
     proof: "src/beacon/voice_tools.py · tests/test_voice_tools.py::test_get_incident_brief_returns_rca_and_evidence_card",
     img: "/landing/night.png",
     pos: "70% 30%",
@@ -44,6 +44,7 @@ const PILLARS = [
   { title: "Evidence before the model", text: "A golden security-group snapshot taken on a healthy stack and a CloudTrail change ledger come first; the model reasons over what is already known to be true." },
   { title: "Verified means proven", text: "A fix is resolved only when the alarm returns to OK after the change, the error metric is zero, and the post-condition holds. Otherwise it escalates, honestly." },
   { title: "Two roles, one direction", text: "The agent you talk to is read-only. The executor is write-only, scoped by resource tag, and dry-runs under that same role. The templates are asserted by tests." },
+  { title: "Undo by phrase", text: "Every fix has an allowlisted inverse. Say “undo fix 1” and Beacon reverses exactly what it applied, records it, and hands the incident back to you." },
   { title: "Runs on your laptop too", text: "`make local` runs the whole product against an in-process moto AWS with a scripted agent: same tools, same safety checks, no account needed." },
 ];
 

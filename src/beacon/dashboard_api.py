@@ -704,6 +704,11 @@ def safety() -> Response[str]:
             "description": spec.description,
             "params": {k: t.__name__ for k, t in spec.params_schema.items()},
             "iam_actions": list(spec.iam_actions),
+            "inverse": spec.inverse,
+            "undo_of": next(
+                (o.id for o in registry.REGISTRY.values() if o.inverse == spec.id),
+                None,
+            ),
         }
         for spec in registry.REGISTRY.values()
     ]

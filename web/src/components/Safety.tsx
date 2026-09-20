@@ -155,7 +155,10 @@ export function Safety({ safety }: { safety: SafetyData | null }) {
             <tbody>
               {(safety?.allowlist ?? []).map((a) => (
                 <tr key={a.id}>
-                  <td className="mono">{a.id}</td>
+                  <td className="mono">
+                    {a.id}
+                    {a.undo_of ? <div className="small dim">undo of {a.undo_of}</div> : a.inverse ? <div className="small dim">undo: {a.inverse}</div> : null}
+                  </td>
                   <td>{a.description}</td>
                   <td className="mono small">{Object.entries(a.params).map(([k, t]) => `${k}: ${t}`).join(", ")}</td>
                   <td className="mono small">{a.iam_actions.join(", ")}</td>

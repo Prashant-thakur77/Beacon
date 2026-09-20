@@ -48,7 +48,25 @@ function EvidenceCard({ ev, hot }: { ev: Evidence; hot: boolean }) {
   );
 }
 
-function FixCard({ incident, proposal, series }: { incident: Incident; proposal: Proposal | null; series: MetricSeries | null }) {
+/** The last fix Beacon executed here that has an allowlisted inverse and has not been undone since. */
+function undoableFix(incident: Incident): number | null {
+  if (incident.handled_by === "contract") return null;
+  const tl = incident.timeline ?? [];
+  let fix: number | null = null;
+  let action = "";
+  for (const e of tl) {
+    const d = (e.detail ?? {}) as Record<string, unknown>;
+    if (e.event === "fix_proposed") {
+      fix = Number(d.fix_id ?? fix ?? 1);
+      action = String(d.action ?? "");
+    }
+    if (e.event === "undone") fix = null;
+  }
+  const executed = tl.some((e) => e.event === "executed");
+  return fix != null && executed && action === "sg.restore_ingress" ? fix : null;
+}
+
+function FixCard({ incident, proposal, series, onPrefill }: { incident: Incident; proposal: Proposal | null; series: MetricSeries | null; onPrefill?: (text: string) => void }) {
   const status = incident.status;
   if (status === "resolved") {
     const verifies = (incident.timeline ?? []).filter((e) => e.event === "verify_attempt");
@@ -62,6 +80,14 @@ function FixCard({ incident, proposal, series }: { incident: Incident; proposal:
         </div>
         <div className="small dim">alarm OK after the fix · error count zero · rule present</div>
         <RecoverySparkline series={series} />
+        {undoableFix(incident) != null && onPrefill ? (
+          <div className="undo-row">
+            <button type="button" className="btn ghost small" onClick={() => onPrefill(`undo fix ${undoableFix(incident)}`)}>
+              ↩︎ Undo fix {undoableFix(incident)}
+            </button>
+            <span className="faint small">the fault will return; Beacon asks you to confirm by phrase</span>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -139,6 +165,19 @@ export function Talk({
   const [hotSentence, setHotSentence] = useState<{ msg: number; idx: number } | null>(null);
   const [hotEvidence, setHotEvidence] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
+  // phone-first incident mode: one thumb, big mic, phrase chips, sticky composer
+  const [phone, setPhone] = useState(() => typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(max-width: 760px)").matches);
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 760px)");
+    const on = () => setPhone(mq.matches);
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  const prefill = useCallback((text: string) => {
+    setTyped(text);
+    window.setTimeout(() => document.getElementById("typed-input")?.focus(), 0);
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [latency, setLatency] = useState<{ stt?: number; agent?: number; tts?: number }>({});
   const [activeStt, setActiveStt] = useState<SttChoice>(stt);
@@ -351,7 +390,7 @@ export function Talk({
   };
 
   return (
-    <div className="talk">
+    <div className={`talk${phone ? " phone" : ""}`}>
       <div className="panel">
         <div className="panel-h">
           <h2>Talk to Beacon</h2>
@@ -401,6 +440,15 @@ export function Talk({
               </div>
             </div>
           </div>
+          {phone && !replayTurns ? (
+            <div className="phone-chips" role="group" aria-label="Say one of these">
+              {["what changed", "can you fix it", undoableFix(incident) != null && incident.status === "resolved" ? `undo fix ${undoableFix(incident)}` : `approve fix ${proposal?.fix_id ?? 1}`].map((t) => (
+                <button key={t} type="button" className="chip-btn" disabled={state === "thinking" || !unlocked} onClick={() => send(t, "typed")}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {error ? <div className="err">{error}</div> : null}
 
           <div className="bubbles" aria-live="polite" aria-label="Conversation with Beacon">
@@ -465,7 +513,7 @@ export function Talk({
         </div>
       </div>
 
-      <FixCard incident={incident} proposal={proposal} series={series} />
+      <FixCard incident={incident} proposal={proposal} series={series} onPrefill={replayTurns ? undefined : prefill} />
 
       {incident.contract_readback_pending ? (
         <div className="fix lilac">

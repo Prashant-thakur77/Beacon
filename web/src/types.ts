@@ -1,6 +1,12 @@
+/** Timeline event names the console knows how to label; others render as-is. */
+export type KnownEvent =
+  | "alarm_received" | "triggered" | "logs_fetched" | "reduced" | "diagnostics_ran" | "diagnostics_skipped" | "changes_checked" | "rca_ready" | "sns_sent"
+  | "fix_proposed" | "approved" | "contract_matched" | "contract_matched_apply_disabled" | "remediation_started" | "executing" | "executed" | "execute_failed"
+  | "verify_attempt" | "resolved" | "escalated" | "contract_granted" | "contract_exhausted" | "contract_ignored" | "undone" | "undo_failed";
+
 export interface TimelineEvent {
   t: string;
-  event: string;
+  event: KnownEvent | (string & {});
   detail?: Record<string, unknown>;
 }
 
@@ -106,7 +112,7 @@ export interface TurnResponse {
 }
 
 export interface Safety {
-  allowlist: Array<{ id: string; description: string; params: Record<string, string>; iam_actions: string[] }>;
+  allowlist: Array<{ id: string; description: string; params: Record<string, string>; iam_actions: string[]; inverse?: string | null; undo_of?: string | null }>;
   apply_enabled: Record<string, boolean | null>;
   rules: string[];
   controls?: Array<{ id: string; title: string; rule: string; file: string; test: string }>;

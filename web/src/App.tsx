@@ -225,7 +225,10 @@ export default function App() {
     setPinned(true);
     setSelectedId(deepId);
     setOpenId(deepId);
-    window.setTimeout(() => document.querySelector<HTMLElement>(".card.selected")?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+    window.setTimeout(() => {
+      const phone = window.matchMedia?.("(max-width: 760px)").matches;
+      document.querySelector<HTMLElement>(phone ? ".talk" : ".card.selected")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
   }, [deepId, route]);
   const selected = incidents.find((i) => i.incident_id === selectedId) ?? null;
   const [live, setLive] = useState<Incident | null>(null);

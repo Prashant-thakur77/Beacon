@@ -103,6 +103,7 @@ Auto-remediation is only worth shipping if it cannot do the wrong thing. Beacon'
 6. **Two roles, one direction.** The agent you talk to has zero EC2/ECS write actions. The remediator role holds only the two allowlisted writes, scoped by `aws:ResourceTag/beacon:remediable=true` (plus the untaggable `security-group-rule/*` statement that trips everyone up). `tests/test_template_safety.py` parses the real CloudFormation and fails if this ever changes.
 7. **Recovered means proven.** Verify requires all three: the alarm is `OK` *and its state changed after the execute time*, the alarm's own metric is at zero, and the action's post-condition holds. Anything else escalates to a human.
 8. **Contracts are scoped and expire.** Alarm + action + exact resources, a use counter, a TTL, and your quote. Revoke from the console.
+9. **Undo by phrase.** Every fix has an allowlisted inverse (`sg.revoke_ingress`); saying `undo fix 1` reverses exactly what Beacon applied, records it in the audit, and hands the incident back to you. Pages reach you where you are: Slack and PagerDuty, deep-linked to `#board/<incident_id>`.
 9. **One switch stops every write path.** `make apply-off` sets `APPLY_ENABLED=false` on the triage, voice and remediate functions.
 
 Details: [`docs/safety.md`](docs/safety.md).
