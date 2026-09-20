@@ -35,7 +35,7 @@ dev = [
     "boto3-stubs[logs,sns,bedrock-runtime,dynamodb,connect,cloudwatch,ec2,ecs,ssm,stepfunctions,sts,polly,lambda]",
     "types-tqdm",
     "types-PyYAML",
-    "ruff>=0.15",
+    "ruff>=0.16.8",
     "pre-commit",
     "cfn-lint",
     "fastapi",
