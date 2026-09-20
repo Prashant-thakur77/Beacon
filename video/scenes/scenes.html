@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Beacon film scenes</title>
+<link rel="stylesheet" href="fonts/geist.css" />
+<style>
+  :root { --bg:#0b0b0d; --fg:#f5f5f4; --dim:#a1a1aa; --faint:#55555c; --line:#26262b; --lilac:#b4a7ff; --amber:#f5b942; --green:#6ee7a0; --red:#ff6b6b; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; width:1920px; height:1080px; background:var(--bg); color:var(--fg); font-family:"Geist", system-ui, sans-serif; overflow:hidden; }
+  .mono { font-family:"Geist Mono", ui-monospace, monospace; }
+  .scene { position:absolute; inset:0; display:none; }
+  .scene.on { display:block; }
+  .center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  .kicker { font-size:22px; letter-spacing:.18em; text-transform:uppercase; color:var(--faint); font-weight:600; }
+  h1 { font-size:96px; font-weight:600; letter-spacing:-.03em; margin:18px 0 0; line-height:1.05; }
+  h2 { font-size:64px; font-weight:600; letter-spacing:-.02em; margin:0; line-height:1.1; }
+  .sub { font-size:30px; color:var(--dim); margin-top:22px; max-width:1200px; line-height:1.4; }
+  .fade { opacity:0; transform:translateY(14px); animation: fadeUp .9s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes fadeUp { to { opacity:1; transform:none; } }
+  .d1{animation-delay:.2s}.d2{animation-delay:1.2s}.d3{animation-delay:2.2s}.d4{animation-delay:3.2s}.d5{animation-delay:4.2s}.d6{animation-delay:5.2s}
+  .dot { width:22px; height:22px; border-radius:50%; background:var(--amber); box-shadow:0 0 40px 8px rgba(245,185,66,.45); animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{transform:scale(1);opacity:.9} 50%{transform:scale(1.25);opacity:1} }
+  .grain { position:absolute; inset:0; pointer-events:none; background:radial-gradient(1200px 700px at 50% 60%, rgba(180,167,255,.06), transparent 70%); }
+
+  /* phone */
+  .phone { width:420px; height:860px; border-radius:56px; background:#000; border:6px solid #1c1c21; position:relative; box-shadow:0 40px 120px rgba(0,0,0,.8); overflow:hidden; }
+  .phone .screen { position:absolute; inset:0; background:#050507; opacity:0; animation: light 1.2s ease-out 1.2s forwards; }
+  @keyframes light { to { opacity:1; } }
+  .phone .time { position:absolute; top:120px; width:100%; text-align:center; font-size:96px; font-weight:500; letter-spacing:-.02em; }
+  .phone .date { position:absolute; top:230px; width:100%; text-align:center; font-size:22px; color:var(--dim); }
+  .notif { position:absolute; left:22px; right:22px; top:320px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); border-radius:26px; padding:18px 20px; opacity:0; transform:translateY(-20px); animation: fadeUp .6s ease-out 2.4s forwards; }
+  .notif .app { display:flex; align-items:center; gap:10px; font-size:16px; color:var(--dim); }
+  .notif .app i { width:18px; height:18px; border-radius:5px; background:var(--red); display:inline-block; }
+  .notif .t { font-size:22px; font-weight:600; margin-top:8px; }
+  .notif .b { font-size:18px; color:var(--dim); margin-top:4px; line-height:1.35; }
+  .notif.two { top:470px; animation-delay:3.6s; }
+  .notif.three { top:620px; animation-delay:4.4s; }
+
+  /* problem */
+  .kb { position:absolute; inset:0; background-size:cover; background-position:center; filter:brightness(.42) saturate(.75); animation: kb 9s ease-out forwards; }
+  .kb.two { opacity:0; animation: kb 9s ease-out forwards, show .8s ease-out 4.4s forwards; }
+  @keyframes kb { from { transform:scale(1.0); } to { transform:scale(1.14); } }
+  @keyframes show { to { opacity:1; } }
+  .kw { position:absolute; left:140px; top:520px; font-size:88px; font-weight:600; letter-spacing:-.03em; text-shadow:0 4px 30px rgba(0,0,0,.6); }
+  /* questions */
+  .q { font-size:72px; font-weight:500; letter-spacing:-.02em; line-height:1.25; color:var(--fg); }
+  .q .n { color:var(--faint); font-family:"Geist Mono"; font-size:32px; margin-right:26px; vertical-align:middle; }
+  .q.last { color:var(--lilac); }
+
+  /* calendar */
+  .cal { display:grid; grid-template-columns:repeat(7,150px); gap:14px; }
+  .cal div { height:150px; border:1px solid var(--line); border-radius:12px; padding:12px; font-family:"Geist Mono"; font-size:20px; color:var(--faint); position:relative; }
+  .cal div.hit::after { content:"payments-errors · 03:12"; position:absolute; left:12px; right:12px; bottom:14px; font-size:14px; color:var(--red); border-top:1px solid rgba(255,107,107,.3); padding-top:8px; opacity:0; animation: fadeUp .5s ease-out forwards; }
+  .cal div.hit { border-color: rgba(255,107,107,.5); }
+
+  /* timezones */
+  .tz { display:flex; gap:120px; align-items:center; }
+  .clock { width:360px; height:360px; border-radius:50%; border:2px solid var(--line); position:relative; }
+  .clock .h, .clock .m { position:absolute; left:50%; top:50%; background:var(--fg); transform-origin:bottom center; border-radius:4px; }
+  .clock .h { width:8px; height:100px; margin-left:-4px; margin-top:-100px; }
+  .clock .m { width:5px; height:150px; margin-left:-2.5px; margin-top:-150px; background:var(--dim); }
+  .clock .lbl { position:absolute; top:100%; left:0; right:0; text-align:center; margin-top:26px; font-size:28px; color:var(--dim); }
+  .clock .big { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:20px; letter-spacing:.2em; color:var(--faint); text-transform:uppercase; padding-top:250px; }
+
+  /* list scenes */
+  .list { width:1500px; text-align:left; }
+  .row { display:grid; grid-template-columns:70px 1fr 460px; gap:24px; align-items:baseline; padding:20px 0; border-bottom:1px solid var(--line); font-size:32px; }
+  .row .k { font-family:"Geist Mono"; color:var(--faint); font-size:22px; }
+  .row .f { font-family:"Geist Mono"; color:var(--lilac); font-size:20px; text-align:right; }
+  .row .f.dim { color:var(--faint); }
+
+  /* cards */
+  .cards { display:flex; gap:40px; }
+  .card { width:700px; border:1px solid var(--line); border-radius:18px; padding:34px 38px; text-align:left; background:rgba(255,255,255,.02); }
+  .card .t { font-size:20px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); font-weight:600; }
+  .card .h { font-size:40px; font-weight:600; margin:14px 0 18px; letter-spacing:-.02em; }
+  .card pre { font-family:"Geist Mono"; font-size:20px; color:var(--dim); margin:0; white-space:pre-wrap; line-height:1.5; }
+  .card pre b { color:var(--fg); font-weight:500; }
+  .card pre i { color:var(--red); font-style:normal; }
+  .card pre em { color:var(--green); font-style:normal; }
+
+  canvas#three { position:absolute; inset:0; }
+  .arch-label { position:absolute; font-family:"Geist Mono"; font-size:22px; color:var(--dim); transform:translate(-50%,-50%); text-align:center; line-height:1.3; }
+  .arch-label b { display:block; color:var(--fg); font-family:"Geist"; font-weight:600; font-size:26px; }
+  .arch-label.lit b { color:var(--lilac); }
+  .arch-title { position:absolute; left:80px; top:64px; }
+  .arch-title .kicker { text-align:left; }
+  .arch-title h2 { font-size:44px; margin-top:10px; }
+
+  .url { font-family:"Geist Mono"; font-size:30px; color:var(--dim); margin-top:14px; }
+  .url b { color:var(--fg); font-weight:500; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<!-- 1 phone -->
+<section class="scene" id="phone">
+  <div class="center">
+    <div class="phone">
+      <div class="screen">
+        <div class="time mono">03:12</div>
+        <div class="date">Sunday 20 September</div>
+        <div class="notif"><div class="app"><i></i>CloudWatch · now</div><div class="t">ALARM: beacon-demo-infra-errors</div><div class="b">ErrorCount ≥ 3 for 1 datapoint · us-east-1</div></div>
+        <div class="notif two"><div class="app"><i></i>PagerDuty · now</div><div class="t">You are on call</div><div class="b">Incident #4128 · payments-service · Acknowledge?</div></div>
+        <div class="notif three"><div class="app"><i style="background:#3b82f6"></i>Slack · now</div><div class="t">#incidents</div><div class="b">anyone awake? checkout is down for everyone</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 problem: real photos, Ken Burns, keyword overlays -->
+<section class="scene" id="problem">
+  <div class="kb" style="background-image:url(photos/servers.jpg)"></div>
+  <div class="kb two" style="background-image:url(photos/night.jpg)"></div>
+  <div class="kw fade" style="animation-delay:.8s">alone</div>
+  <div class="kw fade" style="animation-delay:2.6s; top:640px">half-asleep</div>
+  <div class="kw fade" style="animation-delay:4.6s; top:760px">no laptop</div>
+  <div class="kw fade" style="animation-delay:6.0s; top:880px; color:var(--lilac)">four answers, in order</div>
+</section>
+
+<!-- 3 questions -->
+<section class="scene" id="questions">
+  <div class="center" style="align-items:flex-start; padding-left:300px; gap:36px;">
+    <div class="kicker fade d1">Four questions, in order</div>
+    <div class="q fade d2"><span class="n">01</span>is it real?</div>
+    <div class="q fade d3"><span class="n">02</span>what changed?</div>
+    <div class="q fade d4"><span class="n">03</span>what do I do?</div>
+    <div class="q last fade d5"><span class="n">04</span>can I go back to sleep?</div>
+    <div class="sub fade d6" style="margin-left:0">Today's tools answer, at most, the first one.</div>
+  </div>
+</section>
+
+<!-- 4 repeat -->
+<section class="scene" id="repeat">
+  <div class="center" style="gap:50px">
+    <div class="kicker fade d1">One month on call</div>
+    <div class="cal" id="cal"></div>
+    <div class="sub fade d6">The most common page is a repeat. Nothing learns from the fix.</div>
+  </div>
+</section>
+
+<!-- 5 timezones -->
+<section class="scene" id="timezones">
+  <div class="center" style="gap:90px">
+    <div class="kicker fade d1">Your customers' peak is your night</div>
+    <div class="tz fade d2">
+      <div class="clock"><div class="h" style="transform:rotate(-45deg)"></div><div class="m" style="transform:rotate(0deg)"></div><div class="big">peak traffic</div><div class="lbl">New York · 5:30 PM</div></div>
+      <div style="font-size:64px;color:var(--faint)">→</div>
+      <div class="clock"><div class="h" style="transform:rotate(90deg)"></div><div class="m" style="transform:rotate(0deg)"></div><div class="big" style="color:var(--amber)">on call</div><div class="lbl">Bengaluru · 3:00 AM</div></div>
+    </div>
+    <div class="sub fade d4">Solo engineers and small teams in India, on call for the other side of the world.</div>
+  </div>
+</section>
+
+<!-- 6 title -->
+<section class="scene" id="title">
+  <div class="center">
+    <div class="dot fade d1"></div>
+    <h1 class="fade d2">Beacon <span style="color:var(--dim);font-weight:400">Night Shift</span></h1>
+    <div class="sub fade d3">The on-call agent that fixes the 3 AM page with your voice —<br/>and does not wake you the second time.</div>
+  </div>
+</section>
+
+<!-- 7 arch1 / 16 arch2: three.js -->
+<section class="scene" id="arch1"><canvas id="three"></canvas><div class="arch-title"><div class="kicker">How it starts</div><h2 id="arch-h2">Alarm → triage on Bedrock → Night Board</h2></div><div id="labels"></div></section>
+
+<!-- 8 evidence -->
+<section class="scene" id="evidence">
+  <div class="center" style="gap:50px">
+    <div class="kicker fade d1">Before the model reads a single log line</div>
+    <div class="cards">
+      <div class="card fade d2"><div class="t">Deterministic · drift check</div><div class="h">Golden snapshot</div><pre>live security groups <b>vs</b> snapshot taken on a healthy stack
+sg-08861ee93fee43c6f  <i>missing</i>  tcp/5432 from sg-01eaf3479667c9284
+→ action_params: <b>exact ids</b>, no guessing</pre></div>
+      <div class="card fade d4"><div class="t">Deterministic · change ledger</div><div class="h">CloudTrail → EventBridge</div><pre><i>RevokeSecurityGroupIngress</i>  sg-08861ee93fee43c6f
+by user/prashant · <b>2 min 40 s</b> before the first error
+ranked: destructive verbs first · Beacon's own writes tagged</pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- 15 safety -->
+<section class="scene" id="safety">
+  <div class="center" style="gap:30px">
+    <div class="kicker fade d1">Safety is code and IAM, not a prompt</div>
+    <div class="list" id="safety-list"></div>
+  </div>
+</section>
+
+<!-- 18 prod -->
+<section class="scene" id="prod">
+  <div class="center" style="gap:30px">
+    <div class="kicker fade d1">Built to be run</div>
+    <div class="list" id="prod-list"></div>
+  </div>
+</section>
+
+<!-- 20 learn -->
+<section class="scene" id="learn">
+  <div class="center" style="gap:30px">
+    <div class="kicker fade d1">What this weekend taught me</div>
+    <div class="list" id="learn-list"></div>
+  </div>
+</section>
+
+<!-- 21 close -->
+<section class="scene" id="close">
+  <div class="center">
+    <div class="dot fade d1"></div>
+    <h1 class="fade d2">Beacon <span style="color:var(--dim);font-weight:400">Night Shift</span></h1>
+    <div class="sub fade d3">Build for the fourth question.</div>
+    <div class="url fade d4"><b>github.com/Prashant-thakur77/Beacon</b></div>
+    <div class="url fade d5">Built on AWS · First Commit 2026 · Bharat Builds Tour</div>
+  </div>
+</section>
+
+<script type="importmap">{ "imports": { "three": "./three.module.js" } }</script>
+<script type="module">
+import * as THREE from 'three';
+const scene = new URLSearchParams(location.search).get('scene') || 'title';
+const mode = new URLSearchParams(location.search).get('mode') || '';
+document.getElementById(scene === 'arch2' ? 'arch1' : scene)?.classList.add('on');
+
+const stagger = (id, rows, delay=0.9) => {
+  const el = document.getElementById(id); if (!el) return;
+  rows.forEach(([k, text, file, dim], i) => {
+    const r = document.createElement('div'); r.className = 'row fade'; r.style.animationDelay = (0.4 + i*delay) + 's';
+    r.innerHTML = `<span class="k">${k}</span><span>${text}</span><span class="f${dim?' dim':''}">${file}</span>`; el.appendChild(r);
+  });
+};
+if (scene === 'repeat') {
+  const cal = document.getElementById('cal');
+  const hits = new Set([3, 9, 14, 21, 27]);
+  for (let d = 1; d <= 28; d++) { const c = document.createElement('div'); c.textContent = String(d).padStart(2,'0'); c.className = 'fade'; c.style.animationDelay = (0.2 + d*0.05) + 's'; if (hits.has(d)) { c.classList.add('hit'); c.style.setProperty('--x', d); c.querySelector; } cal.appendChild(c); }
+  // light the hits one by one
+  let i = 0; [...hits].forEach((d, j) => { const c = cal.children[d-1]; c.style.animation = `fadeUp .5s ease-out ${0.2+d*0.05}s forwards`; c.style.setProperty('animation-name','fadeUp'); const a = c.style; setTimeout(() => { c.classList.add('lit'); c.style.borderColor = 'rgba(255,107,107,.6)'; }, 1800 + j*700); });
+  const style = document.createElement('style'); style.textContent = '.cal div.hit::after{animation-delay:var(--d)}'; document.head.appendChild(style);
+  [...hits].forEach((d, j) => cal.children[d-1].style.setProperty('--d', (1.8 + j*0.7) + 's'));
+}
+stagger('safety-list', [
+  ['01','Allowlist by code: exactly two actions exist','remediation/registry.py'],
+  ['02','Allowlist by data: the golden snapshot decides what may be restored','diagnose.py · SSM'],
+  ['03','Dry run under the role that will execute','remediate.py · EC2 DryRun'],
+  ['04','Consent from your transcript, never the model\'s claim','turn_context.py'],
+  ['05','Executes exactly once; retries replay the record','approvals.py'],
+  ['06','Two roles, one direction; tag-scoped writes','remediation-template.yaml'],
+  ['07','Recovered = alarm OK after the fix + metric zero + rule present','remediation/verify.py'],
+  ['08','Contracts are scoped, counted, and expire','contracts.py'],
+  ['09','One switch stops every write path','APPLY_ENABLED'],
+], 0.75);
+stagger('prod-list', [
+  ['log','Named JSON log groups, 14-day retention','/beacon/&lt;stack&gt;/…'],
+  ['page','Lambda Errors + Escalated alarms → SNS','CloudWatch'],
+  ['edge','HSTS, nosniff, DENY, a real CSP; CORS scoped to the console','CloudFront'],
+  ['secret','Demo database password generated by RDS into Secrets Manager','no env var, no git'],
+  ['data','Point-in-time recovery, TTLs on every table','DynamoDB'],
+  ['calls','Every AWS call has a timeout and bounded retries','aws.py'],
+  ['proof','Each claim is a test against the CloudFormation','tests/test_template_ops.py'],
+], 0.7);
+stagger('learn-list', [
+  ['01','A dry run only tells the truth for the caller that will execute','EC2 DryRun'],
+  ['02','Tag-scoped IAM misses the resources that cannot be tagged','security-group-rule/*'],
+  ['03','Verification is a loop, not a boolean: "OK" must come after the fix','StateUpdatedTimestamp'],
+  ['04','cloudtrail:LookupEvents lags minutes; EventBridge does not','change ledger'],
+  ['05','The transcript is a safety artifact','TurnContext'],
+], 0.8);
+
+/* ---------- three.js architecture ---------- */
+if (scene === 'arch1' || scene === 'arch2') {
+  const canvas = document.getElementById('three');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setSize(1920, 1080, false); renderer.setPixelRatio(1);
+  const sc = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(32, 1920/1080, 0.1, 100);
+  const far = scene === 'arch2'; cam.position.set(0, far ? 17 : 9.5, far ? 27 : 15); cam.lookAt(0, 0, far ? -1 : 0);
+  sc.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const key = new THREE.DirectionalLight(0xffffff, 1.1); key.position.set(5, 10, 6); sc.add(key);
+  const rim = new THREE.PointLight(0xb4a7ff, 8, 30); rim.position.set(-6, 4, -4); sc.add(rim);
+
+  const grid = new THREE.GridHelper(60, 60, 0x1c1c21, 0x151518); grid.position.y = -0.61; sc.add(grid);
+  const boxMat = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.45, metalness: 0.15 });
+  const nodes = {};
+  const mk = (name, x, z, c=0x1f1f25, w=1.6, h=1.0, d=1.6) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), boxMat(c)); m.position.set(x, 0, z); sc.add(m); nodes[name] = m; return m; };
+  const edgesOf = (m) => { const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x3a3a44 })); m.add(e); };
+
+  const layout = scene === 'arch1' ? [
+    ['alarm', -7.5, 0, 0x3b2a1a], ['lambda', -4, 0, 0x1f1f25], ['bedrock', -4, -3.5, 0x2a2540], ['ddb', 0, 0, 0x1f1f25], ['board', 4, 0, 0x1f1f25], ['you', 7.5, 0, 0x2a2540],
+  ] : [
+    ['patient', -10, 5, 0x3b2a1a], ['cloudwatch', -10, -1.5, 0x1f1f25], ['cloudtrail', -10, -8, 0x1f1f25],
+    ['lambda', -5, -1.5, 0x1f1f25], ['bedrock', -5, -8, 0x2a2540], ['ddb', 0, -1.5, 0x1f1f25], ['sfn', 0, 5, 0x2a2540],
+    ['remediator', -5, 5, 0x3b2a1a], ['sns', 5, -8, 0x1f1f25], ['console', 5, -1.5, 0x1f1f25], ['voice', 5, 5, 0x2a2540], ['you', 10, 1.5, 0x2a2540],
+  ];
+  layout.forEach(([n, x, z, c]) => edgesOf(mk(n, x, z, c)));
+  const links = scene === 'arch1' ? [['alarm','lambda'],['lambda','bedrock'],['bedrock','lambda'],['lambda','ddb'],['ddb','board'],['board','you']] : [
+    ['patient','cloudwatch'],['cloudwatch','lambda'],['cloudtrail','ddb'],['lambda','bedrock'],['lambda','ddb'],['ddb','console'],['console','you'],['you','voice'],['voice','bedrock'],['voice','sfn'],['sfn','remediator'],['remediator','patient'],['sfn','sns'],['sns','you']
+  ];
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x2c2c34 });
+  links.forEach(([a,b]) => { const g = new THREE.BufferGeometry().setFromPoints([nodes[a].position.clone().setY(0.55), nodes[b].position.clone().setY(0.55)]); sc.add(new THREE.Line(g, lineMat)); });
+  // packets
+  const packets = links.map(([a,b], i) => { const p = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), new THREE.MeshBasicMaterial({ color: i % 3 === 0 ? 0xf5b942 : 0xb4a7ff })); p.userData = { a: nodes[a].position, b: nodes[b].position, off: (i * 0.37) % 1 }; sc.add(p); return p; });
+
+  // HTML labels projected
+  const labels = {
+    alarm: ['CloudWatch','alarm'], lambda: ['Lambda','triage · Cordon'], bedrock: ['Bedrock','Nova 2 Lite · Embeddings'], ddb: ['DynamoDB','incident'], board: ['Night Board','S3 + CloudFront'], you: ['You','browser, 3 AM'],
+    patient: ['Fargate + RDS','the patient'], cloudwatch: ['CloudWatch','alarm · logs · metrics'], cloudtrail: ['CloudTrail','change ledger'], sfn: ['Step Functions','the verified loop'], remediator: ['Remediator','write-only, tag-scoped'], sns: ['SNS','page · "not woken" email'], console: ['Console','S3 + CloudFront'], voice: ['Voice turn','Strands · Transcribe · Polly'],
+  };
+  const lab = document.getElementById('labels');
+  const labelEls = {};
+  Object.keys(nodes).forEach(n => { const e = document.createElement('div'); e.className = 'arch-label'; e.innerHTML = `<b>${labels[n][0]}</b>${labels[n][1]}`; lab.appendChild(e); labelEls[n] = e; });
+  if (scene === 'arch2') { document.querySelector('.arch-title .kicker').textContent = 'Built on AWS, end to end'; document.getElementById('arch-h2').textContent = 'Every box is a service in the account'; }
+  // lit sequence for arch2 as narrated
+  const litSeq = scene === 'arch2' ? ['bedrock','voice','lambda','sfn','cloudwatch','ddb','cloudtrail','sns','console','patient'] : ['alarm','lambda','bedrock','ddb','board','you'];
+  const t0 = performance.now();
+  const v = new THREE.Vector3();
+  function frame() {
+    const t = (performance.now() - t0) / 1000;
+    cam.position.x = Math.sin(t * 0.08) * 1.2; cam.position.z = (far ? 27 : 15) + Math.cos(t * 0.06) * 0.6; cam.lookAt(0, 0, far ? -1 : 0);
+    packets.forEach(p => { const k = (t * 0.25 + p.userData.off) % 1; p.position.lerpVectors(p.userData.a, p.userData.b, k); p.position.y = 0.55 + Math.sin(k * Math.PI) * 0.35; });
+    const litIdx = Math.floor(t / 1.6);
+    Object.keys(nodes).forEach(n => { const m = nodes[n]; const idx = litSeq.indexOf(n); const lit = idx >= 0 && idx <= litIdx; m.material.emissive = new THREE.Color(lit ? 0xb4a7ff : 0x000000); m.material.emissiveIntensity = lit ? 0.14 : 0; labelEls[n].classList.toggle('lit', lit);
+      v.copy(m.position); v.y = m.position.z < -5 ? 1.35 : -0.9; v.project(cam); labelEls[n].style.left = ((v.x + 1) / 2 * 1920) + 'px'; labelEls[n].style.top = ((1 - v.y) / 2 * 1080 + (m.position.z < -5 ? -46 : 40)) + 'px'; });
+    renderer.render(sc, cam); requestAnimationFrame(frame);
+  }
+  frame();
+}
+</script>
+</body>
+</html>
