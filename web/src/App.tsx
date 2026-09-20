@@ -3,6 +3,7 @@ import { makeApi, type Api } from "./api";
 import { loadConfig, type Config } from "./config";
 import { ArchivedRunCard, IncidentCard, JudgeCard, TallyStrip } from "./components/NightBoard";
 import { Analytics } from "./components/Analytics";
+import { Landing } from "./components/Landing";
 import { Announce, Footer, HelpFab, Toasts, useToasts } from "./components/Chrome";
 import { Marquee } from "./components/Marquee";
 import { Contracts } from "./components/Contracts";
@@ -15,7 +16,7 @@ import { computeAnalytics } from "./analytics";
 import type { Analytics as AnalyticsData, Contract, Health, Incident, Safety as SafetyData, Tally } from "./types";
 import { chooseStt } from "./voice/stt";
 
-type Route = "board" | "analytics" | "contracts" | "safety";
+type Route = "home" | "board" | "analytics" | "contracts" | "safety";
 
 /** "Run the night" (local mode): the engineer's lines for the first incident. */
 const NIGHT_SCRIPT = ["can you fix it", "approve fix 1", "yes", "grant contract for seven days"];
@@ -29,7 +30,10 @@ const NIGHT_LABEL: Record<Exclude<Night, null>, string> = {
 function useRoute(): [Route, (r: Route) => void] {
   const read = (): Route => {
     const h = window.location.hash.replace("#", "");
-    return h === "contracts" || h === "safety" || h === "analytics" ? h : "board";
+    if (h === "contracts" || h === "safety" || h === "analytics" || h === "board") return h;
+    // the scripted demo (`?night=1`) opens the board directly; everything else lands on the home page
+    if (h === "" && new URLSearchParams(window.location.search).get("night") === "1") return "board";
+    return h === "" || h === "home" ? "home" : "board";
   };
   const [route, setRoute] = useState<Route>(read);
   useEffect(() => {
@@ -86,6 +90,14 @@ export default function App() {
   // route change: back to the top; the main content rises in (CSS)
   useEffect(() => {
     window.scrollTo({ top: 0 });
+    const titles: Record<Route, string> = {
+      home: "Beacon Night Shift — the 3 AM page, fixed with your voice",
+      board: "Night Board · Beacon Night Shift",
+      analytics: "Analytics · Beacon Night Shift",
+      contracts: "Sleep Contracts · Beacon Night Shift",
+      safety: "Safety · Beacon Night Shift",
+    };
+    document.title = titles[route];
   }, [route]);
   // In replay, ages are relative to the recording (the last event), not to today.
   const now = useMemo(() => {
@@ -236,7 +248,7 @@ export default function App() {
         <Announce text={`Live on AWS · ${config.region}${healthQ.data?.version ? ` · v${healthQ.data.version}` : ""} · Judge passcode in the submission`} href="#safety" />
       ) : null}
       <header className={`topbar${menuOpen ? " open" : ""}`} ref={topbarRef}>
-        <a className="brand" href="#board" aria-label="Beacon Night Shift, Night Board">
+        <a className="brand" href="#home" aria-label="Beacon Night Shift, home">
           <span className="dot" />
           Beacon <span className="sub">Night Shift</span>
         </a>
@@ -246,6 +258,9 @@ export default function App() {
           <span />
         </button>
         <nav className="nav" id="site-nav" aria-label="Sections" ref={navRef}>
+          <a href="#home" className={route === "home" ? "active" : ""} aria-current={route === "home" ? "page" : undefined}>
+            Home
+          </a>
           <a href="#board" className={route === "board" ? "active" : ""} aria-current={route === "board" ? "page" : undefined}>
             Night Board
           </a>
@@ -272,7 +287,9 @@ export default function App() {
         </div>
       </header>
 
-      {route === "board" ? (
+      {route === "home" ? (
+        <Landing tally={tally} local={!!config?.local} onRunNight={localApi ? () => (window.location.href = `${window.location.pathname}?night=1#board`) : undefined} />
+      ) : route === "board" ? (
         <main key="board" className={`main route-in${current ? " two-col" : ""}`}>
           <section className="stack">
             <TallyStrip tally={tally} />
