@@ -1,0 +1,16 @@
+$ git clone https://github.com/Prashant-thakur77/Beacon.git && cd Beacon
+$ make setup
+uv venv --python 3.12 --allow-existing .venv
+uv pip install --python .venv/bin/python -e ".[agent,dev]"
+cd web && npm ci --silent
+Done. Next: make local   (or bash scripts/gate.sh)
+
+$ bash scripts/gate.sh
+All checks passed!
+244 passed in 27.35s
+GATE PASSED
+
+$ make local
+==> http://localhost:8000  (passcode: local). Ctrl-C to stop.
+    http://localhost:8000/?night=1 plays the whole night unattended.
+INFO:     Uvicorn running on http://127.0.0.1:8000

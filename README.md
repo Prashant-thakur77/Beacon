@@ -2,6 +2,14 @@
 
 **The on-call agent that fixes the 3 AM page with your voice — and the second time it happens, does not wake you at all.**
 
+[![CI](https://github.com/Prashant-thakur77/Beacon/actions/workflows/build.yaml/badge.svg)](https://github.com/Prashant-thakur77/Beacon/actions/workflows/build.yaml)
+[![Release](https://img.shields.io/github/v/release/Prashant-thakur77/Beacon?label=release)](https://github.com/Prashant-thakur77/Beacon/releases/latest)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12-3776ab)](pyproject.toml)
+[![Built on AWS](https://img.shields.io/badge/built%20on-AWS-ff9900)](docs/architecture.md)
+
+**Live console:** http://beacon-console-283146810291-us-east-1.s3-website-us-east-1.amazonaws.com · **Demo film:** [3-minute cut](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.2.0/Beacon-Night-Shift-3min.mp4) · [full cut](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.2.0/Beacon-Night-Shift-full.mp4) · **Architecture:** [docs/architecture.md](docs/architecture.md) (Mermaid) · **Try it locally:** `make setup && make local`
+
 It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. You need four answers: *is it real, what changed, what do I do, can I go back to sleep.*
 
 Beacon reads the logs on Amazon Bedrock, finds the CloudTrail change that caused the outage, proves it against a golden snapshot, proposes one allowlisted fix, dry-runs it under a locked-down role, and waits for your word. You say **"approve fix one"** into your browser. A Step Functions loop applies the fix and refuses to say *recovered* until CloudWatch agrees. Then Beacon asks: *handle this myself next time?* You say yes, for a week. That sentence becomes a **Sleep Contract**: a scoped, expiring standing approval, with your own words as the record. The next time the same thing breaks, Beacon fixes it, verifies it, and emails you in the morning. Zero humans woken.
@@ -112,7 +120,9 @@ make set-passcode PASSCODE=<word> && make deploy-console   # S3 + CloudFront + v
 make break-demo                                    # revoke the RDS rule; the alarm fires in 2-3 min
 ```
 
-Then open the console URL. Full runbook with expected outputs: [`docs/human-runbook.md`](docs/human-runbook.md). Prerequisites: Bedrock model access for Nova 2 Lite and Nova 2 Multimodal Embeddings, and a CloudTrail trail in the region (the change ledger listens to EventBridge).
+Then open the console URL. Full runbook with expected outputs: [`docs/human-runbook.md`](docs/human-runbook.md). The same steps run from GitHub Actions: **Actions → Deploy → Run workflow** (`.github/workflows/deploy.yaml`, OIDC role + passcode as secrets).
+
+New AWS accounts sit under a verification hold for a while: CloudFront and Bedrock refuse to create/serve until it clears. `make deploy-console USE_CLOUDFRONT=false` serves the console from S3 website hosting in the meantime (HTTP, typed input; flip the flag back for HTTPS and the mic). Prerequisites: Bedrock model access for Nova 2 Lite and Nova 2 Multimodal Embeddings, and a CloudTrail trail in the region (the change ledger listens to EventBridge).
 
 Operator shortcuts: `make propose`, `make approve FIX=1`, `make replay-approval APPROVAL=<id>` (proves idempotency), `make demo-reset`, `make demo-sleep` (a real second outage), `make demo-rehearse` (the whole cycle unattended), `make apply-off`.
 
@@ -140,7 +150,9 @@ demo/                   the patient: VPC + RDS + Fargate app + alarm, and the st
 requirements/           pinned image dependencies (triage.txt, agent.txt)
 scripts/                gate.sh · commit.sh · local_server.py (make local) · preflight, capture, replay builders
 tests/                  244 tests: moto for AWS, FakeAgent for the model, template safety + ops, local mode
-docs/                   safety.md · human-runbook.md · demo-script.md · submission.md · blog.md · LEARNINGS.md
+docs/                   architecture.md (Mermaid) · safety.md · human-runbook.md · demo-script.md · submission.md · blog.md · LEARNINGS.md
+video/                  how the demo film is generated (Chatterbox narration, three.js scenes, Playwright captures, ffmpeg)
+.github/                CI (gate + console build), manual Deploy workflow, issue/PR templates
 ```
 
 ## Development
