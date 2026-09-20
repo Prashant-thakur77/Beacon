@@ -400,3 +400,44 @@ def test_redact_leaves_uuids_with_numeric_segments_alone() -> None:
     assert "123456789012" not in out["arn"] and "123456789012" not in out["note"]
     assert "658469239225a" in out["note"] and "658469239225-1" in out["note"]
     assert out["sg"] == "sg-058469239225"
+
+
+def test_postmortem_audit_and_report_routes(env: Any) -> None:
+    from beacon import approvals
+
+    incident_id = env["a"]
+    approvals.create(
+        incident_id,
+        "sg.restore_ingress",
+        {"group_id": "sg-1"},
+        source="voice",
+        channel="typed",
+        transcript_quote="approve fix 1",
+        table_name=APPROVALS,
+    )
+    pm = dashboard_api.handler(
+        url_event("GET", f"/incidents/{incident_id}/postmortem"), None
+    )
+    assert pm["statusCode"] == 200
+    assert pm["headers"]["Content-Type"].startswith("text/markdown")
+    assert "# Postmortem" in pm["body"] and '"approve fix 1"' in pm["body"]
+    assert "grant contract for seven days" in pm["body"]  # the fixture's contract
+
+    au = json.loads(dashboard_api.handler(url_event("GET", "/audit"), None)["body"])
+    assert sorted(r["kind"] for r in au["rows"]) == ["approval", "contract"]
+    assert au["count"] == 2
+    ev = url_event("GET", "/audit")
+    ev["rawQueryString"] = "format=csv"
+    ev["queryStringParameters"] = {"format": "csv"}
+    csv = dashboard_api.handler(ev, None)
+    assert csv["headers"]["Content-Type"].startswith("text/csv")
+    assert "approve fix 1" in csv["body"]
+
+    rep = json.loads(
+        dashboard_api.handler(url_event("GET", "/report/latest"), None)["body"]
+    )
+    assert "night_of" in rep and "Good morning" in rep["text"]
+    missing = dashboard_api.handler(
+        url_event("GET", "/incidents/nope/postmortem"), None
+    )
+    assert missing["statusCode"] == 404

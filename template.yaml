@@ -158,6 +158,7 @@ Conditions:
   ScheduleEnabled: !Equals [!Ref EnableSchedule, "true"]
   AlarmEnabled: !Equals [!Ref EnableAlarmTrigger, "true"]
   AlarmPrefixProvided: !Not [!Equals [!Ref AlarmNamePrefix, ""]]
+  IncidentsOn: !Equals [!Ref IncidentsEnabled, "true"]
   SubscriptionEnabled: !Equals [!Ref EnableSubscription, "true"]
   SubscriptionLogGroupProvided: !Not [!Equals [!Ref SubscriptionLogGroup, ""]]
 
@@ -365,6 +366,29 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt BeaconScheduleRule.Arn
+
+  # --- Morning report: 07:00 IST (01:30 UTC), the night just ended, via SNS ---
+
+  BeaconMorningReportRule:
+    Type: AWS::Events::Rule
+    Condition: IncidentsOn
+    Properties:
+      Description: Beacon morning report for last night
+      ScheduleExpression: cron(30 1 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt BeaconFunction.Arn
+          Id: BeaconMorningReport
+          Input: '{"mode": "morning_report"}'
+
+  BeaconMorningReportPermission:
+    Type: AWS::Lambda::Permission
+    Condition: IncidentsOn
+    Properties:
+      FunctionName: !Ref BeaconFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt BeaconMorningReportRule.Arn
 
   # --- Alarm Trigger ---
 

@@ -24,7 +24,7 @@ from aws_lambda_powertools.event_handler import (
     Response,
 )
 
-from beacon import contracts, store
+from beacon import contracts, reports, store
 from beacon.remediation import registry
 
 logger = logging.getLogger(__name__)
@@ -606,6 +606,64 @@ def tally() -> Response[str]:
 def analytics() -> Response[str]:
     live = contracts.list_active(table_name=_env("CONTRACTS_TABLE_NAME"))
     return _json(200, build_analytics(_all_incidents(), live))
+
+
+def _all_approvals() -> list[dict[str, Any]]:
+    table = _env("APPROVALS_TABLE_NAME")
+    if not table:
+        return []
+    return [
+        r
+        for r in contracts._scan(table, boto3.client("dynamodb"))
+        if r.get("kind") in (None, "approval")
+    ]
+
+
+def _all_contracts() -> list[dict[str, Any]]:
+    table = _env("CONTRACTS_TABLE_NAME")
+    return contracts._scan(table, boto3.client("dynamodb")) if table else []
+
+
+@app.get("/incidents/<incident_id>/postmortem")
+def postmortem(incident_id: str) -> Response[str]:
+    """A deterministic Markdown postmortem for one incident (no model call)."""
+    row = store.get_incident(incident_id, table_name=_env("INCIDENTS_TABLE_NAME"))
+    if not row:
+        return _json(404, {"error": "not found"})
+    md = reports.postmortem(row, contracts=_all_contracts(), approvals=_all_approvals())
+    return Response(
+        status_code=200,
+        content_type="text/markdown; charset=utf-8",
+        body=str(redact(md)),
+    )
+
+
+@app.get("/audit")
+def audit() -> Response[str]:
+    """Every consent record with the words that granted it; ``?format=csv``."""
+    rows = reports.audit(
+        approvals=_all_approvals(),
+        contracts=_all_contracts(),
+        incidents=_all_incidents(),
+    )
+    fmt = (app.current_event.query_string_parameters or {}).get("format", "json")
+    if fmt == "csv":
+        return Response(
+            status_code=200,
+            content_type="text/csv; charset=utf-8",
+            body=str(redact(reports.audit_csv(rows))),
+        )
+    return _json(200, {"rows": rows, "count": len(rows)})
+
+
+@app.get("/report/latest")
+def report_latest() -> Response[str]:
+    """The morning report for the night that just ended (or ``?night=YYYY-MM-DD``)."""
+    night = (app.current_event.query_string_parameters or {}).get("night")
+    live = contracts.list_active(table_name=_env("CONTRACTS_TABLE_NAME"))
+    return _json(
+        200, reports.morning_report(_all_incidents(), contracts=live, night_of=night)
+    )
 
 
 @app.get("/contracts")

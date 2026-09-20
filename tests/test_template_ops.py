@@ -181,3 +181,15 @@ def test_public_function_urls_have_both_permissions(
         }
         assert ("lambda:InvokeFunctionUrl", "NONE", None) in actions, fn
         assert ("lambda:InvokeFunction", None, True) in actions, fn
+
+
+def test_morning_report_is_scheduled_at_seven_ist(
+    stacks: dict[str, dict[str, Any]],
+) -> None:
+    base = stacks["template.yaml"]["Resources"]
+    rule = base["BeaconMorningReportRule"]["Properties"]
+    assert rule["ScheduleExpression"] == "cron(30 1 * * ? *)"  # 07:00 IST
+    target = rule["Targets"][0]
+    assert '"mode": "morning_report"' in target["Input"]
+    perm = base["BeaconMorningReportPermission"]["Properties"]
+    assert perm["Principal"] == "events.amazonaws.com"

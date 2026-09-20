@@ -110,10 +110,39 @@ def _configure_logging() -> None:
         logging.getLogger(name).setLevel(logging.WARNING)
 
 
+def _morning_report(event: dict[str, Any], config: BeaconConfig) -> dict[str, Any]:
+    """The 07:00 IST schedule: summarise last night and email it via SNS."""
+    import boto3
+
+    from beacon import contracts, dashboard_api, reports
+
+    rows = dashboard_api._scan_incidents(config.incidents_table_name)
+    live = contracts.list_active(table_name=os.environ.get("CONTRACTS_TABLE_NAME", ""))
+    report = reports.morning_report(
+        rows, contracts=live, night_of=event.get("night_of")
+    )
+    link = _dashboard_link(config)
+    body = report["text"] + (f"\n\nNight Board: {link}" if link else "")
+    boto3.client("sns").publish(
+        TopicArn=config.sns_topic_arn, Subject=report["subject"][:100], Message=body
+    )
+    logger.info(
+        "morning report sent for %s (%d incidents)",
+        report["night_of"],
+        report["incidents"],
+    )
+    return {
+        "mode": "morning_report",
+        **{k: v for k, v in report.items() if k != "text"},
+    }
+
+
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Lambda entry point: analyse logs, notify via SNS, store the incident."""
     _configure_logging()
     config = BeaconConfig.from_env()
+    if isinstance(event, dict) and event.get("mode") == "morning_report":
+        return _morning_report(event, config)
     trigger = parse_event(event, config)
     timeline: list[dict[str, Any]] = [
         _event(
