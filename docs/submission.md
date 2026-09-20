@@ -2,7 +2,9 @@
 
 *Paste into the First Commit form. Replace the bracketed links.*
 
-**Live URL:** [CloudFront URL] (passcode for judges: [word]) · **Repo:** [GitHub URL] · **Video:** [YouTube URL] · **Blog:** [Builder Center URL]
+**Live URL:** http://beacon-console-283146810291-us-east-1.s3-website-us-east-1.amazonaws.com (passcode for judges: `nightshift`) · **Repo:** https://github.com/Prashant-thakur77/Beacon · **Video:** [YouTube URL — also attached to the v0.2.0 release] · **Blog:** [Builder Center URL]
+
+> Honest note for judges (20 Sep): the AWS account is eight days old and still under AWS's new-account verification, which blocks Bedrock model access and CloudFront creation regardless of code. Everything else is deployed and exercised on the account: the demo workload, the real alarm firing, the triage Lambda running to the model call, the remediator role dry run passing, the Function URLs and the console. The `make local` mode (`?night=1`) shows the complete loop with the model scripted; the film uses it for the demo section and shows the real account's CLI output for the deployment.
 
 ## The problem
 
