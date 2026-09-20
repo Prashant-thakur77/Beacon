@@ -250,6 +250,86 @@ Resources:
             Action: s3:GetObject
             Resource: !Sub "${BeaconConsoleBucket.Arn}/*"
 
+  # ---------- HTTPS console without CloudFront: a Function URL proxying the bucket ----------
+
+  BeaconSiteRole:
+    Type: AWS::IAM::Role
+    Condition: UseS3Website
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BeaconSiteRead
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub "${BeaconConsoleBucket.Arn}/*"
+
+  BeaconSiteLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: UseS3Website
+    Properties:
+      LogGroupName: !Sub "/beacon/${BaseStackName}/site"
+      RetentionInDays: 14
+
+  BeaconSiteFunction:
+    Type: AWS::Lambda::Function
+    Condition: UseS3Website
+    Properties:
+      FunctionName: !Sub "beacon-site-${BaseStackName}"
+      PackageType: Image
+      Architectures:
+        - !Ref LambdaArchitecture
+      Code:
+        ImageUri: !Ref AgentImageUri
+      ImageConfig:
+        Command: ["beacon.static_site.handler"]
+      Role: !GetAtt BeaconSiteRole.Arn
+      MemorySize: 512
+      Timeout: 10
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref BeaconSiteLogGroup
+      Environment:
+        Variables:
+          CONSOLE_BUCKET: !Ref BeaconConsoleBucket
+          POWERTOOLS_SERVICE_NAME: beacon-site
+          LITELLM_LOCAL_MODEL_COST_MAP: "True"
+
+  BeaconSiteUrl:
+    Type: AWS::Lambda::Url
+    Condition: UseS3Website
+    Properties:
+      TargetFunctionArn: !GetAtt BeaconSiteFunction.Arn
+      AuthType: NONE
+
+  BeaconSiteUrlPermission:
+    Type: AWS::Lambda::Permission
+    Condition: UseS3Website
+    Properties:
+      FunctionName: !Ref BeaconSiteFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+  BeaconSiteUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: UseS3Website
+    Properties:
+      FunctionName: !Ref BeaconSiteFunction
+      Action: lambda:InvokeFunction
+      Principal: "*"
+      InvokedViaFunctionUrl: true
+
   # ---------- Voice turn (read-only agent role) ----------
 
   BeaconVoiceTurnRole:
@@ -429,6 +509,10 @@ Resources:
             - UseCloudFront
             - !Sub "https://${BeaconConsoleDistribution.DomainName}"
             - !Sub "http://${BeaconConsoleBucket}.s3-website-${AWS::Region}.amazonaws.com"
+          - !If
+            - UseS3Website
+            - !Join ["", ["https://", !Select [0, !Split ["/", !Select [1, !Split ["https://", !GetAtt BeaconSiteUrl.FunctionUrl]]]]]]
+            - http://localhost:5173
           - http://localhost:5173
         AllowHeaders: ["content-type", "x-beacon-passcode"]
         AllowMethods: [GET, POST]
@@ -566,6 +650,10 @@ Resources:
             - UseCloudFront
             - !Sub "https://${BeaconConsoleDistribution.DomainName}"
             - !Sub "http://${BeaconConsoleBucket}.s3-website-${AWS::Region}.amazonaws.com"
+          - !If
+            - UseS3Website
+            - !Join ["", ["https://", !Select [0, !Split ["/", !Select [1, !Split ["https://", !GetAtt BeaconSiteUrl.FunctionUrl]]]]]]
+            - http://localhost:5173
           - http://localhost:5173
         AllowHeaders: ["content-type", "x-beacon-passcode"]
         AllowMethods: [GET, POST, DELETE]
@@ -635,6 +723,11 @@ Outputs:
     Value: !If
       - UseCloudFront
       - !Sub "https://${BeaconConsoleDistribution.DomainName}"
+      - !GetAtt BeaconSiteUrl.FunctionUrl
+  ConsoleHttpUrl:
+    Value: !If
+      - UseCloudFront
+      - "none"
       - !Sub "http://${BeaconConsoleBucket}.s3-website-${AWS::Region}.amazonaws.com"
   VoiceTurnUrl:
     Value: !GetAtt BeaconVoiceTurnUrl.FunctionUrl

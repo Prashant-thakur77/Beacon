@@ -142,8 +142,13 @@ def test_function_urls_only_accept_the_console_origin(
 ) -> None:
     console = stacks["console-template.yaml"]
     urls = _resources(console, "AWS::Lambda::Url")
-    assert len(urls) == 2
+    assert (
+        len(urls) == 3
+    )  # voice, dashboard, and the HTTPS site proxy (no CORS: same origin)
     for name, url in urls.items():
+        if "Cors" not in url["Properties"]:
+            assert name == "BeaconSiteUrl"
+            continue
         cors = url["Properties"]["Cors"]
         assert "*" not in cors["AllowOrigins"], f"{name}: wildcard origin"
         assert any(
@@ -160,7 +165,11 @@ def test_public_function_urls_have_both_permissions(
     """AuthType NONE needs InvokeFunctionUrl and InvokeFunction via the URL."""
     console = stacks["console-template.yaml"]
     perms = _resources(console, "AWS::Lambda::Permission")
-    for fn in ("BeaconVoiceTurnFunction", "BeaconDashboardFunction"):
+    for fn in (
+        "BeaconVoiceTurnFunction",
+        "BeaconDashboardFunction",
+        "BeaconSiteFunction",
+    ):
         mine = [
             p["Properties"]
             for p in perms.values()
