@@ -1,5 +1,7 @@
 import { formatAge, formatStamp } from "../hooks";
 import type { Incident, Tally } from "../types";
+import { useCountUp } from "../motion";
+import { Marquee } from "./Marquee";
 import { Timeline } from "./Timeline";
 
 const STATUS: Record<string, { label: string; cls: string; pulse?: boolean }> = {
@@ -37,27 +39,32 @@ function inr(v: number | undefined): string {
 }
 
 export function TallyStrip({ tally }: { tally: Tally | null }) {
-  const median = tally?.median_minutes_to_recovery;
+  // the numbers count up over 600 ms when they change (serif, tabular digits)
+  const resolved = useCountUp(tally?.resolved);
+  const median = useCountUp(tally?.median_minutes_to_recovery);
+  const woken = useCountUp(tally?.humans_woken);
+  const cost = useCountUp(tally?.cost_inr_per_incident);
+  const sleep = useCountUp(tally?.sleep_protected_hours);
   return (
-    <div className="tally">
-      <div className="tile">
-        <div className="n">{tally ? tally.resolved : "–"}</div>
+    <div className="tally reveal in">
+      <div className="tile" style={{ "--i": 0 } as React.CSSProperties}>
+        <div className="n">{resolved == null ? "–" : Math.round(resolved)}</div>
         <div className="l">incidents resolved</div>
       </div>
-      <div className="tile">
+      <div className="tile" style={{ "--i": 1 } as React.CSSProperties}>
         <div className="n">{median == null ? "–" : median < 1 ? `${Math.round(median * 60)} s` : `${Math.round(median * 10) / 10} min`}</div>
         <div className="l">median time to recovery</div>
       </div>
-      <div className="tile moon">
-        <div className="n">{tally ? tally.humans_woken : "–"}</div>
+      <div className="tile moon" style={{ "--i": 2 } as React.CSSProperties}>
+        <div className="n">{woken == null ? "–" : Math.round(woken)}</div>
         <div className="l">humans woken</div>
       </div>
-      <div className="tile">
-        <div className="n">{tally ? inr(tally.cost_inr_per_incident) : "–"}</div>
+      <div className="tile" style={{ "--i": 3 } as React.CSSProperties}>
+        <div className="n">{cost == null ? "–" : inr(cost)}</div>
         <div className="l">model cost per incident</div>
       </div>
-      <div className="tile moon">
-        <div className="n">{tally?.sleep_protected_hours != null ? `${tally.sleep_protected_hours} h` : "–"}</div>
+      <div className="tile moon" style={{ "--i": 4 } as React.CSSProperties}>
+        <div className="n">{sleep == null ? "–" : `${Math.round(sleep * 10) / 10} h`}</div>
         <div className="l">sleep protected · night IST</div>
       </div>
     </div>
@@ -71,6 +78,7 @@ export function IncidentCard({
   open,
   onSelect,
   onToggle,
+  index = 0,
 }: {
   incident: Incident;
   now: Date;
@@ -78,13 +86,15 @@ export function IncidentCard({
   open: boolean;
   onSelect: () => void;
   onToggle: () => void;
+  index?: number;
 }) {
   const rca = incident.rca_json ?? {};
   const sev = rca.status ?? "?";
   const sevCls = sev === "Critical" || sev === "High" ? "red" : sev === "Medium" ? "amber" : "dim";
   return (
     <div
-      className={`card${selected ? " selected" : ""}${open ? " open" : ""}`}
+      className={`card rise${selected ? " selected" : ""}${open ? " open" : ""}`}
+      style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
       onClick={onSelect}
       role="button"
       tabIndex={0}
@@ -165,7 +175,7 @@ export function JudgeCard({ hasPasscode, open, onRunNight }: { hasPasscode: bool
         <div>
           <b>What it is.</b> An on-call agent for AWS. An alarm fires → Beacon finds the root cause on Bedrock and the CloudTrail change behind it → you talk to it
           in this browser → it proposes one allowlisted fix, dry-runs it, and applies it only when you say <span className="mono">approve fix one</span> → a Step
-          Functions loop proves the recovery → you can grant a <span style={{ color: "var(--lilac)" }}>Sleep Contract</span> so the repeat never wakes you.
+          Functions loop proves the recovery → you can grant a <span className="moon">Sleep Contract</span> so the repeat never wakes you.
         </div>
         <ol className="rules">
           <li>
@@ -182,6 +192,7 @@ export function JudgeCard({ hasPasscode, open, onRunNight }: { hasPasscode: bool
         <div className="faint">
           Reads are public and redacted (no account ids). Writes need the passcode and are limited to the two allowlisted actions on tagged demo resources.
         </div>
+        <Marquee />
       </div>
     </details>
   );

@@ -7,6 +7,7 @@ import { Contracts } from "./components/Contracts";
 import { Safety } from "./components/Safety";
 import { Talk } from "./components/Talk";
 import { useClock, useLocalState, usePoll } from "./hooks";
+import { useNavIndicator, useReveal, useScrolled } from "./motion";
 import { loadReplay, type ReplayBundle } from "./replay";
 import { computeAnalytics } from "./analytics";
 import type { Analytics as AnalyticsData, Contract, Health, Incident, Safety as SafetyData, Tally } from "./types";
@@ -45,6 +46,9 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const wall = useClock();
+  const scrolled = useScrolled();
+  const navRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
   const stt = useMemo(() => chooseStt(), []);
   // In replay, ages are relative to the recording (the last event), not to today.
   const now = useMemo(() => {
@@ -82,6 +86,8 @@ export default function App() {
   const tally: Tally | null = replay ? replay.tally : tallyQ.data;
   const contracts: Contract[] = replay ? replay.contracts : contractsQ.data?.contracts ?? [];
   const safety: SafetyData | null = replay ? replay.safety : safetyQ.data;
+  useNavIndicator(navRef, `${route}:${contracts.length}`);
+  useReveal(mainRef, [route, incidents.length, contracts.length, !!safety, !!replay]);
   // Analytics: the API's aggregation when it has it; otherwise the same maths in the browser
   // (replay bundles, and a deployed API that predates GET /analytics).
   const analytics = useMemo<{ data: AnalyticsData | null; loading: boolean; source: "api" | "computed" | "replay" }>(() => {
@@ -170,13 +176,13 @@ export default function App() {
   }, [night, localApi]);
 
   return (
-    <div className="shell">
+    <div className={`shell${scrolled ? " scrolled" : ""}`} ref={mainRef}>
       <header className="topbar">
         <a className="brand" href="#board" aria-label="Beacon Night Shift, Night Board">
           <span className="dot" />
           Beacon <span className="sub">Night Shift</span>
         </a>
-        <nav className="nav" aria-label="Sections">
+        <nav className="nav" aria-label="Sections" ref={navRef}>
           <a href="#board" className={route === "board" ? "active" : ""} aria-current={route === "board" ? "page" : undefined}>
             Night Board
           </a>
@@ -237,9 +243,10 @@ export default function App() {
                   <ArchivedRunCard onReplay={startReplay} />
                 </div>
               ) : (
-                incidents.map((i) => (
+                incidents.map((i, idx) => (
                   <IncidentCard
                     key={i.incident_id}
+                    index={idx}
                     incident={i.incident_id === current?.incident_id ? current : i}
                     now={now}
                     selected={i.incident_id === selectedId}

@@ -282,7 +282,7 @@ function Lines({
   return (
     <svg className="plot" viewBox={`0 0 ${W} ${H}`} role="img">
       <Baseline max={max} unit={unit} W={W} />
-      {series.map((s) => {
+      {series.map((s, si) => {
         const d = path(s.values);
         const last = [...s.values].reverse().findIndex((v) => v != null);
         const lastIdx = last < 0 ? -1 : s.values.length - 1 - last;
@@ -296,9 +296,16 @@ function Lines({
                   <title>{`${labels[i]} · ${s.name}: ${unit ? unit(v) : v}`}</title>
                   <circle className="dot" cx={cx(i)} cy={y(v)} r={single || i === lastIdx ? 4 : 3} />
                   {i === lastIdx ? (
-                    <text className="val" x={cx(i)} y={y(v) - 8} textAnchor={i === labels.length - 1 && labels.length > 1 ? "end" : "middle"}>
-                      {unit ? unit(v) : v}
-                    </text>
+                    // the first (secondary) series labels beside its dot so two close values never collide
+                    si === 0 && series.length > 1 ? (
+                      <text className="val" x={cx(i) + (i === labels.length - 1 && labels.length > 1 ? -9 : 9)} y={y(v) + 4} textAnchor={i === labels.length - 1 && labels.length > 1 ? "end" : "start"}>
+                        {unit ? unit(v) : v}
+                      </text>
+                    ) : (
+                      <text className="val" x={cx(i)} y={y(v) - 8} textAnchor={i === labels.length - 1 && labels.length > 1 ? "end" : "middle"}>
+                        {unit ? unit(v) : v}
+                      </text>
+                    )
                   ) : null}
                 </g>
               ),
@@ -374,7 +381,7 @@ export function Analytics({ data, loading, source, now }: { data: AnalyticsData 
         </span>
       </div>
 
-      <div className="kpis">
+      <div className="kpis rise">
         <div className="tile">
           <div className="n">{minutes(data?.recovery.p50_minutes)}</div>
           <div className="l">median time to recovery</div>

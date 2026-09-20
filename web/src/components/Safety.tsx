@@ -1,4 +1,5 @@
 import type { Safety as SafetyData } from "../types";
+import { Marquee } from "./Marquee";
 
 const IAM_SG = `{
   "Sid": "RestoreIngressOnTaggedGroups",
@@ -18,6 +19,7 @@ export function Safety({ safety }: { safety: SafetyData | null }) {
   const flags = safety?.apply_enabled ?? {};
   return (
     <div className="stack">
+      <Marquee />
       <div className="panel">
         <div className="panel-h">
           <h2>Kill switch</h2>

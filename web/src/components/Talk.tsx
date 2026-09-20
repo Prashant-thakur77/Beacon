@@ -360,7 +360,7 @@ export function Talk({
         <div className="panel-b stack">
           <div className="mic-wrap">
             <button
-              className={`mic${state === "listening" ? " live" : ""}${state === "speaking" ? " speaking" : ""}`}
+              className={`mic${state === "listening" ? " live" : ""}${state === "speaking" ? " speaking" : ""}${state === "thinking" ? " thinking" : ""}`}
               onPointerDown={startListening}
               onPointerUp={stopListening}
               onPointerLeave={() => state === "listening" && void stopListening()}
@@ -368,11 +368,29 @@ export function Talk({
               aria-label="Hold to talk"
               title="Hold to talk"
             >
-              {state === "speaking" ? "◉" : "🎙"}
+              {state === "listening" ? (
+                <span className="wave" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              ) : state === "speaking" ? (
+                "◉"
+              ) : (
+                "🎙"
+              )}
             </button>
             <div className="stack" style={{ gap: 4 }}>
-              <div className={`state ${state}`} role="status">{stateLabel[state]}</div>
-              <div className="partial">{partial || (state === "listening" ? "…" : unlocked || replayTurns ? "hold the mic and speak, or type below" : "enter the passcode on the left to talk")}</div>
+              <div className={`state ${state}`} role="status">
+                <span key={state} className="state-text">
+                  {stateLabel[state]}
+                </span>
+              </div>
+              <div className={`partial${partial ? " ribbon" : ""}`} key={partial ? "p" : "hint"}>
+                {partial || (state === "listening" ? "…" : unlocked || replayTurns ? "hold the mic and speak, or type below" : "enter the passcode on the left to talk")}
+              </div>
               <div className="row small">
                 <label className="faint small" htmlFor="stt-select">mic</label>
                 <select className="input" style={{ width: "auto", padding: "4px 8px" }} value={activeStt} onChange={(e) => setActiveStt(e.target.value as SttChoice)} id="stt-select">
