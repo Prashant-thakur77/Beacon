@@ -391,6 +391,7 @@ def _url_event(request: Request, body: bytes, prefix: str) -> dict[str, Any]:
         "routeKey": "$default",
         "rawPath": path,
         "rawQueryString": request.url.query,
+        "queryStringParameters": dict(request.query_params) or None,
         "headers": {k.lower(): v for k, v in request.headers.items()},
         "requestContext": {
             "http": {"method": request.method, "path": path, "sourceIp": "127.0.0.1"},

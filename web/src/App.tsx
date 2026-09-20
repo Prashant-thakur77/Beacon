@@ -187,13 +187,20 @@ export default function App() {
   const tally: Tally | null = replay ? replay.tally : tallyQ.data;
   const contracts: Contract[] = replay ? replay.contracts : contractsQ.data?.contracts ?? [];
   const safety: SafetyData | null = replay ? replay.safety : safetyQ.data;
-  const audit: AuditRow[] | null = replay ? auditRows(replay.incidents, replay.contracts) : auditQ.data?.rows ?? (auditQ.error ? auditRows(incidents, contracts) : null);
-  const report: MorningReport | null = replay ? morningReport(replay.incidents, replay.contracts, reportNight ?? undefined) : reportQ.data ?? (reportQ.error ? morningReport(incidents, contracts, reportNight ?? undefined) : null);
+  // Replay prefers what the server rendered at export time; browser mirrors cover older bundles and a pre-feature API.
+  const audit: AuditRow[] | null = replay ? replay.audit ?? auditRows(replay.incidents, replay.contracts) : auditQ.data?.rows ?? (auditQ.error ? auditRows(incidents, contracts) : null);
+  const report: MorningReport | null = replay
+    ? replay.report && (!reportNight || reportNight === replay.report.night_of)
+      ? replay.report
+      : morningReport(replay.incidents, replay.contracts, reportNight ?? undefined)
+    : reportQ.data ?? (reportQ.error ? morningReport(incidents, contracts, reportNight ?? undefined) : null);
   const postmortemFallback = useCallback(() => {
     if (!deepId) return null;
+    const served = replay?.postmortems?.[deepId];
+    if (served) return served;
     const inc = incidents.find((i) => i.incident_id === deepId);
     return inc ? postmortemMd(inc, contracts) : null;
-  }, [deepId, incidents, contracts]);
+  }, [deepId, incidents, contracts, replay]);
   useNavIndicator(navRef, `${route}:${contracts.length}`);
   useReveal(mainRef, [route, incidents.length, contracts.length, !!safety, !!replay]);
   // Analytics: the API's aggregation when it has it; otherwise the same maths in the browser

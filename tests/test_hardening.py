@@ -168,9 +168,13 @@ def test_image_requirement_pins_match_the_tested_environment() -> None:
         assert pins, name
         for pkg, pinned in pins:
             installed = version(pkg)
-            assert installed.split(".")[:2] == pinned.split(".")[:2], (
+            # Same major, and never older than the pin: a fresh install may resolve
+            # a newer minor (litellm ships minors weekly); the image stays pinned.
+            assert installed.split(".")[0] == pinned.split(".")[0], (
                 f"{name}: {pkg} pinned {pinned}, env {installed}; bump the pin"
             )
+            key = lambda v: tuple(int(x) for x in v.split("+")[0].split(".")[:3])  # noqa: E731
+            assert key(installed) >= key(pinned), f"{name}: {pkg} env older than pin"
 
 
 def test_triage_entry_points_do_not_import_powertools() -> None:
