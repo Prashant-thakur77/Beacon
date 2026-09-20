@@ -16,7 +16,7 @@ Beacon reads the logs on Amazon Bedrock, finds the CloudTrail change that caused
 
 Built solo in a weekend for the AWS *First Commit* hackathon. Everything below is live code with tests, not a slide.
 
-![Beacon Night Shift landing page](docs/assets/landing.png)
+![Beacon Night Shift](docs/assets/landing.gif)
 
 <table><tr>
 <td><img src="docs/assets/night-board.png" alt="Night Board" /></td>
@@ -39,7 +39,13 @@ Open <http://localhost:8000/?night=1> (or press **▶ Run the night** on the boa
 
 ## What it does, in one incident
 
+![Beacon Night Shift architecture](docs/assets/architecture.gif)
+
+<details><summary>Static diagram</summary>
+
 ![Beacon Night Shift architecture](docs/assets/architecture.svg)
+
+</details>
 
 ```
 CloudWatch alarm fires ──▶ Lambda (Nova 2 Lite on Bedrock)   RCA + change correlation

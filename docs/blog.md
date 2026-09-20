@@ -2,7 +2,7 @@
 
 *For AWS Builder Center. Repo: https://github.com/Prashant-thakur77/Beacon · Demo film: https://github.com/Prashant-thakur77/Beacon/releases/tag/v0.2.0 · Live console: https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/*
 
-![The Night Board mid-incident](https://raw.githubusercontent.com/Prashant-thakur77/Beacon/main/docs/assets/night-board.png)
+![Beacon Night Shift: the console](https://raw.githubusercontent.com/Prashant-thakur77/Beacon/main/docs/assets/landing.gif)
 
 Last weekend I built Beacon Night Shift for the First Commit hackathon: an on-call agent you talk to in the browser at 3 AM, which proposes a fix, applies it when you say the word, proves the recovery, and — if you let it — handles the same outage next time without waking you. This post is about the four decisions that made it safe enough to give write access to.
 
@@ -20,11 +20,15 @@ For the ledger I first reached for `cloudtrail:LookupEvents` and learned it lags
 
 ## 3. The model cannot approve itself
 
+!["can you fix it" → dry run → "approve fix 1"](https://raw.githubusercontent.com/Prashant-thakur77/Beacon/main/docs/assets/night.gif)
+
 The agent is a Strands `Agent` on `BedrockModel("us.amazon.nova-2-lite-v1:0")` with six plain-Python tools. `approve_fix(fix_id, confirmation_phrase)` looks like it takes the engineer's words as an argument — but the tool ignores that argument for the decision. It reads a `contextvars` `TurnContext` holding the raw transcript of the current turn (from Transcribe, or the typed box) and requires the literal `approve fix <n>`. The model can call the tool; only the human can make it succeed.
 
 A standing approval (the Sleep Contract) gets a stronger gate: the first call returns a read-back — alarm, action, exact resources, days, uses — that the agent must speak; the grant only happens on a later turn whose transcript contains `grant contract for <n> days` (or the Hinglish `saat din ke liye contract do`). "Yes" alone never grants anything. That quote is stored on the contract and on every approval it later produces.
 
 ## 4. Step Functions as the honesty layer
+
+![Every box is a service in the account](https://raw.githubusercontent.com/Prashant-thakur77/Beacon/main/docs/assets/architecture.gif)
 
 The loop is a Standard state machine: `DryRun → RequireApproval → Execute → Wait 30s → Verify` (up to six times) → `Resolve` or `Escalate`. Two details matter.
 
