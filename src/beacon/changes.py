@@ -14,7 +14,10 @@ import os
 import re
 import time
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 import boto3
 from boto3.dynamodb.types import TypeDeserializer
@@ -179,12 +182,18 @@ def recent(
     table_name: str | None = None,
     dynamodb_client: Any | None = None,
     lookup_fallback: bool = False,
+    affected_ids: Iterable[str] = (),
 ) -> list[dict[str, Any]]:
-    """Write API calls in ``[before - minutes, before]``, most destructive first.
+    """Write API calls in ``[before - minutes, before]``, most relevant first.
+
+    A change that names one of ``affected_ids`` (the resources diagnostics found
+    broken) outranks everything else, so a deploy of an unrelated Lambda never
+    hides the revoke that took the rule away. Then most destructive, then time.
 
     Reads the EventBridge-fed ledger; optionally falls back to
     ``cloudtrail:LookupEvents`` when the ledger has nothing (delivery lag).
     """
+    affected = {str(i) for i in affected_ids if i}
     end = before or datetime.now(tz=UTC)
     start = end - timedelta(minutes=minutes)
     table = table_name or os.environ.get("CHANGES_TABLE_NAME", "")
@@ -220,6 +229,7 @@ def recent(
         rows = _lookup_events(minutes, end)
     rows.sort(
         key=lambda r: (
+            0 if affected & {str(i) for i in r.get("resource_ids", [])} else 1,
             _rank(str(r.get("event_name", ""))),
             str(r.get("event_time", "")),
         )

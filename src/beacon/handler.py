@@ -195,7 +195,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
     # Deterministic sources come first: they outrank anything inferred from logs.
     diagnostics = _run_diagnostics(config, timeline)
-    change_rows = _recent_changes(trigger, config, timeline)
+    change_rows = _recent_changes(trigger, config, timeline, diagnostics)
     prefix_sections = []
     if diagnostics is not None:
         prefix_sections.append(f"[diagnostics]\n{diagnostics['text']}")
@@ -399,14 +399,34 @@ def _run_diagnostics(
     return result
 
 
+def _affected_ids(diagnostics: dict[str, Any] | None) -> list[str]:
+    """Resource ids diagnostics found broken (security groups, ECS services)."""
+    if not diagnostics:
+        return []
+    ids: list[str] = []
+    for rule in diagnostics.get("missing_rules") or []:
+        ids.extend(str(rule.get(k) or "") for k in ("group_id", "source_group_id"))
+    for svc in diagnostics.get("ecs_services") or []:
+        ids.append(str(svc.get("service") or svc.get("serviceName") or ""))
+    return [i for i in ids if i]
+
+
 def _recent_changes(
-    trigger: TriggerInfo, config: BeaconConfig, timeline: list[dict[str, Any]]
+    trigger: TriggerInfo,
+    config: BeaconConfig,
+    timeline: list[dict[str, Any]],
+    diagnostics: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]] | None:
     """Write API calls before the alarm from the ledger (LookupEvents fallback)."""
     if not config.incidents_enabled:
         return None
     try:
-        rows = changes.recent(60, before=_alarm_time(trigger), lookup_fallback=True)
+        rows = changes.recent(
+            60,
+            before=_alarm_time(trigger),
+            lookup_fallback=True,
+            affected_ids=_affected_ids(diagnostics),
+        )
     except Exception:
         logger.exception("change lookup failed")
         timeline.append(_event("changes_failed"))

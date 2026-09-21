@@ -6,6 +6,7 @@ import boto3
 import pytest
 from moto import mock_aws
 
+from beacon import changes
 from beacon.changes import ledger_handler
 
 CLOUDTRAIL_EVENT = {
@@ -112,3 +113,47 @@ def test_ledger_handler_tags_remediator_role_events(changes_table: Any) -> None:
     row = changes_table.scan(TableName="beacon-changes-test")["Items"][0]
     assert row["by_beacon"]["BOOL"] is True
     assert row["actor_short"]["S"] == "beacon remediation"
+
+
+def test_recent_ranks_changes_touching_the_affected_resource_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A Lambda deploy after the revoke must not hide the revoke on the broken SG."""
+    rows = [
+        {
+            "event_name": "RevokeSecurityGroupIngress",
+            "event_time": "2026-09-21T14:20:00Z",
+            "resource_ids": ["sg-db"],
+        },
+        {
+            "event_name": "UpdateFunctionCode20150331v2",
+            "event_time": "2026-09-21T14:47:00Z",
+            "resource_ids": [],
+        },
+        {
+            "event_name": "DeleteAlarms",
+            "event_time": "2026-09-21T14:30:00Z",
+            "resource_ids": ["other"],
+        },
+    ]
+
+    class FakeDdb:
+        def query(self, **kwargs: object) -> dict[str, object]:
+            from boto3.dynamodb.types import TypeSerializer
+
+            ser = TypeSerializer()
+            return {
+                "Items": [{k: ser.serialize(v) for k, v in r.items()} for r in rows]
+            }
+
+    out = changes.recent(
+        60, table_name="t", dynamodb_client=FakeDdb(), affected_ids=["sg-db"]
+    )
+    assert [r["event_name"] for r in out][:2] == [
+        "RevokeSecurityGroupIngress",
+        "DeleteAlarms",
+    ]
+    plain = changes.recent(60, table_name="t", dynamodb_client=FakeDdb())
+    assert (
+        plain[0]["event_name"] == "RevokeSecurityGroupIngress"
+    )  # Revoke outranks Delete

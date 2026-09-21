@@ -66,15 +66,26 @@ def plan(analysis: str, trigger: TriggerInfo, config: BeaconConfig) -> dict[str,
         f"--- INCIDENT ANALYSIS ---\n{analysis}"
     )
 
-    response: Any = litellm.completion(
-        model=config.litellm_model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        max_tokens=1024,
-        temperature=0.2,
-    )
+    try:
+        response: Any = litellm.completion(
+            model=config.litellm_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=1024,
+            temperature=0.2,
+        )
+    except Exception as exc:
+        # Same degraded path as triage: no model, no plan; the voice agent
+        # falls back to live queries. A warning, not a stack trace per incident.
+        logger.warning("Pre-fetch planner unavailable (%s); empty plan", exc)
+        return {
+            "metrics": [],
+            "log_queries": [],
+            "status_checks": [],
+            "resource_lookups": [],
+        }
     raw = str(response.choices[0].message.content).strip()
 
     # Strip markdown code fences if present
