@@ -70,6 +70,7 @@ export function makeApi(config: Config, passcode: () => string) {
     postmortem: (id: string) => requestText(`${dash}/incidents/${id}/postmortem`),
     audit: () => request<{ rows: AuditRow[]; count: number }>(`${dash}/audit`),
     auditCsvUrl: `${dash}/audit?format=csv`,
+    recording: (sessionId: string) => request<{ session_id: string; status?: string; duration_seconds?: number | null; audio_url?: string | null }>(`${voice}/recordings/${encodeURIComponent(sessionId)}`, {}, passcode()),
     report: (night?: string) => request<MorningReport>(`${dash}/report/latest${night ? `?night=${encodeURIComponent(night)}` : ""}`),
     health: () => request<Health>(`${dash}/health`),
     metric: (id: string) => request<MetricSeries>(`${dash}/incidents/${id}/metric`),

@@ -56,6 +56,20 @@ def _rca(incident: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _attested(att: dict[str, Any]) -> str:
+    """One clause on where the words came from (confidence, recording, file)."""
+    bits: list[str] = []
+    conf = att.get("confidence")
+    if isinstance(conf, int | float):
+        bits.append(f"heard at {int(float(conf) * 100)}% confidence")
+    sid = str(att.get("session_id") or "")
+    if sid.startswith("sess_"):
+        bits.append(f"AssemblyAI session recording `{sid}`")
+    if att.get("telegram_file_id"):
+        bits.append("Telegram voice note on file")
+    return f" Attested: {', '.join(bits)}." if bits else ""
+
+
 def postmortem(
     incident: dict[str, Any],
     *,
@@ -169,6 +183,7 @@ def postmortem(
             f"Approved by {a.get('source', '?')} via {a.get('channel', '?')} at "
             f'{_hhmm(a.get("granted_at"))}: "{a.get("transcript_quote", "")}". '
             f"Executed: {'yes' if a.get('used_at') else 'no'}."
+            + _attested(a.get("attestation") or {})
         )
     if used_contract:
         out.append("")
@@ -250,6 +265,7 @@ def audit(
                 "executed_at": a.get("used_at"),
                 "result": (a.get("result") or {}).get("code"),
                 "contract_id": a.get("contract_id"),
+                "attestation": a.get("attestation") or {},
             }
         )
     for c in contracts:
@@ -267,6 +283,7 @@ def audit(
                 "status": c.get("status"),
                 "uses": f"{c.get('uses', 0)}/{c.get('max_uses', 0)}",
                 "expires_at": c.get("expires_at"),
+                "attestation": c.get("attestation") or {},
             }
         )
     rows.sort(key=lambda r: str(r.get("at") or ""), reverse=True)

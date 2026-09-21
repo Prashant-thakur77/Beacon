@@ -540,7 +540,14 @@ export default function App() {
         </main>
       ) : route === "audit" ? (
         <main key="audit" className="main route-in">
-          <Audit rows={audit} loading={!!api && auditQ.loading && !audit} csvUrl={api?.auditCsvUrl} onReplay={!replay ? startReplay : undefined} replay={!!replay} />
+          <Audit
+            rows={audit}
+            loading={!!api && auditQ.loading && !audit}
+            csvUrl={api?.auditCsvUrl}
+            onReplay={!replay ? startReplay : undefined}
+            replay={!!replay}
+            onListen={api ? (id) => api.recording(id).then((r) => r.audio_url ?? null).catch(() => null) : undefined}
+          />
         </main>
       ) : route === "report" ? (
         <main key="report" className="main route-in">

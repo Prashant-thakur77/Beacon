@@ -58,6 +58,7 @@ export class AssemblyAITransport implements VoiceTransport {
   private ws: WebSocket | null = null;
   private h: VoiceTransportHandlers | null = null;
   private session: VoiceSession | null = null;
+  private aaiSessionId: string | null = null;
   private lastFinal: { text: string; confidence?: number } = { text: "" };
   private pendingResults: Array<{ call_id: string; result: string }> = [];
   private replyOpen = false;
@@ -111,6 +112,8 @@ export class AssemblyAITransport implements VoiceTransport {
     const h = this.h!;
     switch (msg.type) {
       case "session.ready":
+        // The provider's id; approvals store it so the audit can play the recording back.
+        this.aaiSessionId = typeof msg.session_id === "string" ? msg.session_id : null;
         return;
       case "input.speech.started":
         h.onState("listening");
@@ -148,7 +151,7 @@ export class AssemblyAITransport implements VoiceTransport {
         h.onToolStart?.(call.name);
         const out = await this.runTool(call.name, call.arguments ?? {}, {
           incidentId: s.incidentId,
-          sessionId: s.sessionId,
+          sessionId: this.aaiSessionId ?? s.sessionId,
           transcript: this.lastFinal.text,
           confidence: this.lastFinal.confidence,
         });
@@ -180,7 +183,7 @@ export class AssemblyAITransport implements VoiceTransport {
     if (!s) return { ok: false, result: { error: "no session" } };
     const out = await this.runTool(name, args, {
       incidentId: s.incidentId,
-      sessionId: s.sessionId,
+      sessionId: this.aaiSessionId ?? s.sessionId,
       transcript: this.lastFinal.text,
       confidence: this.lastFinal.confidence,
     });

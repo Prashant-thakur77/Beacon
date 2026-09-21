@@ -508,3 +508,63 @@ def test_telegram_webhook_route_checks_the_secret_not_the_passcode(
     assert ok["statusCode"] == 200
     assert json.loads(ok["body"])["tool"] == "get_incident_brief"
     assert calls[-1][0] == "sendMessage" and "database" in calls[-1][1]["text"]
+
+
+def test_recordings_route_returns_the_session_audio_url(
+    env: Any, monkeypatch: Any, mocker: Any
+) -> None:
+    monkeypatch.setenv("ASSEMBLYAI_API_KEY", "k")
+    sid = "sess_" + "a" * 32
+
+    class Resp:
+        def __init__(self, payload: dict[str, Any]) -> None:
+            self.payload = payload
+
+        def read(self) -> bytes:
+            return json.dumps(self.payload).encode()
+
+        def __enter__(self) -> Resp:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            pass
+
+    seen: list[str] = []
+
+    def fake_open(req: Any, timeout: float = 0) -> Resp:
+        seen.append(req.full_url)
+        assert req.get_header("Authorization") == "Bearer k"
+        return Resp(
+            {
+                "id": sid,
+                "status": "completed",
+                "duration_seconds": 370.1,
+                "artifacts": [{"type": "audio", "url": "https://s3/x.ogg?sig=1"}],
+            }
+        )
+
+    mocker.patch("urllib.request.urlopen", side_effect=fake_open)
+    bad = voice_turn.handler(
+        url_event(
+            "GET", "/recordings/not-a-session", {}, {"x-beacon-passcode": "nightshift"}
+        ),
+        None,
+    )
+    assert bad["statusCode"] == 400
+    assert (
+        voice_turn.handler(url_event("GET", f"/recordings/{sid}", {}, {}), None)[
+            "statusCode"
+        ]
+        == 401
+    )
+    ok = voice_turn.handler(
+        url_event("GET", f"/recordings/{sid}", {}, {"x-beacon-passcode": "nightshift"}),
+        None,
+    )
+    assert ok["statusCode"] == 200
+    body = json.loads(ok["body"])
+    assert (
+        body["audio_url"] == "https://s3/x.ogg?sig=1"
+        and body["duration_seconds"] == 370.1
+    )
+    assert seen == [f"https://agents.assemblyai.com/v1/sessions/{sid}"]

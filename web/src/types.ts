@@ -208,6 +208,8 @@ export interface AuditRow {
   status?: string | null;
   uses?: string | null;
   expires_at?: string | null;
+  /** Where the words came from: STT confidence, session id, voice-note file id. */
+  attestation?: { stt?: string; confidence?: number; session_id?: string; telegram_file_id?: string; language?: string };
 }
 
 export interface MorningReport {

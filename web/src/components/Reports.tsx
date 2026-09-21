@@ -152,7 +152,49 @@ export function Postmortem({ id, api, fallback, onToast }: { id: string; api: Ap
 
 type AuditFilter = "all" | "approvals" | "contracts" | "executed";
 
-export function Audit({ rows, loading, csvUrl, onReplay, replay }: { rows: AuditRow[] | null; loading: boolean; csvUrl?: string; onReplay?: () => void; replay: boolean }) {
+/** Where the words came from — and, for AssemblyAI sessions, the recording itself. */
+function Attestation({ row, onListen }: { row: AuditRow; onListen?: (sessionId: string) => Promise<string | null> }) {
+  const [state, setState] = useState<"idle" | "loading" | "playing" | "gone">("idle");
+  const [src, setSrc] = useState<string | null>(null);
+  const a = row.attestation ?? {};
+  const session = a.session_id && a.session_id.startsWith("sess_") ? a.session_id : null;
+  const bits: string[] = [];
+  if (a.stt === "assemblyai-voice-agent") bits.push("AssemblyAI live");
+  else if (a.stt === "assemblyai-prerecorded") bits.push("Telegram voice note");
+  else if (a.stt === "typed") bits.push("typed");
+  if (typeof a.confidence === "number") bits.push(`${Math.round(a.confidence * 100)}% confidence`);
+  if (a.language) bits.push(a.language);
+  if (!bits.length && !session) return null;
+  return (
+    <div className="attest">
+      <span className="small dim">{bits.join(" · ")}</span>
+      {session && onListen ? (
+        state === "playing" && src ? (
+          <audio controls autoPlay src={src} className="attest-audio" />
+        ) : (
+          <button
+            className="btn ghost small"
+            disabled={state === "loading" || state === "gone"}
+            title="Play the AssemblyAI session recording behind this approval"
+            onClick={() => {
+              setState("loading");
+              void onListen(session).then((url) => {
+                if (url) {
+                  setSrc(url);
+                  setState("playing");
+                } else setState("gone");
+              });
+            }}
+          >
+            {state === "loading" ? "Fetching…" : state === "gone" ? "No recording yet" : "▶ Listen"}
+          </button>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+export function Audit({ rows, loading, csvUrl, onReplay, replay, onListen }: { rows: AuditRow[] | null; loading: boolean; csvUrl?: string; onReplay?: () => void; replay: boolean; onListen?: (sessionId: string) => Promise<string | null> }) {
   const [filter, setFilter] = useState<AuditFilter>("all");
   const list = (rows ?? []).filter((r) => (filter === "all" ? true : filter === "approvals" ? r.kind === "approval" : filter === "contracts" ? r.kind === "contract" : !!r.executed));
   const json = () => download("beacon-audit.json", JSON.stringify({ rows: rows ?? [], count: rows?.length ?? 0 }, null, 2), "application/json");
@@ -225,7 +267,10 @@ export function Audit({ rows, loading, csvUrl, onReplay, replay }: { rows: Audit
                     {r.incident_id ? <a href={`#board/${encodeURIComponent(r.incident_id)}`}>{r.alarm_name ?? "incident"}</a> : r.alarm_name}
                     <div className="mono small dim">{r.action}</div>
                   </td>
-                  <td className="quote-cell">“{r.quote}”</td>
+                  <td className="quote-cell">
+                    “{r.quote}”
+                    <Attestation row={r} onListen={onListen} />
+                  </td>
                   <td className="small dim">
                     {r.channel}
                     {r.source ? ` · ${r.source}` : ""}

@@ -21,6 +21,7 @@ import logging
 import os
 import re
 import time
+import urllib.request
 from functools import cache
 from importlib.resources import files
 from typing import Any, cast
@@ -550,6 +551,56 @@ def assemblyai_token() -> Response[str]:
         logger.exception("assemblyai token mint failed")
         return _json(502, {"error": f"could not mint an AssemblyAI token: {exc}"})
     return _json(200, minted)
+
+
+_SESSION_RE = re.compile(r"^sess_[0-9a-f]{32}$")
+
+
+@app.get("/recordings/<session_id>")
+def recording(session_id: str) -> Response[str]:
+    """A short-lived link to the AssemblyAI session recording behind an approval.
+
+    The API key never leaves the Lambda: the browser gets the presigned audio
+    URL the sessions API returns, valid for minutes, and plays it inline.
+    """
+    if not _passcode_ok(dict(app.current_event.headers)):
+        return _json(401, {"error": "passcode required"})
+    if not _SESSION_RE.match(session_id):
+        return _json(400, {"error": "not an AssemblyAI session id"})
+    param = _env("ASSEMBLYAI_KEY_PARAM")
+    key = _env("ASSEMBLYAI_API_KEY")
+    if not key and param:
+        try:
+            key = aws.client("ssm").get_parameter(Name=param, WithDecryption=True)[
+                "Parameter"
+            ]["Value"]
+        except Exception:
+            logger.exception("assemblyai key unreadable")
+    if not key:
+        return _json(503, {"error": "AssemblyAI is not configured on this deployment"})
+    req = urllib.request.Request(
+        f"https://agents.assemblyai.com/v1/sessions/{session_id}",
+        headers={"Authorization": f"Bearer {key}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+            data = json.loads(resp.read().decode())
+    except Exception as exc:
+        logger.warning("session lookup failed: %s", exc)
+        return _json(502, {"error": "could not reach the sessions API"})
+    audio = next(
+        (a for a in data.get("artifacts") or [] if a.get("type") == "audio"), None
+    )
+    return _json(
+        200,
+        {
+            "session_id": session_id,
+            "status": data.get("status"),
+            "duration_seconds": data.get("duration_seconds"),
+            "ended_at": data.get("ended_at"),
+            "audio_url": audio.get("url") if audio else None,
+        },
+    )
 
 
 @app.post("/telegram/webhook")
