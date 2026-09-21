@@ -534,6 +534,10 @@ def test_recordings_route_returns_the_session_audio_url(
     def fake_open(req: Any, timeout: float = 0) -> Resp:
         seen.append(req.full_url)
         assert req.get_header("Authorization") == "Bearer k"
+        if "agents.eu." in req.full_url:  # the session lives in another region
+            import urllib.error
+
+            raise urllib.error.HTTPError(req.full_url, 404, "nf", {}, None)  # type: ignore[arg-type]
         return Resp(
             {
                 "id": sid,
@@ -567,4 +571,7 @@ def test_recordings_route_returns_the_session_audio_url(
         body["audio_url"] == "https://s3/x.ogg?sig=1"
         and body["duration_seconds"] == 370.1
     )
-    assert seen == [f"https://agents.assemblyai.com/v1/sessions/{sid}"]
+    assert seen == [
+        f"https://agents.eu.assemblyai.com/v1/sessions/{sid}",
+        f"https://agents.us.assemblyai.com/v1/sessions/{sid}",
+    ]

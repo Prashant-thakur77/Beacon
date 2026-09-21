@@ -555,6 +555,14 @@ def assemblyai_token() -> Response[str]:
 
 
 _SESSION_RE = re.compile(r"^sess_[0-9a-f]{32}$")
+_ASSEMBLYAI_HOSTS = tuple(
+    h.strip()
+    for h in os.environ.get(
+        "ASSEMBLYAI_SESSION_HOSTS",
+        "agents.eu.assemblyai.com,agents.us.assemblyai.com,agents.assemblyai.com",
+    ).split(",")
+    if h.strip()
+)
 
 
 @app.get("/recordings/<session_id>")
@@ -579,22 +587,29 @@ def recording(session_id: str) -> Response[str]:
             logger.exception("assemblyai key unreadable")
     if not key:
         return _json(503, {"error": "AssemblyAI is not configured on this deployment"})
-    req = urllib.request.Request(
-        f"https://agents.assemblyai.com/v1/sessions/{session_id}",
-        headers={"Authorization": f"Bearer {key}"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
-            data = json.loads(resp.read().decode())
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode()[:200]
-        logger.warning("session lookup failed: %s %s", exc.code, detail)
-        return _json(
-            502, {"error": f"sessions API answered {exc.code}", "detail": detail}
+    # Sessions are region-sharded behind geo-DNS: a browser in India lands on the
+    # EU cluster, a Lambda in us-east-1 on the US one, and each answers 404 for
+    # the other's sessions. Ask each regional host until one has it.
+    data: dict[str, Any] | None = None
+    last = ""
+    for host in _ASSEMBLYAI_HOSTS:
+        req = urllib.request.Request(
+            f"https://{host}/v1/sessions/{session_id}",
+            headers={"Authorization": f"Bearer {key}"},
         )
-    except Exception as exc:
-        logger.warning("session lookup failed: %s", exc)
-        return _json(502, {"error": "could not reach the sessions API"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+                data = json.loads(resp.read().decode())
+                break
+        except urllib.error.HTTPError as exc:
+            last = f"{host}: {exc.code} {exc.read().decode()[:120]}"
+            if exc.code != 404:
+                logger.warning("session lookup failed: %s", last)
+        except Exception as exc:
+            last = f"{host}: {exc}"
+            logger.warning("session lookup failed: %s", last)
+    if data is None:
+        return _json(404, {"error": "session not found in any region", "detail": last})
     audio = next(
         (a for a in data.get("artifacts") or [] if a.get("type") == "audio"), None
     )
