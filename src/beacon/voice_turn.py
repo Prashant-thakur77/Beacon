@@ -21,6 +21,7 @@ import logging
 import os
 import re
 import time
+import urllib.error
 import urllib.request
 from functools import cache
 from importlib.resources import files
@@ -585,6 +586,12 @@ def recording(session_id: str) -> Response[str]:
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
             data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode()[:200]
+        logger.warning("session lookup failed: %s %s", exc.code, detail)
+        return _json(
+            502, {"error": f"sessions API answered {exc.code}", "detail": detail}
+        )
     except Exception as exc:
         logger.warning("session lookup failed: %s", exc)
         return _json(502, {"error": "could not reach the sessions API"})
