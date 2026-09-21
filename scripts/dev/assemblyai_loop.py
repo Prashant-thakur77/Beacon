@@ -7,11 +7,14 @@ Usage: ASSEMBLYAI_API_KEY=... make local  # then
 
 import asyncio
 import json
+import os
+import re
 import sys
 import time
 
 from playwright.async_api import async_playwright
 
+BASE = os.environ.get("BEACON_LOCAL_URL", "http://localhost:8000")
 LINES = sys.argv[1:] or [
     "can you fix it",
     "approve fix 1",
@@ -48,7 +51,12 @@ async def main():
                     state["log"].append((time.time() - t0, "reply.start", ""))
                 if t == "tool.call":
                     state["pending_tool"] = True
+                    state["last_tool"] = d.get("name")
                     state["log"].append((time.time() - t0, "tool.call", d.get("name")))
+                if t == "reply.done":
+                    state["log"].append(
+                        (time.time() - t0, "reply.done", d.get("status"))
+                    )
                 if t == "reply.done":
                     state["busy"] = False
                 if t == "transcript.agent":
@@ -61,12 +69,15 @@ async def main():
             def tx(f):
                 if isinstance(f, str) and '"tool.result"' in f:
                     state["pending_tool"] = False
+                    m = re.search(r'fix_id\\?":\s*(\d+)', f)
+                    if m and state.get("last_tool") == "propose_fix":
+                        state["fix"] = m.group(1)
 
             ws.on("framereceived", rx)
             ws.on("framesent", tx)
 
         pg.on("websocket", onws)
-        await pg.goto("http://localhost:8765/?voice=assemblyai#board")
+        await pg.goto(f"{BASE}/?voice=assemblyai#board")
         await pg.wait_for_timeout(3000)
         await pg.fill("#passcode", "local")
         await pg.click("text=Unlock voice")
@@ -81,10 +92,34 @@ async def main():
             await asyncio.sleep(1.0)
 
         await settle()
-        for line in LINES:
+        for i, line in enumerate(LINES):
+            line = line.replace("{fix}", state.get("fix", "1"))
+            if line == "!interrupt":
+                # Barge in on the reply being spoken (the read-back after a tool call).
+                t = time.time()
+                # wait for the proposal (tool.result sent), then for the read-back reply
+                state.pop("fix", None)
+                while "fix" not in state and time.time() - t < 60:
+                    await asyncio.sleep(0.2)
+                while not state["busy"] and time.time() - t < 60:
+                    await asyncio.sleep(0.2)
+                await asyncio.sleep(2.5)
+                label = await pg.text_content(".state")
+                state["log"].append((time.time() - t0, "you", f"[interrupt] ({label})"))
+                btn = "document.querySelector('button[aria-label=Interrupt]')"
+                info = await pg.evaluate(
+                    "(() => ({ state: document.querySelector('.state')?.className,"
+                    f" disabled: {btn}?.disabled }}))()"
+                )
+                state["log"].append((time.time() - t0, "dom", json.dumps(info)))
+                await pg.evaluate(f"{btn}.click()")
+                await settle(45)
+                continue
             state["log"].append((time.time() - t0, "you", line))
             await pg.fill("#typed-input-duplex", line)
             await pg.press("#typed-input-duplex", "Enter")
+            if LINES[i + 1 : i + 2] == ["!interrupt"]:
+                continue  # the next step barges in on this reply
             await settle(75)
             # a tool reply may chain: wait until quiet again
             await settle(45)

@@ -20,11 +20,11 @@ const SYSTEM_PROMPT_HINT =
   "You are Beacon, the on-call agent for an AWS incident, speaking to a tired engineer at 3 AM. " +
   "The incident brief is already in this conversation; do not call get_incident_brief unless asked to re-brief. " +
   "When in doubt, call the tool: a wasted call is fine, a missed one is not. propose_fix and check_recovery change nothing, so never ask permission before calling them. " +
-  "Examples: user: 'can you fix it' -> call propose_fix immediately, then say the blast radius from the result and the exact phrase 'approve fix <n>'. " +
+  "Examples: user: 'can you fix it' -> call propose_fix immediately, then say its blast_radius_spoken and the exact phrase 'approve fix <n>'. " +
   "user: 'fix it' / 'restore it' / 'repair it' -> same, call propose_fix immediately. " +
   "user: 'approve fix 1' -> call approve_fix with fix_id 1 and confirmation_phrase 'approve fix 1'. user: 'yes' or 'do it' after a proposal -> do NOT call approve_fix; say: say exactly 'approve fix <n>'. " +
   "user: 'what changed' / 'why' -> call get_evidence with kind 'changes'. user: 'undo fix 1' -> call undo_fix. user: 'is it fixed' -> call check_recovery. " +
-  "After a tool reports a verified fix, offer a Sleep Contract in one sentence. When the engineer agrees (yes, sure, haan) call grant_sleep_contract with days 7 and max_uses 3 without asking anything; it returns a read_back: speak it word for word and then wait. " +
+  "After a tool reports a verified fix, offer a Sleep Contract in one sentence. When the engineer agrees (yes, sure, haan) call grant_sleep_contract with days 7 and max_uses 3 without asking anything; it returns read_back_spoken: speak that word for word and then wait. " +
   "When the engineer then says 'grant contract for <n> days', call grant_sleep_contract again with days <n> and max_uses 3, and the tool grants it. Never ask the engineer how many days; the read-back and the phrase decide that. " +
   "Voice style: at most two short sentences per turn. Never read resource ids or hashes aloud; say 'the R D S security group' or 'the E C S service'. Spell acronyms as letters (R D S, E C S, U S east 1). " +
   "Cite evidence ids like [E2] at the end of a sentence that relies on them. Answer Hinglish with Hinglish.";
@@ -75,6 +75,9 @@ export function TalkDuplex({
   const [partial, setPartial] = useState("");
   const [heard, setHeard] = useState<{ text: string; confidence?: number } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  /** fix_id proposed inside the reply now being spoken; interrupting that reply withdraws it. */
+  const proposalInReply = useRef<number | null>(null);
+  const replySpoke = useRef(false);
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [hotEvidence, setHotEvidence] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
@@ -120,6 +123,7 @@ export function TalkDuplex({
           } else setPartial(e.text);
         },
         onAgentText: (e) => {
+          replySpoke.current = true;
           const tools = pendingTools.current;
           pendingTools.current = [];
           setMessages((prev) => [...prev, { role: "beacon", text: e.text, cited: e.cited, toolEvents: tools, at: new Date().toISOString() }]);
@@ -128,17 +132,40 @@ export function TalkDuplex({
         },
         onAgentAudio: (pcm, rate) => player.push(pcm, rate),
         onAgentDone: (status) => {
+          // A tool call closes one reply and the read-back is the next one, so the proposal
+          // stays armed until a reply that actually spoke completes.
+          const spoke = replySpoke.current;
+          replySpoke.current = false;
+          const proposal = proposalInReply.current;
+          if (status === "completed" && spoke) proposalInReply.current = null;
           if (status === "interrupted") {
+            proposalInReply.current = null;
             player.flush();
             setMessages((prev) => {
               const last = prev[prev.length - 1];
-              if (last?.role === "beacon") return [...prev.slice(0, -1), { ...last, text: `${last.text} —` , interrupted: true } as Message];
+              if (last?.role === "beacon") return [...prev.slice(0, -1), { ...last, text: `${last.text} —`, interrupted: true }];
               return prev;
             });
+            // Barge-in that means something: speaking over a read-back withdraws the fix it
+            // was reading. The engineer has to ask again; "approve fix n" no longer works.
+            if (proposal !== null && t.callTool) {
+              void t
+                .callTool("cancel_proposal", { fix_id: proposal, reason: "engineer interrupted the read-back" })
+                .then(({ result }) => {
+                  const withdrawn = Boolean((result as { withdrawn?: boolean } | null)?.withdrawn);
+                  if (!withdrawn) return;
+                  setMessages((prev) => [...prev, { role: "beacon", note: true, text: `Fix ${proposal} withdrawn — you spoke over the read-back, so nothing was applied. Say "fix it" to propose it again.`, at: new Date().toISOString() }]);
+                  void t.inject(`The engineer interrupted the read-back, so fix ${proposal} was withdrawn and cannot be approved. Nothing was applied. Ask in one short sentence what they want; call propose_fix again only if they ask for the fix.`);
+                })
+                .catch(() => undefined);
+            }
           }
           setHotEvidence(null);
         },
         onToolResult: (name, args, result, events, cards) => {
+          const fixId = (result as { fix_id?: number } | null)?.fix_id;
+          if (name === "propose_fix" && typeof fixId === "number") proposalInReply.current = fixId;
+          else if (name === "approve_fix" || name === "cancel_proposal") proposalInReply.current = null;
           const summary = events[0]?.summary ?? (typeof result === "object" && result && "error" in (result as object) ? String((result as { error: string }).error) : "ok");
           pendingTools.current.push({ name, args, summary, evidence_id: cards[0]?.id ?? null });
           const fresh = cards.filter((c) => !pendingEvidence.current.some((p) => p.id === c.id));
@@ -177,6 +204,17 @@ export function TalkDuplex({
   }, [player]);
 
   useEffect(() => () => void disconnect(), [disconnect]);
+
+  // Esc interrupts Beacon mid-sentence (same as speaking over it, or the Interrupt button).
+  useEffect(() => {
+    if (!live) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || (e.target as HTMLElement | null)?.tagName === "INPUT") return;
+      transport.current?.interrupt();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [live]);
 
   // Agent-initiated turn: when the loop resolves or escalates while we are live, Beacon speaks first.
   const announcedFor = useRef<string | null>(null);
@@ -235,8 +273,14 @@ export function TalkDuplex({
             <div className="stack" style={{ gap: 4 }}>
               <div className={`state ${state}`}>{stateLabel[state]}</div>
               <div className="partial">{partial || (heard ? `heard: “${heard.text}”${heard.confidence != null ? ` (${Math.round(heard.confidence * 100)}%)` : ""}` : "full-duplex: just talk")}</div>
-              {state === "speaking" ? (
-                <button className="btn ghost small" onClick={() => transport.current?.interrupt()}>
+              {live ? (
+                <button
+                  className="btn ghost small"
+                  aria-label="Interrupt"
+                  title="Stop Beacon mid-sentence (Esc). Interrupting a read-back withdraws the fix it was reading."
+                  disabled={state !== "speaking" && state !== "thinking"}
+                  onClick={() => transport.current?.interrupt()}
+                >
                   Interrupt
                 </button>
               ) : null}
@@ -253,10 +297,11 @@ export function TalkDuplex({
                   <div>“{m.text}”</div>
                 </div>
               ) : (
-                <div key={mi} className={`bubble beacon${(m as Message & { interrupted?: boolean }).interrupted ? " interrupted" : ""}`}>
+                <div key={mi} className={`bubble beacon${m.interrupted ? " interrupted" : ""}${m.note ? " note" : ""}`}>
                   <div className="who">
                     Beacon<span className="when">{formatTime(m.at)}</span>
-                    {(m as Message & { interrupted?: boolean }).interrupted ? <span className="pill amber">interrupted</span> : null}
+                    {m.interrupted ? <span className="pill amber">interrupted</span> : null}
+                    {m.note ? <span className="pill">console</span> : null}
                   </div>
                   <div>
                     {splitSentences(m.text).map((s, si) => (

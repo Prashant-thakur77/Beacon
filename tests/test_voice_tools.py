@@ -134,13 +134,14 @@ def _ctx(
     )
 
 
-def test_tool_schemas_cover_the_seven_tools_with_json_schema() -> None:
+def test_tool_schemas_cover_the_eight_tools_with_json_schema() -> None:
     names = [t["name"] for t in voice_tools.TOOL_SCHEMAS]
     assert names == [
         "get_incident_brief",
         "get_evidence",
         "propose_fix",
         "approve_fix",
+        "cancel_proposal",
         "undo_fix",
         "grant_sleep_contract",
         "check_recovery",
@@ -264,7 +265,7 @@ def test_approve_fix_refuses_without_passcode_or_with_apply_disabled(
 def test_approve_fix_refuses_unknown_or_expired_proposal(env: Any) -> None:
     with turn_context(_ctx(env["incident_id"], "approve fix 2")):
         out = voice_tools.approve_fix(2, "approve fix 2")
-    assert out["approved"] is False and "no proposal" in out["error"]
+    assert out["approved"] is False and "never proposed" in out["error"]
 
 
 def test_grant_sleep_contract_needs_read_back_then_explicit_phrase(env: Any) -> None:
@@ -384,3 +385,22 @@ def test_undo_fix_reverses_only_what_beacon_applied_and_needs_the_phrase(
     with turn_context(_ctx(inc, "yes undo it")):
         again = voice_tools.undo_fix(1, "undo fix 1")
     assert again["undone"] is False and "say" in again["error"]
+
+
+def test_cancel_proposal_withdraws_the_pending_fix(env: Any) -> None:
+    """Barge-in on the read-back: the proposal is gone; the phrase stops working."""
+    inc = env["incident_id"]
+    with turn_context(_ctx(inc, "fix it")):
+        voice_tools.propose_fix()
+    with turn_context(_ctx(inc, "wait, stop")) as ctx:
+        out = voice_tools.cancel_proposal(1, "engineer interrupted the read-back")
+    assert out["withdrawn"] is True and ctx.tool_events[-1]["name"] == "cancel_proposal"
+    with turn_context(_ctx(inc, "approve fix 1")):
+        refused = voice_tools.approve_fix(1, "approve fix 1")
+    assert refused["approved"] is False and "withdrawn" in refused["error"]
+    env["sfn"].assert_not_called()
+    incident = store.get_incident(inc, table_name=INCIDENTS)
+    assert incident["timeline"][-1]["event"] == "proposal_withdrawn"
+    with turn_context(_ctx(inc, "stop")):
+        again = voice_tools.cancel_proposal(1)
+    assert again["withdrawn"] is False

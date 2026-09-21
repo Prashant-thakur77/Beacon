@@ -97,6 +97,47 @@ def create_proposal(
     return record
 
 
+def withdraw_proposal(
+    incident_id: str,
+    fix_id: int,
+    *,
+    reason: str,
+    table_name: str,
+    dynamodb_client: Any | None = None,
+) -> bool:
+    """Expire a proposal now (barge-in withdrew it); False if there was none."""
+    client = _client(dynamodb_client)
+    key = _proposal_key(incident_id, fix_id)
+    if (
+        get_proposal(incident_id, fix_id, table_name=table_name, dynamodb_client=client)
+        is None
+    ):
+        return False
+    client.update_item(
+        TableName=table_name,
+        Key={"approval_id": {"S": key}},
+        UpdateExpression="SET expires_at = :now, withdrawn_reason = :r",
+        ExpressionAttributeValues={
+            ":now": {"S": _now().isoformat()},
+            ":r": {"S": reason[:200]},
+        },
+    )
+    return True
+
+
+def get_proposal_raw(
+    incident_id: str,
+    fix_id: int,
+    *,
+    table_name: str,
+    dynamodb_client: Any | None = None,
+) -> dict[str, Any] | None:
+    """The proposal row whether or not it is still live (to explain a refusal)."""
+    return _get_raw(
+        table_name, _proposal_key(incident_id, fix_id), _client(dynamodb_client)
+    )
+
+
 def get_proposal(
     incident_id: str,
     fix_id: int,

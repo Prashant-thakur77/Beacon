@@ -125,6 +125,10 @@ export interface Message {
   toolEvents?: ToolEvent[];
   speechMarks?: Array<{ time: number; value: string }>;
   channel?: string;
+  /** The engineer spoke over this reply (AssemblyAI reply.done{interrupted}). */
+  interrupted?: boolean;
+  /** A console note (proposal withdrawn, reconnect), not something the agent said. */
+  note?: boolean;
   at: string;
 }
 

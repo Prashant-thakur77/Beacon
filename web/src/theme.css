@@ -269,6 +269,8 @@ select.input { width: auto; padding: 6px 10px; font-size: 13px; color: var(--dim
 .bubble.beacon .who { color: var(--deep); }
 .bubble.user > div:not(.who) { color: var(--dim); }
 .bubble.interrupted > div:not(.who) { color: var(--dim); }
+.bubble.beacon.note { border-style: dashed; background: transparent; }
+.bubble.beacon.note > div:not(.who) { color: var(--dim); font-style: italic; }
 .sentence { transition: background 150ms; border-radius: 3px; }
 .sentence.hot { background: var(--lavender); }
 .chip {

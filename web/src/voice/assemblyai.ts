@@ -172,6 +172,19 @@ export class AssemblyAITransport implements VoiceTransport {
     }
   }
 
+  async callTool(name: string, args: Record<string, unknown>): Promise<{ ok: boolean; result: unknown }> {
+    const s = this.session;
+    if (!s) return { ok: false, result: { error: "no session" } };
+    const out = await this.runTool(name, args, {
+      incidentId: s.incidentId,
+      sessionId: s.sessionId,
+      transcript: this.lastFinal.text,
+      confidence: this.lastFinal.confidence,
+    });
+    this.h?.onToolResult(name, args, out.result, out.tool_events, out.evidence);
+    return { ok: out.ok, result: out.result };
+  }
+
   private flushResults(): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     for (const r of this.pendingResults) this.ws.send(JSON.stringify({ type: "tool.result", ...r }));

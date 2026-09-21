@@ -335,10 +335,19 @@ def approve_fix(fix_id: int, confirmation_phrase: str) -> dict[str, Any]:
         incident["incident_id"], int(fix_id), table_name=_approvals_table()
     )
     if proposal is None:
+        raw = approvals.get_proposal_raw(
+            incident["incident_id"], int(fix_id), table_name=_approvals_table()
+        )
+        why = (
+            "was withdrawn because you interrupted the read-back"
+            if raw and raw.get("withdrawn_reason")
+            else "expired or was never proposed"
+        )
         return {
             **refusal,
             "error": (
-                f"no proposal {fix_id} (or it expired); ask me to propose the fix again"
+                f"fix {fix_id} {why}; nothing was applied. Say 'fix it' and I will "
+                "propose it again with a fresh number"
             ),
         }
     if not (proposal.get("dry_run") or {}).get("ok"):
@@ -455,16 +464,15 @@ def _spoken_scope(action: str, params: dict[str, Any]) -> str:
             "rule from the application security group into the database security group"
         )
     if action == "ecs.force_redeploy":
-        return f"the {params.get('service', 'demo')} service on cluster {params.get('cluster', '')}".strip()
+        svc, cluster = params.get("service", "demo"), params.get("cluster", "")
+        return f"the {svc} service on cluster {cluster}".strip()
     return "that one resource"
 
 
 def spoken_blast_radius(action: str, params: dict[str, Any]) -> str:
     """Blast radius for the ear; the exact ids stay on screen."""
-    return (
-        f"One change: {_SPOKEN_ACTION.get(action, action)}, {_spoken_scope(action, params)}. "
-        "Nothing else changes."
-    )
+    what = _SPOKEN_ACTION.get(action, action)
+    return f"One change: {what}, {_spoken_scope(action, params)}. Nothing else changes."
 
 
 def _read_back_spoken(
@@ -483,10 +491,11 @@ def _read_back_spoken(
         14: "fourteen",
         30: "thirty",
     }.get(days, str(days))
+    what = _SPOKEN_ACTION.get(action, action)
     return (
-        f"Read-back: next time this alarm fires, I may {_SPOKEN_ACTION.get(action, action)}, "
-        f"{_spoken_scope(action, params)}, at most {max_uses} times, for {day_word} days. "
-        f"To confirm, say: grant contract for {day_word} days."
+        f"Read-back: next time this alarm fires, I may {what}, "
+        f"{_spoken_scope(action, params)}, at most {max_uses} times, "
+        f"for {day_word} days. To confirm, say: grant contract for {day_word} days."
     )
 
 
@@ -594,6 +603,43 @@ def grant_sleep_contract(days: int = 7, max_uses: int = 3) -> dict[str, Any]:
         "scope": params,
         "instruction": (
             "Confirm the contract in one sentence and wish the engineer good night."
+        ),
+    }
+
+
+@observability.span("tool:cancel_proposal")
+def cancel_proposal(
+    fix_id: int, reason: str = "engineer interrupted"
+) -> dict[str, Any]:
+    """Withdraw a pending proposal: after this, 'approve fix <n>' needs a fresh
+    propose_fix. The console calls it when the engineer barges in on a read-back;
+    the agent may call it when the engineer says no, stop, or wait."""
+    incident = _incident()
+    withdrawn = approvals.withdraw_proposal(
+        incident["incident_id"],
+        int(fix_id),
+        reason=reason,
+        table_name=_approvals_table(),
+    )
+    if withdrawn:
+        store.append_timeline(
+            incident["incident_id"],
+            "proposal_withdrawn",
+            table_name=_incidents_table(),
+            detail={"fix_id": int(fix_id), "reason": reason[:200]},
+        )
+    _tool_event(
+        "cancel_proposal",
+        {"fix_id": fix_id},
+        f"withdrew fix {fix_id}" if withdrawn else f"no pending fix {fix_id}",
+    )
+    return {
+        "withdrawn": withdrawn,
+        "fix_id": int(fix_id),
+        "spoken_hint": (
+            "Fix withdrawn; nothing was applied. Ask again if you want it proposed."
+            if withdrawn
+            else "There was no pending fix to withdraw."
         ),
     }
 
@@ -819,6 +865,26 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "cancel_proposal",
+        "description": (
+            "Withdraw a proposed fix that has not been approved, so 'approve fix <n>' "
+            "no longer works until it is proposed again. Call it when the engineer "
+            "says no, stop, wait, or cancel while a fix is pending. Never call it to "
+            "undo an applied fix; that is undo_fix."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "fix_id": {"type": "integer", "description": "The pending fix number"},
+                "reason": {
+                    "type": "string",
+                    "description": "Why, e.g. 'engineer said stop'",
+                },
+            },
+            "required": ["fix_id"],
+        },
+    },
+    {
         "name": "undo_fix",
         "description": (
             "Reverse a fix Beacon already applied in this incident. Only succeeds "
@@ -880,6 +946,7 @@ TOOL_FUNCTIONS: dict[str, Callable[..., dict[str, Any]]] = {
     "get_evidence": get_evidence,
     "propose_fix": propose_fix,
     "approve_fix": approve_fix,
+    "cancel_proposal": cancel_proposal,
     "undo_fix": undo_fix,
     "grant_sleep_contract": grant_sleep_contract,
     "check_recovery": check_recovery,

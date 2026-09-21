@@ -54,6 +54,11 @@ export interface VoiceTransport {
   sendText(text: string): Promise<void>;
   /** Make the agent speak to a system-side fact (the loop resolved or escalated); not the engineer speaking. */
   inject(content: string): Promise<void>;
+  /**
+   * Run a tool from the console itself, outside any agent turn (barge-in withdraws a
+   * proposal through cancel_proposal). Optional: the cascade runs its tools server-side.
+   */
+  callTool?(name: string, args: Record<string, unknown>): Promise<{ ok: boolean; result: unknown }>;
   /** Interrupt the agent (barge-in). */
   interrupt(): void;
   stop(): Promise<void>;

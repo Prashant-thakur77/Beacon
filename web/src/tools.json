@@ -61,6 +61,26 @@
     }
   },
   {
+    "name": "cancel_proposal",
+    "description": "Withdraw a proposed fix that has not been approved, so 'approve fix <n>' no longer works until it is proposed again. Call it when the engineer says no, stop, wait, or cancel while a fix is pending. Never call it to undo an applied fix; that is undo_fix.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "fix_id": {
+          "type": "integer",
+          "description": "The pending fix number"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why, e.g. 'engineer said stop'"
+        }
+      },
+      "required": [
+        "fix_id"
+      ]
+    }
+  },
+  {
     "name": "undo_fix",
     "description": "Reverse a fix Beacon already applied in this incident. Only succeeds if the engineer literally said 'undo fix <n>' in this turn; the server checks the transcript. Do not call for fixes that were not applied.",
     "parameters": {
