@@ -104,8 +104,6 @@ async def run(lines: list[str]) -> int:
     tools = json.loads((ROOT / "web/src/tools.json").read_text())
     incident = _get(f"{LOCAL}/dash/incidents")["incidents"][0]
     inc_id = incident["incident_id"]
-    token = _get(TOKEN_URL, {"Authorization": f"Bearer {key}"})["token"]
-
     state: dict[str, Any] = {"fix": "1", "busy": False, "pending": False, "last": ""}
     log: list[tuple[float, str, str]] = []
     t0 = time.time()
@@ -114,56 +112,62 @@ async def run(lines: list[str]) -> int:
         log.append((time.time() - t0, kind, text))
         print(f"{time.time() - t0:6.1f} {kind:10} {text}", flush=True)
 
-    async with websockets.connect(
-        f"{WS_URL}?token={token}", open_timeout=15, ping_interval=None
-    ) as ws:
-        await ws.send(
-            json.dumps(
-                {
-                    "type": "session.update",
-                    "session": {
-                        "system_prompt": f"{system_prompt()}\n\n{brief(incident)}",
-                        "greeting": "Beacon here. Bolo, kya karna hai?",
-                        "input": {
-                            "format": {"encoding": "audio/pcm"},
-                            "turn_detection": {"vad_threshold": 0.5},
-                            "transcription_mode": "balanced",
-                            "language_codes": ["hi", "en"],
-                            "keyterms": [
-                                incident.get("alarm_name") or "",
-                                "approve fix one",
-                                "approve fix two",
-                                "grant contract for seven days",
-                                "saat din ke liye contract do",
-                                "Beacon",
-                            ],
-                        },
-                        "output": {
-                            "voice": "jane",
-                            "format": {"encoding": "audio/pcm"},
-                        },
-                        "tools": [
-                            {
-                                "type": "function",
-                                "name": t["name"],
-                                "description": t["description"],
-                                "parameters": t["parameters"],
-                                "execution_mode": "interactive",
-                                "timeout_seconds": 60,
-                            }
-                            for t in tools
+    async def connect() -> Any:
+        tok = _get(TOKEN_URL, {"Authorization": f"Bearer {key}"})["token"]
+        return await websockets.connect(
+            f"{WS_URL}?token={tok}", open_timeout=15, ping_interval=None
+        )
+
+    link: dict[str, Any] = {"ws": await connect()}
+    if True:  # one block, so the body keeps its indentation
+        ws = link["ws"]
+        session_update = json.dumps(
+            {
+                "type": "session.update",
+                "session": {
+                    "system_prompt": f"{system_prompt()}\n\n{brief(incident)}",
+                    "greeting": "Beacon here. Bolo, kya karna hai?",
+                    "input": {
+                        "format": {"encoding": "audio/pcm"},
+                        "turn_detection": {"vad_threshold": 0.5},
+                        "transcription_mode": "balanced",
+                        "language_codes": ["hi", "en"],
+                        "keyterms": [
+                            incident.get("alarm_name") or "",
+                            "approve fix one",
+                            "approve fix two",
+                            "grant contract for seven days",
+                            "saat din ke liye contract do",
+                            "Beacon",
                         ],
                     },
-                }
-            )
+                    "output": {
+                        "voice": "jane",
+                        "format": {"encoding": "audio/pcm"},
+                    },
+                    "tools": [
+                        {
+                            "type": "function",
+                            "name": t["name"],
+                            "description": t["description"],
+                            "parameters": t["parameters"],
+                            "execution_mode": "interactive",
+                            "timeout_seconds": 60,
+                        }
+                        for t in tools
+                    ],
+                },
+            }
         )
+        await ws.send(session_update)
+
         pending_results: list[dict[str, Any]] = []
         audio_out = 0
         agent_pcm: list[bytes] = []
 
         async def reader() -> None:
             nonlocal audio_out
-            async for raw in ws:
+            async for raw in link["ws"]:
                 if isinstance(raw, bytes):
                     audio_out += len(raw)
                     if state.get("first_audio") is None:
@@ -184,6 +188,16 @@ async def run(lines: list[str]) -> int:
                         state["first_audio"] = time.time()
                         lag = time.time() - state["turn_end"]
                         note("audio", f"first audio {lag:.1f}s after turn end")
+                elif kind == "session.ready":
+                    state["resume_token"] = msg.get("resume_token")
+                    state["session_id"] = msg.get("session_id")
+                elif kind == "session.resumed":
+                    note(
+                        "resumed",
+                        json.dumps({k: v for k, v in msg.items() if k != "config"})[
+                            :160
+                        ],
+                    )
                 elif kind == "input.speech.stopped":
                     state["turn_end"] = time.time()
                     state["first_audio"] = None
@@ -223,14 +237,16 @@ async def run(lines: list[str]) -> int:
                     )
                     if not state["busy"]:
                         for r in pending_results:
-                            await ws.send(json.dumps({"type": "tool.result", **r}))
+                            await link["ws"].send(
+                                json.dumps({"type": "tool.result", **r})
+                            )
                         pending_results.clear()
                         state["pending"] = False
                 elif kind == "reply.done":
                     state["busy"] = False
                     note("reply.done", str(msg.get("status")))
                     for r in pending_results:
-                        await ws.send(json.dumps({"type": "tool.result", **r}))
+                        await link["ws"].send(json.dumps({"type": "tool.result", **r}))
                     pending_results.clear()
                     state["pending"] = False
                 elif kind in ("session.error", "error"):
@@ -243,7 +259,7 @@ async def run(lines: list[str]) -> int:
                 note("READER", f"{type(exc).__name__}: {exc}")
                 raise
 
-        task = asyncio.create_task(guarded_reader())
+        tasks: dict[str, Any] = {"reader": asyncio.create_task(guarded_reader())}
 
         # A microphone never stops: stream silence between utterances so turn detection
         # sees the end of each one (and the socket stays alive).
@@ -253,7 +269,7 @@ async def run(lines: list[str]) -> int:
         async def sender() -> None:
             while True:
                 chunk = outbox.get_nowait() if not outbox.empty() else silence
-                await ws.send(
+                await link["ws"].send(
                     json.dumps(
                         {
                             "type": "input.audio",
@@ -263,7 +279,30 @@ async def run(lines: list[str]) -> int:
                 )
                 await asyncio.sleep(0.05)
 
-        send_task = asyncio.create_task(sender())
+        tasks["sender"] = asyncio.create_task(sender())
+
+        async def drop_and_resume() -> None:
+            """Kill the socket like a Wi-Fi blip, then resume the same session."""
+            tasks["reader"].cancel()
+            tasks["sender"].cancel()
+            link["ws"].transport.abort()
+            note("drop", "socket aborted mid-turn")
+            await asyncio.sleep(1.0)
+            link["ws"] = await connect()
+            await link["ws"].send(
+                json.dumps(
+                    {"type": "session.resume", "session_id": state["session_id"]}
+                )
+            )
+            first = json.loads(await asyncio.wait_for(link["ws"].recv(), 15))
+            note("resume", json.dumps({k: str(v)[:70] for k, v in first.items()}))
+            if first.get("type") == "session.error":
+                # grace window gone / credential refused: a fresh session, same config
+                link["ws"] = await connect()
+                await link["ws"].send(session_update)
+                note("resume", "refused; started a fresh session")
+            tasks["reader"] = asyncio.create_task(guarded_reader())
+            tasks["sender"] = asyncio.create_task(sender())
 
         async def settle(max_s: float = 60) -> None:
             t = time.time()
@@ -274,6 +313,10 @@ async def run(lines: list[str]) -> int:
 
         await settle(20)
         for line in lines:
+            if line == "!drop":
+                await drop_and_resume()
+                await settle(30)
+                continue
             text = line.replace("{fix}", state["fix"])
             note("you", text)
             pcm = await asyncio.to_thread(synth, polly, text)
@@ -281,11 +324,14 @@ async def run(lines: list[str]) -> int:
                 outbox.put_nowait(pcm[i : i + CHUNK])
             while not outbox.empty():
                 await asyncio.sleep(0.1)
+            if lines[lines.index(line) + 1 : lines.index(line) + 2] == ["!drop"]:
+                continue  # the next step kills the socket before the reply lands
             await settle(75)
             await settle(45)
-        await ws.send(json.dumps({"type": "session.end"}))
-        send_task.cancel()
-        task.cancel()
+        await link["ws"].send(json.dumps({"type": "session.end"}))
+        tasks["sender"].cancel()
+        tasks["reader"].cancel()
+        await link["ws"].close()
 
     if save := os.environ.get("BEACON_SAVE_AGENT_WAV"):
         import wave
@@ -307,6 +353,7 @@ async def run(lines: list[str]) -> int:
     calls = [t.split()[0] for _, k, t in log if k == "tool.call"]
     print("heard:", heard)
     print("tools:", calls)
+    print("session:", state.get("session_id"))
     return 0
 
 

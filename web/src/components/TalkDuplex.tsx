@@ -144,6 +144,9 @@ export function TalkDuplex({
           }
           player.push(pcm, rate);
         },
+        onResumed: (n) => {
+          setMessages((prev) => [...prev, { role: "beacon", note: true, text: `Connection dropped and the session resumed (${n}). Nothing ran in the gap: a fix only executes when its tool call reaches this browser.`, at: new Date().toISOString() }]);
+        },
         onToolStart: (name) => {
           lat.current.toolStart = performance.now();
           setLatency((prev) => ({ ...prev, toolName: name }));

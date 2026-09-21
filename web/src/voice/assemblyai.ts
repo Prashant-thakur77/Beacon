@@ -59,6 +59,10 @@ export class AssemblyAITransport implements VoiceTransport {
   private h: VoiceTransportHandlers | null = null;
   private session: VoiceSession | null = null;
   private aaiSessionId: string | null = null;
+  private resumeToken: string | null = null;
+  private resumes = 0;
+  private resuming = false;
+  private stopping = false;
   private lastFinal: { text: string; confidence?: number } = { text: "" };
   private pendingResults: Array<{ call_id: string; result: string }> = [];
   private replyOpen = false;
@@ -76,36 +80,72 @@ export class AssemblyAITransport implements VoiceTransport {
     this.session = session;
     this.h = handlers;
     handlers.onState("connecting");
+    const greeting = session.greeting ?? "";
     const { token } = await this.getToken();
     // Browsers cannot set headers on WebSocket; the short-lived token rides the URL.
     const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
     this.ws = ws;
     ws.onopen = () => {
-      ws.send(
-        JSON.stringify({
-          type: "session.update",
-          session: {
-            system_prompt: session.systemPrompt,
-            greeting: session.greeting ?? "",
-            input: {
-              format: { encoding: "audio/pcm" },
-              turn_detection: { vad_threshold: 0.5 },
-              transcription_mode: "balanced",
-              language_codes: session.languageCodes ?? ["en", "hi"],
-              ...(session.keyterms?.length ? { keyterms: session.keyterms } : {}),
-            },
-            output: { voice: session.voice ?? "jane", format: { encoding: "audio/pcm" } },
-            // Client-side function tools: the browser gets tool.call and answers with tool.result
-            // (after reply.done); "interactive" lets the agent keep the turn while we run it.
-            tools: tools.map((t) => ({ type: "function", name: t.name, description: t.description, parameters: t.parameters, execution_mode: "interactive", timeout_seconds: 60 })),
-          },
-        }),
-      );
+      ws.send(this.sessionUpdate(session, greeting));
       handlers.onState("listening");
     };
     ws.onmessage = (e) => void this.onMessage(JSON.parse(String(e.data)));
     ws.onerror = () => handlers.onError("AssemblyAI socket error");
-    ws.onclose = () => handlers.onState("idle");
+    ws.onclose = () => void this.onClose(ws);
+  }
+
+  private sessionUpdate(session: VoiceSession, greeting: string): string {
+    return JSON.stringify({
+      type: "session.update",
+      session: {
+        system_prompt: session.systemPrompt,
+        greeting,
+        input: {
+          format: { encoding: "audio/pcm" },
+          turn_detection: { vad_threshold: 0.5 },
+          transcription_mode: "balanced",
+          language_codes: session.languageCodes ?? ["en", "hi"],
+          ...(session.keyterms?.length ? { keyterms: session.keyterms } : {}),
+        },
+        output: { voice: session.voice ?? "jane", format: { encoding: "audio/pcm" } },
+        // Client-side function tools: the browser gets tool.call and answers with tool.result
+        // (after reply.done); "interactive" lets the agent keep the turn while we run it.
+        tools: tools.map((t) => ({ type: "function", name: t.name, description: t.description, parameters: t.parameters, execution_mode: "interactive", timeout_seconds: 60 })),
+      },
+    });
+  }
+
+  /**
+   * A dropped socket (Wi-Fi blip, laptop lid) resumes the same session by its
+   * session_id inside the API's 30 s reconnect window. Nothing
+   * executes across the gap: a tool only runs when its tool.call reaches the
+   * browser and the browser calls the Lambda.
+   */
+  private async onClose(closed: WebSocket): Promise<void> {
+    const h = this.h;
+    if (!h || this.ws !== closed) return; // stop() or an older socket
+    if (this.stopping || !this.aaiSessionId || this.resumes >= 3) {
+      h.onState("idle");
+      return;
+    }
+    this.resumes += 1;
+    h.onState("connecting");
+    try {
+      const { token } = await this.getToken();
+      const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
+      this.ws = ws;
+      // The spec: session.resume { session_id } within 30 s of the drop (the
+      // resume_token in session.ready is informational here).
+      this.resuming = true;
+      ws.onopen = () => ws.send(JSON.stringify({ type: "session.resume", session_id: this.aaiSessionId }));
+      ws.onmessage = (e) => void this.onMessage(JSON.parse(String(e.data)));
+      ws.onerror = () => h.onError("AssemblyAI socket error");
+      ws.onclose = () => void this.onClose(ws);
+      h.onResumed?.(this.resumes);
+    } catch (e) {
+      h.onError(e instanceof Error ? e.message : String(e));
+      h.onState("error");
+    }
   }
 
   private async onMessage(msg: Record<string, unknown>): Promise<void> {
@@ -114,6 +154,13 @@ export class AssemblyAITransport implements VoiceTransport {
       case "session.ready":
         // The provider's id; approvals store it so the audit can play the recording back.
         this.aaiSessionId = typeof msg.session_id === "string" ? msg.session_id : null;
+        this.resumeToken = typeof msg.resume_token === "string" ? msg.resume_token : this.resumeToken;
+        this.resuming = false;
+        h.onState("listening");
+        return;
+      case "session.resumed":
+        this.resuming = false;
+        h.onState("listening");
         return;
       case "input.speech.started":
         h.onState("listening");
@@ -170,6 +217,15 @@ export class AssemblyAITransport implements VoiceTransport {
         return;
       }
       case "session.error":
+        if (this.resuming) {
+          // The 30 s grace window is gone (or the credential was refused): start a
+          // fresh session with the same config; the brief is in the system prompt.
+          this.resuming = false;
+          this.aaiSessionId = null;
+          h.onError(`resume refused (${String(msg.code ?? "")}); starting a fresh session`);
+          if (this.session) void this.start(this.session, h);
+          return;
+        }
         h.onError(`${String(msg.code ?? "")} ${String(msg.message ?? "")}`.trim());
         h.onState("error");
         return;
@@ -231,6 +287,7 @@ export class AssemblyAITransport implements VoiceTransport {
   }
 
   async stop(): Promise<void> {
+    this.stopping = true;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ type: "session.end" }));
     this.ws?.close();
     this.ws = null;
