@@ -47,6 +47,8 @@ Mechanics (all serverless, one new Lambda Function URL as the bot webhook):
 
 Done when: a voice note saying "approve fix one" in Hinglish applies a fix on the local demo, and the audit row shows the transcript, the confidence and the file id.
 
+**Status 21 Sep:** built and tested (`telegram.py`, `telegram_bot.py`, route `POST /telegram/webhook`, templates, `make set-telegram-token` / `set-telegram-webhook`, `docs/telegram.md`); *Snooze 15* became *Ack* (records `acknowledged`, no re-page) because a snooze that does not re-page would lie. Deployment waits on a bot token + user id.
+
 ## 3. Stage 3 — Fix at the source: the pull request (Thu 25 → Sat 27)
 
 The runtime fix (restore the rule) is a patch. The cause was a change; the durable fix lives in the infrastructure code. This is the feature the other entries do not have, and it is the "business value" row: no more 3 AM fixes that evaporate.
@@ -62,6 +64,8 @@ The runtime fix (restore the rule) is a patch. The cause was a change; the durab
 4. **Demo repo.** Point it at a fork of Beacon itself so the demo PR is real and visible.
 
 Done when: "open the pull request" in a voice turn produces a green-CI PR on GitHub within 30 s, and the audit shows the phrase that opened it.
+
+**Status 21 Sep:** built (`fix_pr.py`, `open_fix_pr` consent tool, `pr_opened` timeline event + PR link on the card, phrase routes in Telegram and the local agent, `make set-fix-pr-token`, `docs/fix-at-source.md`). First real PR opened by voice against `Prashant-thakur77/beacon-demo-infra` from `make local` (postmortem-only there, since moto security groups carry no CloudFormation tags); the live-account run produces the template patch.
 
 ## 4. Stage 4 — Proof: recordings, replay, tests (Sat 27 → Sun 28)
 
