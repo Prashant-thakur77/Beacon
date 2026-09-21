@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/Prashant-thakur77/Beacon/actions/workflows/build.yaml/badge.svg)](https://github.com/Prashant-thakur77/Beacon/actions/workflows/build.yaml)
 [![Release](https://img.shields.io/github/v/release/Prashant-thakur77/Beacon?label=release)](https://github.com/Prashant-thakur77/Beacon/releases/latest)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-3776ab)](pyproject.toml)
 [![Built on AWS](https://img.shields.io/badge/built%20on-AWS-ff9900)](docs/architecture.md)
 
@@ -223,4 +223,4 @@ Known gaps, on purpose for a hackathon: a single passcode instead of per-user id
 
 ## License
 
-Apache 2.0.
+MIT (see [LICENSE](LICENSE)). Third-party dependencies keep their own licenses (Strands, Powertools and Cordon are Apache-2.0; the film's music, Kevin MacLeod's *Immersed*, is CC BY 4.0 and credited in `video/README.md`).
