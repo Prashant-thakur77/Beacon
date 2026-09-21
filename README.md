@@ -90,6 +90,19 @@ The second incident under a contract runs the same loop with `source: contract` 
 | **Amazon EC2 / ECS / RDS** | the patient: a real Fargate app behind a security group | `demo/` |
 | **AWS IAM** | two roles, one direction (see Safety) | all three templates |
 
+## Built on AssemblyAI (the voice you can interrupt)
+
+The console's default voice path is the **AssemblyAI Voice Agent API**; the AWS cascade (Transcribe → Nova → Polly) stays one toggle away for the side-by-side. Each AssemblyAI API is used where it fits, not everywhere:
+
+| AssemblyAI API | What it does here | Where |
+|---|---|---|
+| **Voice Agent API** (`wss://agents.assemblyai.com/v1/ws`) | Full duplex in the browser: Universal-3 Pro STT, turn detection, barge-in, the managed LLM, TTS, and the nine Beacon tools declared as client-side functions — every `tool.call` comes back to the browser, which runs it on the voice Lambda with the transcript the API produced. English and Hinglish in and out. | `web/src/voice/assemblyai.ts`, `voice_turn.py` (`POST /tools/<name>`) |
+| **Pre-recorded transcription** (`/v2/transcript`, language detection, `keyterms_prompt`) | Telegram voice notes: the file is uploaded from the Lambda, transcribed with **word-level confidence**, and a mumbled "approve fix one" is refused with the confidence it was heard at. | `telegram.py`, `telegram_bot.py` |
+| **Session recordings** (`GET /v1/sessions/{id}`) | Every approval and contract made in a live session stores the session id; the audit page plays the recording behind the quote (**▶ Listen**), and the postmortem cites it. | `voice_turn.py` (`GET /recordings/<id>`), `web/src/components/Reports.tsx` |
+| Temporary tokens (`GET /v1/token`) | The browser never sees the API key; the Lambda mints a 10-minute token per session. | `voice_turn.py` (`POST /assemblyai/token`) |
+
+Three behaviours the socket makes possible, each with a test or a harness run behind it: **barge-in withdraws the fix** (`cancel_proposal`, the interrupted read-back cannot be approved), **drop-safety** (an approval spoken before the socket dies never executes — execution is a Lambda call after `tool.call`, never socket state), and **the night ends with a pull request** (`open the pull request` → `open_fix_pr` restores the rule in the CloudFormation template and files the postmortem; nothing is merged). Details and measured latencies: [docs/assemblyai.md](docs/assemblyai.md); the plan: [docs/assemblyai-roadmap.md](docs/assemblyai-roadmap.md); Telegram: [docs/telegram.md](docs/telegram.md); the PR: [docs/fix-at-source.md](docs/fix-at-source.md).
+
 ## Safety model (the part that matters)
 
 Auto-remediation is only worth shipping if it cannot do the wrong thing. Beacon's controls are in code and IAM, not in a prompt:
