@@ -103,7 +103,8 @@ Auto-remediation is only worth shipping if it cannot do the wrong thing. Beacon'
 6. **Two roles, one direction.** The agent you talk to has zero EC2/ECS write actions. The remediator role holds only the two allowlisted writes, scoped by `aws:ResourceTag/beacon:remediable=true` (plus the untaggable `security-group-rule/*` statement that trips everyone up). `tests/test_template_safety.py` parses the real CloudFormation and fails if this ever changes.
 7. **Recovered means proven.** Verify requires all three: the alarm is `OK` *and its state changed after the execute time*, the alarm's own metric is at zero, and the action's post-condition holds. Anything else escalates to a human.
 8. **Contracts are scoped and expire.** Alarm + action + exact resources, a use counter, a TTL, and your quote. Revoke from the console.
-9. **Undo by phrase.** Every fix has an allowlisted inverse (`sg.revoke_ingress`); saying `undo fix 1` reverses exactly what Beacon applied, records it in the audit, and hands the incident back to you. Pages reach you where you are: Slack and PagerDuty, deep-linked to `#board/<incident_id>`.
+9. **Undo by phrase.** Every fix has an allowlisted inverse (`sg.revoke_ingress`); saying `undo fix 1` reverses exactly what Beacon applied, records it in the audit, and hands the incident back to you. Pages reach you where you are: Slack, PagerDuty and Telegram, deep-linked to `#board/<incident_id>`.
+10. **Telegram voice notes.** The page lands in your Telegram chat with *Talk · Fix 1 · Ack* buttons; you answer with a voice note in English or Hinglish. AssemblyAI's pre-recorded API transcribes it with word-level confidence, the same phrase router runs the same tools, and a mumbled `approve fix one` is refused with the confidence it was heard at. See [docs/telegram.md](docs/telegram.md).
 9. **One switch stops every write path.** `make apply-off` sets `APPLY_ENABLED=false` on the triage, voice and remediate functions.
 
 Details: [`docs/safety.md`](docs/safety.md).
@@ -140,7 +141,7 @@ Then open the console URL. Full runbook with expected outputs: [`docs/human-runb
 
 New AWS accounts sit under a verification hold for a while: CloudFront and Bedrock refuse to create/serve until it clears. `make deploy-console USE_CLOUDFRONT=false` serves the console from S3 website hosting in the meantime (HTTP, typed input; flip the flag back for HTTPS and the mic). Prerequisites: Bedrock model access for Nova 2 Lite and Nova 2 Multimodal Embeddings, and a CloudTrail trail in the region (the change ledger listens to EventBridge).
 
-Paging channels: pass `WEBHOOK_URL=<Slack-compatible incoming webhook>` and/or `PAGERDUTY_ROUTING_KEY=<Events v2 key>` to `make deploy`, `make deploy-remediation` and `make deploy-console`; every page, contract run, resolution, escalation, undo and morning report is posted with a deep link to the incident (PagerDuty incidents open on a page and close on resolution).
+Paging channels: pass `WEBHOOK_URL=<Slack-compatible incoming webhook>` and/or `PAGERDUTY_ROUTING_KEY=<Events v2 key>` to `make deploy`, `make deploy-remediation` and `make deploy-console` (Telegram: `make set-telegram-token …` then the same three deploys and `make set-telegram-webhook`, see [docs/telegram.md](docs/telegram.md)); every page, contract run, resolution, escalation, undo and morning report is posted with a deep link to the incident (PagerDuty incidents open on a page and close on resolution).
 
 Operator shortcuts: `make propose`, `make approve FIX=1`, `make replay-approval APPROVAL=<id>` (proves idempotency), `make demo-reset`, `make demo-sleep` (a real second outage), `make demo-rehearse` (the whole cycle unattended), `make apply-off`.
 

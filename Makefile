@@ -2,7 +2,7 @@
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
        test lint check-image-tags smoke-strands export-tools deploy-remediation teardown-remediation \
        snapshot-sg tag-remediable dry-run changes incidents lint-templates remediable-ecs break-demo-deploy fix-demo-deploy \
-       deploy-console teardown-console web-build set-passcode console-config set-assemblyai-key \
+       deploy-console teardown-console web-build set-passcode console-config set-assemblyai-key set-telegram-token set-telegram-webhook \
        check-reduction capture-run propose approve replay-approval demo-alarm demo-reset \
        demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix preflight dashboard build-replay help setup
 
@@ -149,7 +149,12 @@ ifneq ($(REMEDIABLE_ECS_SERVICES),)
 	OVERRIDES += RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES)
 endif
 # Paging channels (optional; both NoEcho). Shared by all three stacks.
-CHANNELS = $(if $(WEBHOOK_URL),WebhookUrl=$(WEBHOOK_URL),) $(if $(PAGERDUTY_ROUTING_KEY),PagerDutyRoutingKey=$(PAGERDUTY_ROUTING_KEY),) $(if $(DASHBOARD_URL),DashboardUrl=$(DASHBOARD_URL),)
+TELEGRAM_TOKEN_PARAM ?=
+TELEGRAM_CHAT_ID     ?=
+TELEGRAM_ALLOWED_IDS ?=
+TELEGRAM_WEBHOOK_SECRET ?=
+CHANNELS = $(if $(WEBHOOK_URL),WebhookUrl=$(WEBHOOK_URL),) $(if $(PAGERDUTY_ROUTING_KEY),PagerDutyRoutingKey=$(PAGERDUTY_ROUTING_KEY),) $(if $(DASHBOARD_URL),DashboardUrl=$(DASHBOARD_URL),) \
+	$(if $(TELEGRAM_TOKEN_PARAM),TelegramTokenParam=$(TELEGRAM_TOKEN_PARAM),) $(if $(TELEGRAM_CHAT_ID),TelegramChatId=$(TELEGRAM_CHAT_ID),)
 REMEDIABLE_ECS_SERVICES ?=
 
 # Console stack
@@ -528,7 +533,9 @@ deploy-console: web-build
 			PollyVoiceId=$(POLLY_VOICE_ID) SttLanguage=$(STT_LANGUAGE) VoiceEngine=$(VOICE_ENGINE) \
 			$(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),) \
 			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),) \
-			$(if $(ASSEMBLYAI_KEY_PARAM),AssemblyAIKeyParam=$(ASSEMBLYAI_KEY_PARAM),)
+			$(if $(ASSEMBLYAI_KEY_PARAM),AssemblyAIKeyParam=$(ASSEMBLYAI_KEY_PARAM),) \
+			$(if $(TELEGRAM_ALLOWED_IDS),TelegramAllowedIds=$(TELEGRAM_ALLOWED_IDS),) \
+			$(if $(TELEGRAM_WEBHOOK_SECRET),TelegramWebhookSecret=$(TELEGRAM_WEBHOOK_SECRET),)
 	$(call save_env,PASSCODE,$(PASSCODE))
 	@BUCKET=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
 		--query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' --output text) && \
@@ -547,6 +554,32 @@ set-assemblyai-key:
 	aws ssm put-parameter --name /beacon/$(STACK_NAME)/assemblyai-key --type SecureString --value "$(ASSEMBLYAI_API_KEY)" --overwrite --region $(REGION) > /dev/null
 	$(call save_env,ASSEMBLYAI_KEY_PARAM,/beacon/$(STACK_NAME)/assemblyai-key)
 	@echo "Stored. Next: make deploy-console VOICE_BACKEND=assemblyai"
+
+# Telegram: store the bot token, then point the bot's webhook at the voice Lambda.
+#   make set-telegram-token TELEGRAM_BOT_TOKEN=123:abc TELEGRAM_CHAT_ID=<your id> TELEGRAM_ALLOWED_IDS=<your id>
+#   make deploy && make deploy-remediation && make deploy-console ...   (pages + webhook env)
+#   make set-telegram-webhook                                            (registers the URL + secret)
+set-telegram-token:
+	$(call check_param,TELEGRAM_BOT_TOKEN)
+	$(call check_param,TELEGRAM_CHAT_ID)
+	aws ssm put-parameter --name /beacon/$(STACK_NAME)/telegram-token --type SecureString --value "$(TELEGRAM_BOT_TOKEN)" --overwrite --region $(REGION) > /dev/null
+	$(call save_env,TELEGRAM_TOKEN_PARAM,/beacon/$(STACK_NAME)/telegram-token)
+	$(call save_env,TELEGRAM_CHAT_ID,$(TELEGRAM_CHAT_ID))
+	$(call save_env,TELEGRAM_ALLOWED_IDS,$(if $(TELEGRAM_ALLOWED_IDS),$(TELEGRAM_ALLOWED_IDS),$(TELEGRAM_CHAT_ID)))
+	$(call save_env,TELEGRAM_WEBHOOK_SECRET,$(if $(TELEGRAM_WEBHOOK_SECRET),$(TELEGRAM_WEBHOOK_SECRET),$(shell openssl rand -hex 16)))
+	@echo "Stored. Next: make deploy, make deploy-remediation, make deploy-console (same flags as before), then make set-telegram-webhook"
+
+set-telegram-webhook:
+	$(call check_param,TELEGRAM_WEBHOOK_SECRET)
+	@TOKEN=$$(aws ssm get-parameter --name /beacon/$(STACK_NAME)/telegram-token --with-decryption --query Parameter.Value --output text --region $(REGION)) && \
+	VOICE_URL=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`VoiceTurnUrl`].OutputValue' --output text) && \
+	curl -s -X POST "https://api.telegram.org/bot$$TOKEN/setWebhook" \
+		-H 'content-type: application/json' \
+		-d "{\"url\": \"$${VOICE_URL%/}/telegram/webhook\", \"secret_token\": \"$(TELEGRAM_WEBHOOK_SECRET)\", \"allowed_updates\": [\"message\", \"callback_query\"]}" && echo && \
+	curl -s -X POST "https://api.telegram.org/bot$$TOKEN/setMyCommands" -H 'content-type: application/json' \
+		-d '{"commands":[{"command":"status","description":"Tonight so far"},{"command":"contracts","description":"Active Sleep Contracts"},{"command":"report","description":"Morning report link"},{"command":"help","description":"Phrases I understand"}]}' > /dev/null && \
+	echo "Webhook set to $${VOICE_URL%/}/telegram/webhook"
 
 # Re-upload the site + config without touching the stack.
 console-config: web-build

@@ -12,4 +12,5 @@
 | Where the build stands, what is proven and what is not | [`STATUS.md`](STATUS.md), [`TASKS.md`](TASKS.md) |
 | Open decisions for the maintainer | [`QUESTIONS.md`](QUESTIONS.md) |
 | The original plans (kept for the record) | [`PLAN.md`](PLAN.md), [`PLAN-v2.md`](PLAN-v2.md) |
-| The next hackathon (AssemblyAI Voice Agent) | branch `assemblyai`: `assemblyai.md`, `assemblyai-deck.md` |
+| The next hackathon (AssemblyAI Voice Agent) | branch `assemblyai`: `assemblyai.md` (spike + Stage 1 results), `assemblyai-roadmap.md` (the five-stage plan), `assemblyai-deck.md` |
+| Telegram pages and voice notes | `telegram.md` |

@@ -108,6 +108,29 @@ Parameters:
     NoEcho: true
     Description: PagerDuty Events v2 routing key; pages open an incident keyed by the Beacon incident id and resolutions close it (blank = off)
 
+  TelegramTokenParam:
+    Type: String
+    Default: ""
+    Description: SSM SecureString holding the Telegram bot token (make set-telegram-token); blank = Telegram off
+
+  TelegramChatId:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Telegram chat id that receives pages (the on-call engineer's private chat with the bot)
+
+  TelegramAllowedIds:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Comma-separated Telegram user ids allowed to talk to the bot (the webhook ignores everyone else)
+
+  TelegramWebhookSecret:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Secret Telegram echoes in X-Telegram-Bot-Api-Secret-Token (make set-telegram-webhook)
+
 Conditions:
   PageOnErrors: !Not [!Equals [!Ref SnsTopicArn, ""]]
   UseCloudFront: !Equals [!Ref UseCloudFront, "true"]
@@ -521,6 +544,10 @@ Resources:
           DASHBOARD_URL: !Ref DashboardUrl
           WEBHOOK_URL: !Ref WebhookUrl
           PAGERDUTY_ROUTING_KEY: !Ref PagerDutyRoutingKey
+          TELEGRAM_TOKEN_PARAM: !Ref TelegramTokenParam
+          TELEGRAM_CHAT_ID: !Ref TelegramChatId
+          TELEGRAM_ALLOWED_IDS: !Ref TelegramAllowedIds
+          TELEGRAM_WEBHOOK_SECRET: !Ref TelegramWebhookSecret
           BEACON_VERSION: "0.2.0"
           POWERTOOLS_METRICS_NAMESPACE: Beacon
           LITELLM_LOCAL_MODEL_COST_MAP: "True"

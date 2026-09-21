@@ -468,6 +468,11 @@ def _run_tool(
         transcript=transcript,
         channel=channel,
         passcode_ok=True,
+        attestation={
+            "stt": "assemblyai-voice-agent" if channel == "assemblyai" else channel,
+            "session_id": session_id,
+            **({"confidence": confidence} if confidence is not None else {}),
+        },
     )
     with turn_context(ctx):
         result = voice_tools.dispatch(name, args)
@@ -545,6 +550,28 @@ def assemblyai_token() -> Response[str]:
         logger.exception("assemblyai token mint failed")
         return _json(502, {"error": f"could not mint an AssemblyAI token: {exc}"})
     return _json(200, minted)
+
+
+@app.post("/telegram/webhook")
+def telegram_webhook() -> Response[str]:
+    """Telegram's webhook (bot messages, voice notes, button taps).
+
+    Authenticated by the webhook secret, not the passcode; the allowlist of
+    Telegram user ids is checked inside. Always answers 200 once the secret
+    matches, because Telegram retries anything else and a retry would re-run
+    a tool.
+    """
+    from beacon import telegram_bot
+
+    event = app.current_event
+    out = telegram_bot.handle_event(
+        {"headers": dict(event.headers), "body": event.body or "{}"}
+    )
+    return Response(
+        status_code=int(out["statusCode"]),
+        content_type="application/json",
+        body=str(out["body"]),
+    )
 
 
 # ---------------------------------------------------------------------------

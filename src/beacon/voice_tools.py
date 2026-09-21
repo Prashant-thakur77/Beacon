@@ -362,6 +362,7 @@ def approve_fix(fix_id: int, confirmation_phrase: str) -> dict[str, Any]:
         transcript_quote=ctx.transcript.strip(),
         fix_id=int(fix_id),
         table_name=_approvals_table(),
+        attestation=ctx.attestation,
     )
     payload = {
         "approval_id": record["approval_id"],
@@ -571,6 +572,7 @@ def grant_sleep_contract(days: int = 7, max_uses: int = 3) -> dict[str, Any]:
         granted_by=ctx.channel,
         incident_id=incident["incident_id"],
         table_name=_contracts_table(),
+        attestation=ctx.attestation,
     )
     store.update_status(
         incident["incident_id"],
@@ -701,6 +703,7 @@ def undo_fix(fix_id: int, confirmation_phrase: str) -> dict[str, Any]:
         transcript_quote=ctx.transcript.strip(),
         fix_id=int(fix_id),
         table_name=_approvals_table(),
+        attestation=ctx.attestation,
     )
     result = _invoke_remediate(
         {

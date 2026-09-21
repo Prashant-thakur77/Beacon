@@ -24,6 +24,9 @@ class TurnContext:
     transcript: str
     channel: str = "typed"
     passcode_ok: bool = False
+    # Where the words came from: STT confidence, the voice-note file id, the
+    # AssemblyAI session id. Stored on every approval and contract this turn makes.
+    attestation: dict[str, Any] = field(default_factory=dict)
     evidence: list[dict[str, Any]] = field(default_factory=list)
     tool_events: list[dict[str, Any]] = field(default_factory=list)
 

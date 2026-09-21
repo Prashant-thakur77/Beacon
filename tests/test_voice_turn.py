@@ -464,3 +464,47 @@ def test_assemblyai_token_route_is_503_when_not_configured(
 ) -> None:
     monkeypatch.delenv("ASSEMBLYAI_KEY_PARAM", raising=False)
     assert _post("/assemblyai/token", {})["statusCode"] == 503
+
+
+def test_telegram_webhook_route_checks_the_secret_not_the_passcode(
+    env: Any, monkeypatch: Any, mocker: Any
+) -> None:
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "s3cret")
+    monkeypatch.setenv("TELEGRAM_ALLOWED_IDS", "42")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "1:x")
+    calls: list[tuple[str, dict[str, Any]]] = []
+    mocker.patch(
+        "beacon.telegram.call",
+        side_effect=lambda m, p, **kw: calls.append((m, p)) or {"ok": True},
+    )
+    mocker.patch("beacon.telegram.speak", return_value=None)
+    update = {
+        "message": {
+            "message_id": 1,
+            "from": {"id": 42},
+            "chat": {"id": 42},
+            "text": "what happened",
+        }
+    }
+    bad = voice_turn.handler(
+        url_event(
+            "POST",
+            "/telegram/webhook",
+            update,
+            {"x-telegram-bot-api-secret-token": "nope"},
+        ),
+        None,
+    )
+    assert bad["statusCode"] == 401
+    ok = voice_turn.handler(
+        url_event(
+            "POST",
+            "/telegram/webhook",
+            update,
+            {"x-telegram-bot-api-secret-token": "s3cret"},
+        ),
+        None,
+    )
+    assert ok["statusCode"] == 200
+    assert json.loads(ok["body"])["tool"] == "get_incident_brief"
+    assert calls[-1][0] == "sendMessage" and "database" in calls[-1][1]["text"]

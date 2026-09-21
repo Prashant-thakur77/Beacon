@@ -169,6 +169,7 @@ def create(
     ttl_seconds: int = APPROVAL_TTL_SECONDS,
     fix_id: int | None = None,
     contract_id: str | None = None,
+    attestation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Record consent for exactly one (action, params) on one incident."""
     now = _now()
@@ -183,6 +184,7 @@ def create(
         "source": source,
         "channel": channel,
         "transcript_quote": transcript_quote,
+        "attestation": dict(attestation or {}),
         "contract_id": contract_id,
         "granted_at": now.isoformat(),
         "expires_at": (now + timedelta(seconds=ttl_seconds)).isoformat(),

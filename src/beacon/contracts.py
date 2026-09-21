@@ -43,6 +43,7 @@ def put(
     incident_id: str,
     table_name: str,
     dynamodb_client: Any | None = None,
+    attestation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     now = _now()
     expires = now + timedelta(days=days)
@@ -60,6 +61,7 @@ def put(
         "uses": 0,
         "status": "active",
         "transcript_quote": transcript_quote,
+        "attestation": dict(attestation or {}),
         "granted_by": granted_by,
         "incident_id": incident_id,
         "last_used_at": None,

@@ -1,9 +1,11 @@
-"""Where a page actually lands: Slack-compatible webhooks and PagerDuty.
+"""Where a page actually lands: Slack-compatible webhooks, PagerDuty, Telegram.
 
 SNS email stays the baseline. When ``WEBHOOK_URL`` is set, every event is also
 posted as a Slack-style message with a deep link into the incident; when
 ``PAGERDUTY_ROUTING_KEY`` is set, a page opens a PagerDuty incident keyed by
-the Beacon incident id, and a resolution closes it. Both are fire-and-forget:
+the Beacon incident id, and a resolution closes it; when ``TELEGRAM_CHAT_ID`` is
+set (with the bot token), the on-call chat gets the page with *Talk / Fix 1 / Ack*
+buttons and can answer with a voice note (see ``telegram.py``). All are fire-and-forget:
 a slow or failing channel never breaks triage or the loop.
 """
 
@@ -154,4 +156,14 @@ def send(
         )
         if payload is not None:
             sent["pagerduty"] = _post(_PD_URL, payload)
+    if os.environ.get("TELEGRAM_CHAT_ID", ""):
+        from beacon import telegram  # stdlib + boto3 only; safe in every image
+
+        try:
+            sent["telegram"] = telegram.send_event(
+                kind, title, text, incident_id=incident_id, link=link
+            )
+        except Exception:  # same rule: a chat outage never breaks the loop
+            logger.exception("telegram send failed")
+            sent["telegram"] = False
     return sent
