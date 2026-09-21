@@ -17,10 +17,40 @@ import { EvidenceCard, FixCard, Sentence, splitSentences } from "./Talk";
 type State = "connecting" | "listening" | "thinking" | "speaking" | "idle" | "error";
 
 const SYSTEM_PROMPT_HINT =
-  "You are Beacon, the on-call agent for an AWS incident. Use your tools; never guess. Call get_incident_brief first. " +
-  "For a fix, call propose_fix, read back the blast radius and the exact phrase 'approve fix <n>'. Only call approve_fix after the engineer says it. " +
-  "After a verified fix, offer a Sleep Contract; call grant_sleep_contract, read the read-back aloud, and wait for 'grant contract for <n> days'. " +
-  "Cite evidence ids like [E2] at the end of sentences that rely on them. Short sentences. Answer Hinglish with Hinglish.";
+  "You are Beacon, the on-call agent for an AWS incident, speaking to a tired engineer at 3 AM. " +
+  "The incident brief is already in this conversation; do not call get_incident_brief unless asked to re-brief. " +
+  "When in doubt, call the tool: a wasted call is fine, a missed one is not. propose_fix and check_recovery change nothing, so never ask permission before calling them. " +
+  "Examples: user: 'can you fix it' -> call propose_fix immediately, then say the blast radius from the result and the exact phrase 'approve fix <n>'. " +
+  "user: 'fix it' / 'restore it' / 'repair it' -> same, call propose_fix immediately. " +
+  "user: 'approve fix 1' -> call approve_fix with fix_id 1 and confirmation_phrase 'approve fix 1'. user: 'yes' or 'do it' after a proposal -> do NOT call approve_fix; say: say exactly 'approve fix <n>'. " +
+  "user: 'what changed' / 'why' -> call get_evidence with kind 'changes'. user: 'undo fix 1' -> call undo_fix. user: 'is it fixed' -> call check_recovery. " +
+  "After a tool reports a verified fix, offer a Sleep Contract in one sentence. When the engineer agrees (yes, sure, haan) call grant_sleep_contract with days 7 and max_uses 3 without asking anything; it returns a read_back: speak it word for word and then wait. " +
+  "When the engineer then says 'grant contract for <n> days', call grant_sleep_contract again with days <n> and max_uses 3, and the tool grants it. Never ask the engineer how many days; the read-back and the phrase decide that. " +
+  "Voice style: at most two short sentences per turn. Never read resource ids or hashes aloud; say 'the R D S security group' or 'the E C S service'. Spell acronyms as letters (R D S, E C S, U S east 1). " +
+  "Cite evidence ids like [E2] at the end of a sentence that relies on them. Answer Hinglish with Hinglish.";
+
+/** The brief as system context, so the first real turn needs no tool round trip. */
+function briefContext(incident: Incident): string {
+  const rca = incident.rca_json ?? {};
+  const change = (incident.changes ?? [])[0];
+  const missing = (incident.diagnostics?.missing_rules ?? [])[0];
+  return [
+    `Incident ${incident.incident_id} on alarm ${incident.alarm_name ?? "unknown"}, status ${incident.status}, severity ${rca.status ?? "unknown"}.`,
+    rca.spoken_summary || rca.summary ? `Summary: ${rca.spoken_summary || rca.summary}` : "",
+    change ? `Change ledger: ${String(change.event_name)} by ${String(change.actor_short ?? "unknown")} at ${String(change.event_time ?? "?")} on ${((change.resource_ids as string[] | undefined) ?? []).join(", ")}.` : "",
+    missing ? `Drift: rule ${String(missing.ip_protocol ?? "tcp")}/${String(missing.from_port ?? "?")} from ${String(missing.source_group_id ?? "?")} is missing on ${String(missing.group_id ?? "?")}; the allowlisted fix is sg.restore_ingress.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function greetingFor(incident: Incident): string {
+  const rca = incident.rca_json ?? {};
+  const s = String(rca.spoken_summary || rca.summary || "").split(/(?<=\.)\s/)[0];
+  if (incident.handled_by === "contract" && incident.status === "resolved") return "This one was handled under your Sleep Contract; you were not woken. Ask me anything about it.";
+  if (incident.status === "resolved") return "This incident is resolved. Ask me what happened, or whether to handle it myself next time.";
+  return s ? `${s.replace(/\s+sg-[0-9a-f]+/g, " the security group")} Say fix it, and I will propose the fix.` : "Beacon here. Ask me what is going on.";
+}
 
 export function TalkDuplex({
   api,
@@ -69,8 +99,8 @@ export function TalkDuplex({
       {
         incidentId: incident.incident_id,
         sessionId,
-        systemPrompt: SYSTEM_PROMPT_HINT,
-        greeting: "Beacon here. Give me one second to read the incident.",
+        systemPrompt: `${SYSTEM_PROMPT_HINT}\n\n${briefContext(incident)}`,
+        greeting: greetingFor(incident),
         keyterms: [
           incident.alarm_name ?? "",
           ...(incident.diagnostics?.missing_rules ?? []).flatMap((r) => [String(r.group_id ?? ""), String(r.source_group_id ?? "")]),
@@ -147,6 +177,29 @@ export function TalkDuplex({
   }, [player]);
 
   useEffect(() => () => void disconnect(), [disconnect]);
+
+  // Agent-initiated turn: when the loop resolves or escalates while we are live, Beacon speaks first.
+  const announcedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const key = `${incident.incident_id}:${incident.status}`;
+    if (!live || !transport.current) return;
+    if (announcedFor.current === null) {
+      announcedFor.current = key; // do not announce the state we connected in
+      return;
+    }
+    if (announcedFor.current === key) return;
+    announcedFor.current = key;
+    if (incident.status === "resolved") {
+      const verifies = (incident.timeline ?? []).filter((e) => e.event === "verify_attempt");
+      const last = (verifies[verifies.length - 1]?.detail ?? {}) as { attempt?: number };
+      void transport.current.inject(
+        `CloudWatch has verified the recovery: the alarm is back to OK after the fix, the error metric is zero and the rule is present (verify attempt ${last.attempt ?? 1}). ` +
+          "Tell the engineer, then offer a Sleep Contract in one sentence.",
+      );
+    } else if (incident.status === "escalated") {
+      void transport.current.inject("Verification did not pass and the loop escalated to a human. Say so plainly and ask what they want to do.");
+    }
+  }, [incident.status, incident.incident_id, incident.timeline, live]);
 
   const jump = (id: string) => {
     setHotEvidence(id);

@@ -68,6 +68,19 @@ export class AwsCascadeTransport implements VoiceTransport {
     /* the STT transport owns the microphone in this backend */
   }
 
+  async inject(content: string): Promise<void> {
+    // The cascade has an explicit event turn on the server; reuse the resolved/escalated wording.
+    const status = /escalat/i.test(content) ? "escalated" : "resolved";
+    if (!this.h || !this.session) return;
+    this.h.onState("thinking");
+    try {
+      const resp = await this.api.turn({ incident_id: this.session.incidentId, session_id: this.session.sessionId, mode: "event", event: status, lang: this.sttLanguage });
+      await this.deliver(resp);
+    } catch (e) {
+      this.h.onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async sendText(text: string, channel = "typed"): Promise<void> {
     if (!this.h || !this.session) return;
     const h = this.h;
@@ -86,6 +99,11 @@ export class AwsCascadeTransport implements VoiceTransport {
       h.onState("error");
       return;
     }
+    await this.deliver(resp);
+  }
+
+  private async deliver(resp: TurnResponse): Promise<void> {
+    const h = this.h!;
     for (const ev of resp.tool_events) h.onToolResult(ev.name, ev.args, ev.summary, [ev], resp.evidence);
     h.onAgentText({ text: resp.reply_text, cited: resp.cited });
     h.onState("speaking");

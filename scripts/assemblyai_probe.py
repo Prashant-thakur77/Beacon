@@ -115,14 +115,20 @@ async def session(ws: Any, seconds: int, say: str | None) -> int:
             if say and not said and time.time() - started > 3:
                 said = True
                 # try the text-input shape the transport assumes; if the server rejects it, we learn the real one
-                # no text-input event exists: inject a user message, then ask for a reply
+                # no text-input event exists: typed lines ride reply.create's
+                # one-shot instructions (verified: the model then sees the words)
                 await ws.send(
                     json.dumps(
-                        {"type": "conversation.message", "role": "user", "content": say}
+                        {
+                            "type": "reply.create",
+                            "instructions": (
+                                f'The user just typed: "{say}". Respond to exactly '
+                                "that as if spoken, using tools as needed."
+                            ),
+                        }
                     )
                 )
-                await ws.send(json.dumps({"type": "reply.create"}))
-                print(f"[send] conversation.message + reply.create {say!r}")
+                print(f"[send] reply.create(instructions) {say!r}")
             continue
         except Exception as exc:
             print(f"[recv] closed: {exc}")

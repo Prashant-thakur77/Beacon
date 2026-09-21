@@ -733,9 +733,10 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "name": "propose_fix",
         "description": (
-            "Propose the one allowlisted fix for this incident. Runs a dry run under "
-            "the remediator role and returns the blast radius and the exact "
-            "confirmation phrase. Never applies anything."
+            "Propose the one allowlisted fix for this incident. Call it as soon as "
+            "the engineer asks to fix, repair or restore anything; do not ask for "
+            "permission first, it only runs a dry run and changes nothing. Returns "
+            "the blast radius and the exact confirmation phrase to say."
         ),
         "parameters": {"type": "object", "properties": {}, "required": []},
     },

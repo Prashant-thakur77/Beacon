@@ -52,6 +52,8 @@ export interface VoiceTransport {
   sendAudio(pcm16: Int16Array, sampleRate: number): void;
   /** Send typed text as if spoken. */
   sendText(text: string): Promise<void>;
+  /** Make the agent speak to a system-side fact (the loop resolved or escalated); not the engineer speaking. */
+  inject(content: string): Promise<void>;
   /** Interrupt the agent (barge-in). */
   interrupt(): void;
   stop(): Promise<void>;

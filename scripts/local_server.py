@@ -101,9 +101,19 @@ class LocalWorld:
         )
         golden = actions_sg.snapshot([self.rds_sg, self.ecs_sg], ec2_client=ec2)
         os.environ["GOLDEN_SG_PARAM"] = f"/beacon/{STACK}/golden-sg"
-        boto3.client("ssm", region_name=REGION).put_parameter(
+        ssm = boto3.client("ssm", region_name=REGION)
+        ssm.put_parameter(
             Name=os.environ["GOLDEN_SG_PARAM"], Type="String", Value=json.dumps(golden)
         )
+        # AssemblyAI phase: with a real key in the environment, local mode can run the
+        # Voice Agent backend (?voice=assemblyai); the tools still run here against moto.
+        if os.environ.get("ASSEMBLYAI_API_KEY"):
+            os.environ["ASSEMBLYAI_KEY_PARAM"] = f"/beacon/{STACK}/assemblyai-key"
+            ssm.put_parameter(
+                Name=os.environ["ASSEMBLYAI_KEY_PARAM"],
+                Type="SecureString",
+                Value=os.environ["ASSEMBLYAI_API_KEY"],
+            )
 
         cw = boto3.client("cloudwatch", region_name=REGION)
         cw.put_metric_alarm(
@@ -464,7 +474,9 @@ def create_app() -> FastAPI:
             "dashboardUrl": f"{base}/dash",
             "region": REGION,
             "sttLanguage": "en-IN",
-            "voiceBackend": "aws",
+            "voiceBackend": "assemblyai"
+            if os.environ.get("ASSEMBLYAI_API_KEY")
+            else "aws",
             "archivedIncidentId": "",
             "local": True,
             # Local only: lets the console's "Run the night" button unlock itself.

@@ -186,27 +186,29 @@ export class AssemblyAITransport implements VoiceTransport {
 
   async sendText(text: string): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    // There is no text-input event: inject the words as a user message, then ask for a reply.
-    // The typed text is the transcript the server-side consent check will see.
+    // The protocol has no text-input event (only audio). reply.create's one-shot
+    // `instructions` is the documented way to make the agent respond to something
+    // other than speech, so the typed line rides there. The typed text is also the
+    // transcript the server-side consent check sees for consent tools.
     this.lastFinal = { text, confidence: 1 };
-    this.h?.onUserTranscript({ text, final: true, confidence: 1 });
-    this.ws.send(JSON.stringify({ type: "conversation.message", role: "user", content: text }));
-    this.ws.send(JSON.stringify({ type: "reply.create" }));
+    this.ws.send(
+      JSON.stringify({
+        type: "reply.create",
+        instructions: `The engineer just typed: "${text}". Respond to exactly that as if they had spoken it, using your tools as the rules say.`,
+      }),
+    );
   }
 
-  /** Inject a system-side fact (e.g. "the alarm is back to OK") and have the agent speak to it. */
-  async inject(content: string, speak = true): Promise<void> {
+  /** Make the agent speak to a system-side fact (e.g. "CloudWatch says the alarm is back to OK"). */
+  async inject(content: string): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(JSON.stringify({ type: "conversation.message", role: "system", content }));
-    if (speak) this.ws.send(JSON.stringify({ type: "reply.create" }));
+    this.ws.send(JSON.stringify({ type: "reply.create", instructions: `System update, not the engineer speaking: ${content} Tell the engineer in one sentence.` }));
   }
 
   interrupt(): void {
-    // Interruption is turn-detection driven (speaking over the agent yields reply.done{interrupted}).
-    // The button version: stop local playback at once and tell the agent to stop and listen.
+    // Interruption is turn-detection driven: speaking over the agent yields reply.done{interrupted}.
+    // The button version stops local playback at once; the agent's current reply is simply not played.
     this.h?.onAgentDone("interrupted");
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(JSON.stringify({ type: "conversation.message", role: "system", content: "The engineer interrupted you. Stop speaking and wait for them." }));
   }
 
   async stop(): Promise<void> {
