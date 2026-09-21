@@ -122,6 +122,22 @@
     }
   },
   {
+    "name": "open_fix_pr",
+    "description": "After a fix is applied and verified, open the pull request that fixes the cause in the infrastructure code (plus the postmortem). Consent tool: call it only when the engineer says 'open the pull request' (or 'pull request kholo'), passing those words as confirmation_phrase. Never merges. Offer it once, in one sentence, after the Sleep Contract question is settled.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "confirmation_phrase": {
+          "type": "string",
+          "description": "The engineer's words, e.g. 'open the pull request'"
+        }
+      },
+      "required": [
+        "confirmation_phrase"
+      ]
+    }
+  },
+  {
     "name": "check_recovery",
     "description": "Check whether the remediation loop has verified recovery (alarm OK after the fix, error metric zero, post-condition).",
     "parameters": {

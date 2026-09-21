@@ -134,6 +134,15 @@ export function IncidentCard({
         <span className="stamp" title={absolute(incident.timestamp)}>
           {formatStamp(incident.timestamp)}
         </span>
+        {(() => {
+          const pr = [...(incident.timeline ?? [])].reverse().find((e) => e.event === "pr_opened");
+          const d = (pr?.detail ?? {}) as { url?: string; number?: number };
+          return pr && d.url ? (
+            <a className="btn ghost small" href={d.url} target="_blank" rel="noreferrer" title="The pull request Beacon opened after this incident" onClick={(e) => e.stopPropagation()}>
+              PR #{String(d.number)}
+            </a>
+          ) : null;
+        })()}
         {onPostmortem && (incident.status === "resolved" || incident.status === "escalated") ? (
           <button
             className="btn ghost small"

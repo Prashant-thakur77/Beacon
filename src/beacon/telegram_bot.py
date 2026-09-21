@@ -14,7 +14,7 @@ from beacon.turn_context import TurnContext, turn_context
 
 logger = logging.getLogger(__name__)
 
-_CONSENT_TOOLS = ("approve_fix", "grant_sleep_contract", "undo_fix")
+_CONSENT_TOOLS = ("approve_fix", "grant_sleep_contract", "undo_fix", "open_fix_pr")
 _MAX_TEXT = 500
 
 
@@ -141,6 +141,10 @@ def wording(name: str, result: dict[str, Any]) -> str:
     if name == "propose_fix":
         blast = result.get("blast_radius_spoken") or result.get("blast_radius") or ""
         return f"{blast}\n\nReply exactly: {result.get('confirmation_phrase')}"
+    if name == "open_fix_pr":
+        if result.get("opened"):
+            return f"{result.get('spoken_hint')}\n{result.get('url')}"
+        return str(result.get("error"))
     if name == "cancel_proposal":
         return str(result.get("spoken_hint"))
     if name == "approve_fix":

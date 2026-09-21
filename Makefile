@@ -153,6 +153,10 @@ TELEGRAM_TOKEN_PARAM ?=
 TELEGRAM_CHAT_ID     ?=
 TELEGRAM_ALLOWED_IDS ?=
 TELEGRAM_WEBHOOK_SECRET ?=
+FIX_PR_REPO          ?=
+FIX_PR_TOKEN_PARAM   ?=
+FIX_PR_BASE          ?=
+FIX_PR_TEMPLATE_PATH ?=
 CHANNELS = $(if $(WEBHOOK_URL),WebhookUrl=$(WEBHOOK_URL),) $(if $(PAGERDUTY_ROUTING_KEY),PagerDutyRoutingKey=$(PAGERDUTY_ROUTING_KEY),) $(if $(DASHBOARD_URL),DashboardUrl=$(DASHBOARD_URL),) \
 	$(if $(TELEGRAM_TOKEN_PARAM),TelegramTokenParam=$(TELEGRAM_TOKEN_PARAM),) $(if $(TELEGRAM_CHAT_ID),TelegramChatId=$(TELEGRAM_CHAT_ID),)
 REMEDIABLE_ECS_SERVICES ?=
@@ -535,7 +539,9 @@ deploy-console: web-build
 			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),) \
 			$(if $(ASSEMBLYAI_KEY_PARAM),AssemblyAIKeyParam=$(ASSEMBLYAI_KEY_PARAM),) \
 			$(if $(TELEGRAM_ALLOWED_IDS),TelegramAllowedIds=$(TELEGRAM_ALLOWED_IDS),) \
-			$(if $(TELEGRAM_WEBHOOK_SECRET),TelegramWebhookSecret=$(TELEGRAM_WEBHOOK_SECRET),)
+			$(if $(TELEGRAM_WEBHOOK_SECRET),TelegramWebhookSecret=$(TELEGRAM_WEBHOOK_SECRET),) \
+			$(if $(FIX_PR_REPO),FixPrRepo=$(FIX_PR_REPO),) $(if $(FIX_PR_TOKEN_PARAM),FixPrTokenParam=$(FIX_PR_TOKEN_PARAM),) \
+			$(if $(FIX_PR_BASE),FixPrBase=$(FIX_PR_BASE),) $(if $(FIX_PR_TEMPLATE_PATH),FixPrTemplatePath=$(FIX_PR_TEMPLATE_PATH),)
 	$(call save_env,PASSCODE,$(PASSCODE))
 	@BUCKET=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
 		--query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' --output text) && \
@@ -580,6 +586,17 @@ set-telegram-webhook:
 	curl -s -X POST "https://api.telegram.org/bot$$TOKEN/setMyCommands" -H 'content-type: application/json' \
 		-d '{"commands":[{"command":"status","description":"Tonight so far"},{"command":"contracts","description":"Active Sleep Contracts"},{"command":"report","description":"Morning report link"},{"command":"help","description":"Phrases I understand"}]}' > /dev/null && \
 	echo "Webhook set to $${VOICE_URL%/}/telegram/webhook"
+
+# Fix at the source: store the fine-grained GitHub token (contents + pull requests on one repo).
+#   make set-fix-pr-token GITHUB_PR_TOKEN=github_pat_... FIX_PR_REPO=owner/repo
+#   make deploy-console ...   (same flags as before)
+set-fix-pr-token:
+	$(call check_param,GITHUB_PR_TOKEN)
+	$(call check_param,FIX_PR_REPO)
+	aws ssm put-parameter --name /beacon/$(STACK_NAME)/github-pr-token --type SecureString --value "$(GITHUB_PR_TOKEN)" --overwrite --region $(REGION) > /dev/null
+	$(call save_env,FIX_PR_TOKEN_PARAM,/beacon/$(STACK_NAME)/github-pr-token)
+	$(call save_env,FIX_PR_REPO,$(FIX_PR_REPO))
+	@echo "Stored. Next: make deploy-console (same flags as before); then say 'open the pull request' after a fix."
 
 # Re-upload the site + config without touching the stack.
 console-config: web-build

@@ -763,6 +763,99 @@ def undo_fix(fix_id: int, confirmation_phrase: str) -> dict[str, Any]:
     }
 
 
+@observability.span("tool:open_fix_pr")
+def open_fix_pr(confirmation_phrase: str = "") -> dict[str, Any]:
+    """Open the pull request that fixes the cause in the infrastructure code.
+
+    Consent tool: the phrase must be in the transcript and a fix must have been
+    applied on this incident. The patch and the PR text come from code; nothing
+    is merged.
+    """
+    from beacon import fix_pr, reports
+
+    ctx = current()
+    incident = _incident()
+    refusal = {"opened": False, "phrase": fix_pr.PHRASE}
+    if not fix_pr.configured():
+        _tool_event("open_fix_pr", {}, "refused: not configured")
+        return {
+            **refusal,
+            "error": "fix-at-source is not configured on this deployment",
+        }
+    if not fix_pr.said_phrase(ctx.transcript):
+        _tool_event("open_fix_pr", {}, "refused: phrase not in transcript")
+        return {
+            **refusal,
+            "error": f"I need you to say exactly '{fix_pr.PHRASE}' to open it",
+        }
+    if not ctx.passcode_ok:
+        return {**refusal, "error": "the session is not authorised"}
+    rows = approvals.list_for_incident(
+        incident["incident_id"], table_name=_approvals_table()
+    )
+    applied = [r for r in rows if r.get("kind") == "approval"]
+    if not applied:
+        _tool_event("open_fix_pr", {}, "refused: no fix applied")
+        return {
+            **refusal,
+            "error": "no fix has been applied on this incident; approve one first",
+        }
+    approval = applied[-1]
+    postmortem_md = reports.postmortem(
+        incident,
+        contracts=contracts._scan(_contracts_table(), aws.client("dynamodb")),
+        approvals=rows,
+    )
+    try:
+        pr = fix_pr.open_pr(
+            incident,
+            action=str(approval["action"]),
+            params=dict(approval["params"]),
+            postmortem_md=postmortem_md,
+            approval=approval,
+            link=channels.deep_link(incident["incident_id"]),
+        )
+    except Exception as exc:
+        logger.exception("open_fix_pr failed")
+        _tool_event("open_fix_pr", {}, f"failed: {exc}")
+        return {**refusal, "error": f"could not open the pull request: {exc}"}
+    store.append_timeline(
+        incident["incident_id"],
+        "pr_opened",
+        table_name=_incidents_table(),
+        detail={
+            "url": pr["url"],
+            "number": pr["number"],
+            "kind": pr["kind"],
+            "files": pr["files"],
+            "quote": ctx.transcript.strip()[:200],
+            "channel": ctx.channel,
+        },
+    )
+    card = current().add_evidence("pull_request", f"PR #{pr['number']}", pr)
+    _tool_event("open_fix_pr", {}, f"opened {pr['url']}", card["id"])
+    channels.send(
+        "resolved",
+        f"Pull request opened for {incident.get('alarm_name')}",
+        f"{pr['title']}\n{pr['url']}",
+        incident_id=incident["incident_id"],
+    )
+    return {
+        **pr,
+        "opened": True,
+        "evidence": [card],
+        "spoken_hint": (
+            f"Pull request {pr['number']} is open"
+            + (
+                " with the template change and the postmortem."
+                if pr["kind"] == "template_patch"
+                else f" with the postmortem; {pr['reason']}."
+            )
+            + " Nothing is merged; review it in daylight."
+        ),
+    }
+
+
 @observability.span("tool:check_recovery")
 def check_recovery() -> dict[str, Any]:
     """Where the remediation loop is: status, last verify attempt, timings."""
@@ -938,6 +1031,27 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "open_fix_pr",
+        "description": (
+            "After a fix is applied and verified, open the pull request that fixes "
+            "the cause in the infrastructure code (plus the postmortem). Consent "
+            "tool: call it only when the engineer says 'open the pull request' "
+            "(or 'pull request kholo'), passing those words as "
+            "confirmation_phrase. Never merges. Offer it once, in one sentence, "
+            "after the Sleep Contract question is settled."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "confirmation_phrase": {
+                    "type": "string",
+                    "description": "The engineer's words, e.g. 'open the pull request'",
+                }
+            },
+            "required": ["confirmation_phrase"],
+        },
+    },
+    {
         "name": "check_recovery",
         "description": (
             "Check whether the remediation loop has verified recovery "
@@ -955,6 +1069,7 @@ TOOL_FUNCTIONS: dict[str, Callable[..., dict[str, Any]]] = {
     "cancel_proposal": cancel_proposal,
     "undo_fix": undo_fix,
     "grant_sleep_contract": grant_sleep_contract,
+    "open_fix_pr": open_fix_pr,
     "check_recovery": check_recovery,
 }
 

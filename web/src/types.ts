@@ -2,7 +2,8 @@
 export type KnownEvent =
   | "alarm_received" | "triggered" | "logs_fetched" | "reduced" | "diagnostics_ran" | "diagnostics_skipped" | "changes_checked" | "rca_ready" | "sns_sent"
   | "fix_proposed" | "approved" | "contract_matched" | "contract_matched_apply_disabled" | "remediation_started" | "executing" | "executed" | "execute_failed"
-  | "verify_attempt" | "resolved" | "escalated" | "contract_granted" | "contract_exhausted" | "contract_ignored" | "undone" | "undo_failed";
+  | "verify_attempt" | "resolved" | "escalated" | "contract_granted" | "contract_exhausted" | "contract_ignored" | "undone" | "undo_failed"
+  | "proposal_withdrawn" | "acknowledged" | "pr_opened" | "model_unavailable";
 
 export interface TimelineEvent {
   t: string;

@@ -119,6 +119,26 @@ Parameters:
     NoEcho: true
     Description: Telegram chat id that receives pages (the on-call engineer's private chat with the bot)
 
+  FixPrRepo:
+    Type: String
+    Default: ""
+    Description: GitHub repository (owner/name) that open_fix_pr opens pull requests on; blank = tool refuses
+
+  FixPrTokenParam:
+    Type: String
+    Default: ""
+    Description: SSM SecureString holding the fine-grained GitHub token (make set-fix-pr-token)
+
+  FixPrBase:
+    Type: String
+    Default: main
+    Description: Base branch for the fix-at-source pull request
+
+  FixPrTemplatePath:
+    Type: String
+    Default: demo/demo-infra-template.yaml
+    Description: Path of the CloudFormation template the patch targets inside the repository
+
   TelegramAllowedIds:
     Type: String
     Default: ""
@@ -546,6 +566,10 @@ Resources:
           PAGERDUTY_ROUTING_KEY: !Ref PagerDutyRoutingKey
           TELEGRAM_TOKEN_PARAM: !Ref TelegramTokenParam
           TELEGRAM_CHAT_ID: !Ref TelegramChatId
+          FIX_PR_REPO: !Ref FixPrRepo
+          FIX_PR_TOKEN_PARAM: !Ref FixPrTokenParam
+          FIX_PR_BASE: !Ref FixPrBase
+          FIX_PR_TEMPLATE_PATH: !Ref FixPrTemplatePath
           TELEGRAM_ALLOWED_IDS: !Ref TelegramAllowedIds
           TELEGRAM_WEBHOOK_SECRET: !Ref TelegramWebhookSecret
           BEACON_VERSION: "0.2.0"

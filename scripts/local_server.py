@@ -324,6 +324,15 @@ class ScriptedAgent:
         elif "system event" in t and "escalated" in t:
             r = self._call("check_recovery", {})
             reply = f"Verification did not pass; status is {r.get('status')}. A human is needed."
+        elif re.search(
+            r"\b(open (?:the |a )?(?:pull request|pr)|pull request kholo)\b", t
+        ):
+            r = self._call("open_fix_pr", {"confirmation_phrase": text})
+            reply = (
+                str(r.get("spoken_hint"))
+                if r.get("opened")
+                else f"I could not open it: {r.get('error')}"
+            )
         elif re.search(r"\bundo fix\b", t):
             m = re.search(r"undo fix (\w+)", t)
             fix = {"one": 1, "two": 2}.get(m.group(1), 1) if m else 1

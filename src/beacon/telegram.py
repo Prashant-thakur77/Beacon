@@ -330,6 +330,10 @@ def route(text: str) -> tuple[str, dict[str, Any]] | None:
         return "grant_sleep_contract", {"days": _num(m.group(1)), "max_uses": 3}
     if m := re.search(rf"\b{_NUM} din ke liye contract\b", t):
         return "grant_sleep_contract", {"days": _num(m.group(1)), "max_uses": 3}
+    if re.search(
+        r"\b(open (?:the |a )?(?:pull request|pr)|pull request (?:kholo|banao))\b", t
+    ):
+        return "open_fix_pr", {"confirmation_phrase": text}
     if re.search(r"\b(contract|next time|handle it yourself|khud sambhal)\b", t):
         return "grant_sleep_contract", {"days": 7, "max_uses": 3}
     if re.search(r"\b(fix|repair|restore|propose|theek|thik)\b", t):
@@ -356,6 +360,7 @@ HELP = (
     "• undo fix 1\n"
     "• is it fixed\n"
     "• handle it next time → then: grant contract for 7 days\n"
+    "• open the pull request  (after a fix: the durable fix, never merged)\n"
     "Commands: /status /contracts /report /use <incident id> /help"
 )
 

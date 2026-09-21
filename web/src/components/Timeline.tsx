@@ -27,6 +27,10 @@ const LABELS: Record<string, string> = {
   contract_ignored: "Contract ignored",
   undone: "↩︎ Undone by phrase",
   undo_failed: "Undo refused",
+  proposal_withdrawn: "Proposal withdrawn (barge-in)",
+  acknowledged: "Acknowledged on Telegram",
+  pr_opened: "Pull request opened (fix at the source)",
+  model_unavailable: "Model unavailable — deterministic triage",
 };
 
 function tone(ev: TimelineEvent): string {
@@ -35,6 +39,7 @@ function tone(ev: TimelineEvent): string {
   if (ev.event === "verify_attempt") return d.ok ? "ok" : "warn";
   if (ev.event === "escalated" || ev.event === "execute_failed" || ev.event === "undone" || ev.event === "undo_failed") return "bad";
   if (ev.event.startsWith("contract")) return "moon";
+  if (ev.event === "pr_opened") return "ok";
   if (ev.event === "sns_sent" || ev.event === "fix_proposed" || ev.event === "alarm_received") return "warn";
   return "";
 }
@@ -118,6 +123,16 @@ function Detail({ ev }: { ev: TimelineEvent }) {
       );
     case "undo_failed":
       return <div className="d">{String(d.error ?? d.reason ?? "refused")}</div>;
+    case "proposal_withdrawn":
+      return <div className="d">fix {String(d.fix_id)} withdrawn · {String(d.reason ?? "")} · nothing was applied</div>;
+    case "pr_opened":
+      return (
+        <div className="d">
+          <a href={String(d.url)} target="_blank" rel="noreferrer">PR #{String(d.number)}</a> · {d.kind === "template_patch" ? "template change + postmortem" : "postmortem"} · “{String(d.quote ?? "")}” via {String(d.channel ?? "voice")}
+        </div>
+      );
+    case "model_unavailable":
+      return <div className="d">{String(d.reason ?? "")}</div>;
     case "resolved":
       return <div className="d">handled by {String(d.handled_by ?? "voice")}{d.attempts ? ` after ${String(d.attempts)} verify attempt(s)` : ""}</div>;
     default:

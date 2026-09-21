@@ -134,7 +134,7 @@ def _ctx(
     )
 
 
-def test_tool_schemas_cover_the_eight_tools_with_json_schema() -> None:
+def test_tool_schemas_cover_the_nine_tools_with_json_schema() -> None:
     names = [t["name"] for t in voice_tools.TOOL_SCHEMAS]
     assert names == [
         "get_incident_brief",
@@ -144,6 +144,7 @@ def test_tool_schemas_cover_the_eight_tools_with_json_schema() -> None:
         "cancel_proposal",
         "undo_fix",
         "grant_sleep_contract",
+        "open_fix_pr",
         "check_recovery",
     ]
     assert set(names) == set(voice_tools.TOOL_FUNCTIONS)
@@ -404,3 +405,50 @@ def test_cancel_proposal_withdraws_the_pending_fix(env: Any) -> None:
     with turn_context(_ctx(inc, "stop")):
         again = voice_tools.cancel_proposal(1)
     assert again["withdrawn"] is False
+
+
+def test_open_fix_pr_needs_the_phrase_an_applied_fix_and_a_repo(
+    env: Any, monkeypatch: Any, mocker: Any
+) -> None:
+    inc = env["incident_id"]
+    with turn_context(_ctx(inc, "open the pull request")):
+        assert (
+            "not configured"
+            in voice_tools.open_fix_pr("open the pull request")["error"]
+        )
+    monkeypatch.setenv("FIX_PR_REPO", "o/r")
+    monkeypatch.setenv("GITHUB_PR_TOKEN", "t")
+    with turn_context(_ctx(inc, "open the pull request")):
+        out = voice_tools.open_fix_pr("open the pull request")
+    assert out["opened"] is False and "no fix has been applied" in out["error"]
+    with turn_context(_ctx(inc, "fix it")):
+        voice_tools.propose_fix()
+    with turn_context(_ctx(inc, "approve fix 1")):
+        assert voice_tools.approve_fix(1, "approve fix 1")["approved"] is True
+    with turn_context(_ctx(inc, "please open it")):
+        refused = voice_tools.open_fix_pr("open the pull request")
+    assert refused["opened"] is False and "say exactly" in refused["error"]
+    opened = mocker.patch(
+        "beacon.fix_pr.open_pr",
+        return_value={
+            "url": "https://github.com/o/r/pull/41",
+            "number": 41,
+            "branch": "beacon/incident-x",
+            "files": ["demo/demo-infra-template.yaml", "docs/incidents/x.md"],
+            "kind": "template_patch",
+            "reason": None,
+            "title": "Restore …",
+        },
+    )
+    with turn_context(_ctx(inc, "okay, open the pull request")) as ctx:
+        out = voice_tools.open_fix_pr("open the pull request")
+    assert out["opened"] is True and out["url"].endswith("/pull/41")
+    assert "Nothing is merged" in out["spoken_hint"]
+    kwargs = opened.call_args.kwargs
+    assert kwargs["action"] == "sg.restore_ingress" and kwargs["params"] == PARAMS
+    assert kwargs["approval"]["transcript_quote"] == "approve fix 1"
+    assert "# " in kwargs["postmortem_md"]
+    incident = store.get_incident(inc, table_name=INCIDENTS)
+    last = incident["timeline"][-1]
+    assert last["event"] == "pr_opened" and last["detail"]["number"] == 41
+    assert ctx.evidence[-1]["kind"] == "pull_request"

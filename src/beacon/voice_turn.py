@@ -41,7 +41,7 @@ _ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 _MAX_TEXT = 2000
 _CITATION_RE = re.compile(r"\s*\[(E\d+)\]")
 _MAX_HISTORY = 20
-_CONSENT_TOOLS = ("approve_fix", "grant_sleep_contract")
+_CONSENT_TOOLS = ("approve_fix", "grant_sleep_contract", "undo_fix", "open_fix_pr")
 _MIN_CONSENT_CONFIDENCE = 0.85
 
 # CORS lives on the Function URL (console-template.yaml), scoped to the console
