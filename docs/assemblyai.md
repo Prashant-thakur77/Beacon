@@ -47,6 +47,22 @@ Facts verified from the docs on 18 Sep (re-verify on day 1, the spike):
 
 Day 1's spike is now one command: `ASSEMBLYAI_API_KEY=… .venv/bin/python scripts/assemblyai_probe.py` — it tries the three auth variants (header, minted query token, query key), sends `session.update` with an echo tool, prints one line per distinct event, and ends with the list of event names `assemblyai.ts` expects but did not see. Fix whatever differs in `assemblyai.ts` / `_mint_assemblyai_token` and move on.
 
+## Stage 1 results (21 Sep evening, live socket, real key)
+
+Everything below ran unattended by `scripts/dev/assemblyai_loop.py` (typed lines in a real Chromium against the console) and `scripts/dev/assemblyai_audio.py` (Polly speech pushed through `input.audio`, the same tools, no browser), first against `make local`, then against the deployed account.
+
+| Check | Result |
+|---|---|
+| Whole night by voice on **real AWS** (console URL, passcode) | "what happened" → brief; "fix it" → `propose_fix` in **1.9 s**; "approve fix 1" → `approve_fix`, Step Functions `SUCCEEDED`, verified on attempt 5 (2 m 35 s), incident `resolved`, alarm back to OK; contract read-back; "grant contract for seven days" → granted. No Bedrock involved: triage ran in the deterministic degraded mode (`model_unavailable` in the timeline), the voice path is AssemblyAI end to end. |
+| **Barge-in withdraws the fix** | Interrupting the read-back after `propose_fix` calls `cancel_proposal`; `approve fix 1` afterwards is refused with *"fix 1 was withdrawn because you interrupted the read-back; nothing was applied"*; "fix it" proposes fix 2; approval of fix 2 executes. The interrupted bubble is marked and a console note explains the withdrawal. |
+| **Hinglish by audio** | Spoken "kya hua hai" / "isko fix kar do" transcribe as Devanagari (`क्या हुआ है?`, `इसको फिक्स कर दो।`); the agent understands them, calls `propose_fix`, and answers in Hinglish ("U S east 1 mein web service R D S se connect nahi kar paa rahi hai. Security group ka rule missing hai"). Spoken "approve fix five" is heard as *"Approve fix five."* and the server's phrase check accepts it. Voice `jane` pronounces the Hinglish well enough that pre-recorded STT re-transcribes it as Hindi words. |
+| **Latency** (turn end → first agent audio) | 0.1–0.4 s when no tool is needed; a tool turn starts speaking in ~0.2 s, calls the tool 1–2 s in, tool round trip 40–200 ms (Lambda), and the read-back reply begins ~2 s after `tool.result`. The console shows these live (latency strip in the Talk panel). |
+| **Agent audio field** | `reply.audio` carries the PCM in `data`, not `audio`; the transport read the wrong field until this run (silent agent). Fixed; the loop driver now fails loudly if no audio bytes arrive. |
+| Client pings | The `websockets` library's keepalive pings went unanswered mid-reply and closed the socket (`1011 keepalive ping timeout`); browsers do not ping, so the audio harness runs with `ping_interval=None`. |
+| Prompt adherence | With trigger phrases in the tool descriptions (`propose_fix`, `grant_sleep_contract`) the managed LLM calls tools without asking permission in every run of the loop; one earlier run asked the engineer to say the phrase instead of issuing the read-back first. |
+
+Backend switch: the Talk panel has an *AssemblyAI · full duplex / AWS cascade · push to talk* toggle, remembered per browser, for the side-by-side.
+
 ## Day by day
 
 | Day | Work | Done when |

@@ -31,6 +31,8 @@ Goal: the live browser experience on the Voice Agent API is smooth enough to fil
 
 Done when: a judge with the passcode can open the live URL, press Connect, and run the whole night by voice with nothing scripted.
 
+**Status 21 Sep:** 1.1 spoken read-backs ✔ · 1.2 `cancel_proposal` + barge-in wiring ✔ (real-mic take still to film) · 1.3 Hinglish by audio ✔ (`scripts/dev/assemblyai_audio.py`) · 1.4 `voice_focus` pending a noisy-room test · 1.5 deployed, backend switch ✔ · 1.6 latency strip ✔. Results in `docs/assemblyai.md` § Stage 1 results.
+
 ## 2. Stage 2 — Telegram: the page where the engineer actually is (Wed 24 → Thu 25)
 
 Why Telegram: it is on every Indian engineer's phone, voice notes are the native way people talk to each other at night, bots are free, and it has inline buttons. WhatsApp Business is the same idea with a longer approval path; Telegram first, WhatsApp as a documented follow-up.
