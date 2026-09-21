@@ -2,7 +2,7 @@
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
        test lint check-image-tags smoke-strands export-tools deploy-remediation teardown-remediation \
        snapshot-sg tag-remediable dry-run changes incidents lint-templates remediable-ecs break-demo-deploy fix-demo-deploy \
-       deploy-console teardown-console web-build set-passcode console-config set-assemblyai-key set-telegram-token set-telegram-webhook \
+       deploy-console teardown-console web-build set-passcode console-config set-assemblyai-key set-telegram-token set-telegram-webhook set-fix-pr-token \
        check-reduction capture-run propose approve replay-approval demo-alarm demo-reset \
        demo-sleep demo-rehearse apply-on apply-off warm latest-incident local local-break local-fix preflight dashboard build-replay help setup
 
@@ -30,6 +30,11 @@ help:  ## every target with a "##" comment, grouped as the runbook uses them
 	@echo "  remediable-ecs     allowlist the demo ECS service           dry-run          must print DRY RUN PASSED"
 	@echo "  set-passcode       PASSCODE=<word>                          deploy-console   S3 + CloudFront + Function URLs"
 	@echo "  preflight          every check before recording"
+	@echo
+	@echo "Voice, phone and the pull request:"
+	@echo "  set-assemblyai-key ASSEMBLYAI_API_KEY=…   then deploy-console VOICE_BACKEND=assemblyai (full duplex in the browser)"
+	@echo "  set-telegram-token TELEGRAM_BOT_TOKEN=… TELEGRAM_CHAT_ID=…   then the three deploys and set-telegram-webhook"
+	@echo "  set-fix-pr-token   GITHUB_PR_TOKEN=github_pat_… FIX_PR_REPO=owner/repo   then deploy-console (say: open the pull request)"
 	@echo
 	@echo "Operate the demo:"
 	@echo "  break-demo / fix-demo            revoke / restore the RDS ingress rule"

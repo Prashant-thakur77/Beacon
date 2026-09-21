@@ -166,4 +166,11 @@ def send(
         except Exception:  # same rule: a chat outage never breaks the loop
             logger.exception("telegram send failed")
             sent["telegram"] = False
+    if sent:
+        logger.info(
+            "channels %s %s: %s",
+            kind,
+            incident_id or "-",
+            ", ".join(f"{k}={'ok' if v else 'FAILED'}" for k, v in sent.items()),
+        )
     return sent

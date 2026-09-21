@@ -48,6 +48,13 @@ const PILLARS = [
   { title: "Runs on your laptop too", text: "`make local` runs the whole product against an in-process moto AWS with a scripted agent: same tools, same safety checks, no account needed." },
 ];
 
+const NIGHT_SHIFT = [
+  { title: "Interrupt it", text: "Full duplex on the AssemblyAI Voice Agent API. Speak over a read-back and the fix it was reading is withdrawn — turn-taking with a safety meaning.", tag: "voice" },
+  { title: "Answer from your phone", text: "The page lands in Telegram with Talk · Fix 1 · Ack. Reply with a voice note, in English or Hinglish; a mumbled approval is refused with the confidence it was heard at.", tag: "telegram" },
+  { title: "End it with a pull request", text: "Say “open the pull request” and the missing rule is restored in the CloudFormation template, with the postmortem and your approval quoted. Nothing is merged at 3 AM.", tag: "github" },
+  { title: "Proof you can play back", text: "Every approval stores the session recording. The audit page plays the words behind the fix, with the confidence they were heard at.", tag: "audit" },
+];
+
 const QUOTES = [
   { from: "from the demo night", text: "grant contract for seven days", note: "the exact phrase that creates a Sleep Contract, kept as the record" },
   { from: "from the safety tests", text: "fix 1 sg.restore_ingress · dry run PASSED (DryRunOperation, via remediator role)", note: "every action is rehearsed under the role that will execute it" },
@@ -59,6 +66,7 @@ const FAQ = [
   { q: "What can it change?", a: "Restore one security-group ingress rule that exists in the golden snapshot, or force a new deployment of one ECS service. Both are scoped by the beacon:remediable resource tag in IAM." },
   { q: "What if the fix fails?", a: "Verification needs three things: the alarm back to OK after the fix, the error metric at zero, and the post-condition. After the retry window it escalates to a human and says so on the board." },
   { q: "What happens without Bedrock?", a: "Triage falls back to a deterministic summary and the console still shows the alarm, the CloudTrail change and the timeline. On a fresh AWS account under verification hold, that is the state the live URL is in today." },
+  { q: "Which parts are the model, and which are code?", a: "The model decides whether to call a tool, and only after your words. Consent is checked against the transcript in code; the patch in the pull request is computed from the parameters that passed the dry run; the PR text, the postmortem and the morning report are rendered from the incident record. No model writes to AWS or to the repository." },
   { q: "Can I run it without an AWS account?", a: "Yes. `make setup && make local` runs the whole product against moto with a scripted agent, and `?night=1` plays the entire night unattended in the browser." },
   { q: "What did it cost?", a: "Nova 2 Lite list price at a fixed ₹/USD gives an order of magnitude on the Analytics page: a few tenths of a rupee per incident. It is not a bill." },
 ];
@@ -273,6 +281,23 @@ export function Landing({ tally, replay, local, onRunNight }: { tally: Tally | n
         <div className="pillars">
           {PILLARS.map((p, i) => (
             <div key={p.title} className="pillar reveal" style={{ "--i": i } as React.CSSProperties}>
+              <h3>{p.title}</h3>
+              <p>{p.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 5b · the night shift */}
+      <section className="section">
+        <div className="eyebrow center">The night shift</div>
+        <h2 className="display center">
+          Where the engineer <em>actually is.</em>
+        </h2>
+        <div className="pillars four">
+          {NIGHT_SHIFT.map((p, i) => (
+            <div key={p.title} className="pillar reveal" style={{ "--i": i } as React.CSSProperties}>
+              <span className="eyebrow">{p.tag}</span>
               <h3>{p.title}</h3>
               <p>{p.text}</p>
             </div>

@@ -169,20 +169,25 @@ src/beacon/
   store.py / approvals.py / contracts.py   DynamoDB: incidents, approvals, Sleep Contracts
   remediation/          registry (the allowlist), actions_sg, actions_ecs, verify (three checks)
   remediate.py          remediate Lambda: dryrun · require_approval · execute · verify · resolve · escalate · all
-  voice_tools.py        seven tools + TOOL_SCHEMAS (shared across voice backends)
-  turn_context.py       the raw transcript of the current turn; consent is decided here
-  voice_turn.py         Function URL: /session (STS mic creds), /turn (Strands agent + Polly), tool_only
+  voice_tools.py        nine tools + TOOL_SCHEMAS (shared across voice backends): brief, evidence, propose, approve, cancel, undo, contract, PR, recovery
+  turn_context.py       the raw transcript of the current turn + attestation (confidence, session, file); consent is decided here
+  voice_turn.py         Function URL: /tools/<name> (AssemblyAI path), /assemblyai/token, /recordings/<id>, /telegram/webhook, /session + /turn (AWS cascade)
+  telegram.py           Telegram outbound (pages with buttons), pre-recorded STT, Polly voice notes, the phrase router
+  telegram_bot.py       Telegram inbound: one update → one tool → one reply (secret + allowlist)
+  fix_pr.py             fix at the source: deterministic template patch + postmortem → GitHub pull request
+  channels.py           fan-out of every page/resolution/undo/report to Slack-compatible webhooks, PagerDuty, Telegram
+  reports.py            postmortem, audit rows/CSV, morning report (rendered from the record, no model)
   voice_loop.py         litellm fallback engine, same tools
   dashboard_api.py      read-only Function URL for the console (redacts account ids / ARNs); GET /analytics aggregates nights, recovery percentiles, cost
   observability.py      Powertools EMF metrics + X-Ray spans, one dimension set, incident id as metadata
   aws.py                boto3 clients with bounded timeouts and retries
-web/                    Vite + React console: Night Board, Talk, Analytics, Contracts, Safety, replay, "Run the night"
+web/                    Vite + React console: Night Board, Talk (full duplex on AssemblyAI + AWS cascade), Analytics, Contracts, Audit (with recordings), Safety, replay
 template.yaml           base stack (triage)          remediation-template.yaml   console-template.yaml
 demo/                   the patient: VPC + RDS + Fargate app + alarm, and the sticky-wedge failure mode
 requirements/           pinned image dependencies (triage.txt, agent.txt)
-scripts/                gate.sh · commit.sh · local_server.py (make local) · preflight, capture, replay builders
-tests/                  244 tests: moto for AWS, FakeAgent for the model, template safety + ops, local mode
-docs/                   architecture.md (Mermaid) · safety.md · human-runbook.md · demo-script.md · submission.md · blog.md · LEARNINGS.md
+scripts/                gate.sh · commit.sh · local_server.py (make local) · dev/assemblyai_loop.py + dev/assemblyai_audio.py (voice harnesses) · capture, replay builders
+tests/                  300+ tests: moto for AWS, FakeAgent for the model, fake Telegram/GitHub/AssemblyAI, template safety + ops, local mode
+docs/                   architecture.md (Mermaid) · safety.md · assemblyai.md · telegram.md · fix-at-source.md · human-runbook.md · submission.md · blog.md
 video/                  how the demo film is generated (Chatterbox narration, three.js scenes, Playwright captures, ffmpeg)
 .github/                CI (gate + console build), manual Deploy workflow, issue/PR templates
 ```

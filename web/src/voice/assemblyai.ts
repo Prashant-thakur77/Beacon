@@ -60,6 +60,7 @@ export class AssemblyAITransport implements VoiceTransport {
   private session: VoiceSession | null = null;
   private aaiSessionId: string | null = null;
   private resumeToken: string | null = null;
+  private turnDetection: { vad_threshold: number; min_silence?: number; max_silence?: number } = { vad_threshold: 0.5 };
   private resumes = 0;
   private resuming = false;
   private stopping = false;
@@ -94,6 +95,14 @@ export class AssemblyAITransport implements VoiceTransport {
     ws.onclose = () => void this.onClose(ws);
   }
 
+  setTurnDetection(opts: { vad_threshold: number; min_silence?: number; max_silence?: number }): void {
+    this.turnDetection = opts;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    // input.turn_detection is mutable after session.ready (the spec lists it under the
+    // fields session.update may change mid-session).
+    this.ws.send(JSON.stringify({ type: "session.update", session: { input: { turn_detection: opts } } }));
+  }
+
   private sessionUpdate(session: VoiceSession, greeting: string): string {
     return JSON.stringify({
       type: "session.update",
@@ -102,7 +111,7 @@ export class AssemblyAITransport implements VoiceTransport {
         greeting,
         input: {
           format: { encoding: "audio/pcm" },
-          turn_detection: { vad_threshold: 0.5 },
+          turn_detection: this.turnDetection,
           transcription_mode: "balanced",
           language_codes: session.languageCodes ?? ["en", "hi"],
           ...(session.keyterms?.length ? { keyterms: session.keyterms } : {}),

@@ -189,6 +189,8 @@ def test_triage_entry_points_do_not_import_powertools() -> None:
         "beacon.voice_turn",
         "beacon.voice_tools",
         "beacon.remediate",
+        "beacon.telegram_bot",  # inbound half needs the tools; pages only need telegram
+        "beacon.fix_pr",
     }
     seen: set[str] = set()
     todo = ["beacon.handler"]

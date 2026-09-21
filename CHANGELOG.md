@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.0 — 21–22 Sep 2026 (AssemblyAI Voice Agent phase, branch `assemblyai`)
+
+Added
+- Full-duplex voice on the AssemblyAI Voice Agent API: continuous mic, turn detection, barge-in, the nine tools as client-side functions executed on the voice Lambda from the transcript; Hinglish in and out; backend switch (AssemblyAI / AWS cascade); measured latency strip; noisy-room preset.
+- `cancel_proposal`: interrupting a read-back withdraws the proposed fix; the refusal explains it.
+- Telegram: pages with *Talk · Fix 1 · Ack*, voice notes transcribed by AssemblyAI pre-recorded STT with word-level confidence (min-word gate 85 %), phrase router onto the same tools, Polly voice-note replies, `/status /contracts /report /use`; webhook on the voice Lambda behind a secret and a user allowlist.
+- `open_fix_pr`: the pull request that fixes the cause in the CloudFormation template (deterministic patch mapped through logical-id tags) plus the postmortem; body quotes the approval, verify checks and CloudTrail change; resolved incidents only; never merges.
+- Attestation on approvals and contracts (backend, confidence, session id, voice-note file id); `GET /recordings/<id>` and **▶ Listen** in the audit; postmortems and the morning report cite recordings and pull requests.
+- Degraded triage when Bedrock is unavailable (deterministic sources, `model_unavailable` event); change ledger ranks changes touching the broken resources first.
+- Harnesses: `scripts/dev/assemblyai_loop.py` (browser, `!interrupt`) and `scripts/dev/assemblyai_audio.py` (Polly speech through `input.audio`, `!drop`).
+
+Changed
+- License: MIT.
+
 ## Unreleased — 20 Sep 2026 evening sprint
 
 - Console: Wispr-Flow-inspired editorial theme and motion, landing page, Analytics, Safety Controls/Proof, mobile nav, deep links, filters, keyboard shortcuts, 404/meta, archived-night on empty deployments.

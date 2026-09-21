@@ -215,3 +215,32 @@ def test_morning_report_for_a_quiet_night() -> None:
         [], contracts=[], night_of="2026-09-21", now="2026-09-22T01:30:00+00:00"
     )
     assert rep["incidents"] == 0 and "quiet" in rep["text"].lower()
+
+
+def test_reports_carry_the_pull_request() -> None:
+    from beacon import reports
+
+    inc = {
+        "incident_id": "i1",
+        "alarm_name": "beacon-demo-infra-errors",
+        "timestamp": "2026-09-21T20:41:00+00:00",
+        "resolved_at": "2026-09-21T20:44:00+00:00",
+        "status": "resolved",
+        "rca_json": {"summary": "x"},
+        "timeline": [
+            {"event": "resolved", "at": "2026-09-21T20:44:00+00:00", "detail": {}},
+            {
+                "event": "pr_opened",
+                "at": "2026-09-21T20:46:00+00:00",
+                "detail": {"url": "https://github.com/o/r/pull/2", "number": 2},
+            },
+        ],
+    }
+    pm = reports.postmortem(inc, contracts=[], approvals=[])
+    assert "## Durable fix" in pm and "https://github.com/o/r/pull/2" in pm
+    report = reports.morning_report(
+        [inc], contracts=[], now="2026-09-22T01:30:00+00:00"
+    )
+    assert report["pull_requests"] == ["https://github.com/o/r/pull/2"]
+    assert "Durable fix: pull request https://github.com/o/r/pull/2" in report["text"]
+    assert "1 pull request(s) opened for review" in report["text"]

@@ -31,13 +31,22 @@ flowchart LR
 
   subgraph console["Console stack (beacon-console)"]
     S3["S3 bucket<br/>Night Board build"] --> EDGE["CloudFront, or the<br/>static_site Lambda URL (HTTPS)"] --> YOU(("you, 3 AM"))
-    YOU --> VOICE["Lambda · voice-turn<br/>Strands on Nova 2 Lite"]
+    YOU <-->|"full duplex · tools on one socket"| AAI["AssemblyAI Voice Agent API<br/>Universal-3 Pro · turn detection · TTS"]
+    YOU -->|"POST /tools/name (transcript)"| VOICE["Lambda · voice-turn<br/>tools + consent · Strands cascade"]
     VOICE --> BR
     VOICE -->|dry run via| REMED
-    VOICE -->|approval record| APPR
+    VOICE -->|approval record + attestation| APPR
     VOICE --> SFN
-    VOICE --> POLLY["Polly + Transcribe"]
+    VOICE --> POLLY["Polly + Transcribe<br/>(AWS cascade)"]
+    VOICE -->|"GET /recordings/id"| AAI
     YOU --> DASH["Lambda · dashboard<br/>read-only, redacted"] --> INC
+  end
+
+  subgraph phone["Where the engineer actually is"]
+    TG(("Telegram<br/>page · voice note")) -->|"webhook (secret + allowlist)"| VOICE
+    VOICE -->|"pre-recorded STT · word confidence"| AAIP["AssemblyAI /v2/transcript"]
+    TRIAGE -->|"page with Talk · Fix 1 · Ack"| TG
+    VOICE -->|"open_fix_pr: branch + PR"| GH["GitHub<br/>infrastructure repo"]
   end
 ```
 

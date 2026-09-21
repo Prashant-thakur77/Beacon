@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "beacon"
-version = "0.2.0"
+version = "0.3.0"
 description = "Beacon Night Shift: the on-call agent that fixes the 3 AM page with your voice, and does not wake you the second time"
 authors = [{ name = "Prashant", email = "prashant101007@gmail.com" }]
 requires-python = ">=3.12"

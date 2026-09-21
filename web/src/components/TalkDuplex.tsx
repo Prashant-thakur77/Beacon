@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Api } from "../api";
 import type { Config } from "../config";
-import { formatTime } from "../hooks";
+import { formatTime, useLocalState } from "../hooks";
 import type { Evidence, Incident, Message, MetricSeries, ToolEvent } from "../types";
 import { PcmPlayer } from "../voice/pcmPlayer";
 import { makeTransport, type VoiceBackend } from "../voice/select";
@@ -80,6 +80,13 @@ export function TalkDuplex({
   /** fix_id proposed inside the reply now being spoken; interrupting that reply withdraws it. */
   const proposalInReply = useRef<number | null>(null);
   const replySpoke = useRef(false);
+  // Noisy room: a higher VAD threshold and a longer confident-silence window, so a
+  // fan or a TV does not open turns and short pauses do not close them.
+  const [noisy, setNoisy] = useLocalState("beacon.noisyRoom", "");
+  const turnDetection = useMemo(() => (noisy ? { vad_threshold: 0.7, min_silence: 700, max_silence: 2000 } : { vad_threshold: 0.5 }), [noisy]);
+  useEffect(() => {
+    transport.current?.setTurnDetection?.(turnDetection);
+  }, [turnDetection]);
   /** Live latency, measured in the browser: turn end → first audio, tool round trip, turn total. */
   const lat = useRef<{ turnEnd: number | null; firstAudio: number | null; toolStart: number | null }>({ turnEnd: null, firstAudio: null, toolStart: null });
   const [latency, setLatency] = useState<{ ttfa?: number; tool?: number; toolName?: string; turn?: number; turns: number }>({ turns: 0 });
@@ -103,6 +110,7 @@ export function TalkDuplex({
     await player.ensure();
     const t = makeTransport(backend, api, config, stt, passcode);
     transport.current = t;
+    t.setTurnDetection?.(turnDetection);
     await t.start(
       {
         incidentId: incident.incident_id,
@@ -220,7 +228,7 @@ export function TalkDuplex({
     silent.gain.value = 0;
     source.connect(node).connect(silent).connect(micCtx.current.destination);
     setLive(true);
-  }, [api, backend, config, incident.alarm_name, incident.diagnostics, incident.incident_id, onIncident, passcode, player, sessionId, stt]);
+  }, [api, backend, config, incident.alarm_name, incident.diagnostics, incident.incident_id, onIncident, passcode, player, sessionId, stt, turnDetection]);
 
   const disconnect = useCallback(async () => {
     setLive(false);
@@ -310,6 +318,9 @@ export function TalkDuplex({
             <div className="stack" style={{ gap: 4 }}>
               <div className={`state ${state}`}>{stateLabel[state]}</div>
               <div className="partial">{partial || (heard ? `heard: “${heard.text}”${heard.confidence != null ? ` (${Math.round(heard.confidence * 100)}%)` : ""}` : "full-duplex: just talk")}</div>
+              <label className="noisy small" title="Higher speech threshold and a longer pause before Beacon answers — for a fan, a TV, a train.">
+                <input type="checkbox" checked={!!noisy} onChange={(e) => setNoisy(e.target.checked ? "1" : "")} /> noisy room
+              </label>
               {live ? (
                 <button
                   className="btn ghost small"

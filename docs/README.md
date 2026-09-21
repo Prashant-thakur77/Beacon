@@ -14,3 +14,4 @@
 | The original plans (kept for the record) | [`PLAN.md`](PLAN.md), [`PLAN-v2.md`](PLAN-v2.md) |
 | The next hackathon (AssemblyAI Voice Agent) | branch `assemblyai`: `assemblyai.md` (spike + Stage 1 results), `assemblyai-roadmap.md` (the five-stage plan), `assemblyai-deck.md` |
 | Telegram pages and voice notes | `telegram.md` |
+| The pull request that ends the incident | `fix-at-source.md` |

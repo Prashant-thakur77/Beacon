@@ -63,6 +63,8 @@ export interface VoiceTransport {
    * proposal through cancel_proposal). Optional: the cascade runs its tools server-side.
    */
   callTool?(name: string, args: Record<string, unknown>): Promise<{ ok: boolean; result: unknown }>;
+  /** Mid-session turn-detection tuning (noisy room: higher VAD threshold, longer silence). */
+  setTurnDetection?(opts: { vad_threshold: number; min_silence?: number; max_silence?: number }): void;
   /** Interrupt the agent (barge-in). */
   interrupt(): void;
   stop(): Promise<void>;
