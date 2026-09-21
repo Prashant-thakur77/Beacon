@@ -546,7 +546,20 @@ export default function App() {
             csvUrl={api?.auditCsvUrl}
             onReplay={!replay ? startReplay : undefined}
             replay={!!replay}
-            onListen={api ? (id) => api.recording(id).then((r) => r.audio_url ?? null).catch(() => null) : undefined}
+            onListen={
+              api
+                ? (id) => {
+                    let code = passcode;
+                    if (!code) {
+                      code = window.prompt("Passcode (the recording is fetched through the voice Lambda)") ?? "";
+                      if (!code) return Promise.resolve(null);
+                      setPasscode(code);
+                    }
+                    const fresh = config ? makeApi(config, () => code) : api;
+                    return fresh.recording(id).then((r) => r.audio_url ?? null).catch(() => null);
+                  }
+                : undefined
+            }
           />
         </main>
       ) : route === "report" ? (
