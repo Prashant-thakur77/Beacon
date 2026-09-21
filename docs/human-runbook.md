@@ -216,6 +216,21 @@ If anything fails: paste the verbatim output. Most likely culprits, in order: `U
 
 ---
 
+## §4 — Voice, phone and the pull request (AssemblyAI phase)
+
+Everything here is one `make` target plus the same three deploys; the flags you used before still apply (`.beacon.env` remembers them; if it is ever truncated, the live values are in each stack's Parameters tab).
+
+| Step | Command | Expected |
+|---|---|---|
+| AssemblyAI key | `make set-assemblyai-key ASSEMBLYAI_API_KEY=…` then `make deploy-console … VOICE_BACKEND=assemblyai` | `config.json` on the site says `"voiceBackend": "assemblyai"`; `POST /assemblyai/token` (with the passcode) returns a token |
+| Telegram | `make set-telegram-token TELEGRAM_BOT_TOKEN=… TELEGRAM_CHAT_ID=<your id> TELEGRAM_ALLOWED_IDS=<your id>` → `make deploy … && make deploy-remediation … && make deploy-console …` → `make set-telegram-webhook` | `Webhook set to …/telegram/webhook`; `make break-demo` pages the chat within a minute |
+| Pull requests | `make set-fix-pr-token GITHUB_PR_TOKEN=github_pat_… FIX_PR_REPO=owner/repo` → `make deploy-console …` | after a resolved fix, "open the pull request" answers with the PR number |
+| Prove it without a mic | `BEACON_LOCAL_URL=<console url> BEACON_PASSCODE=<passcode> ~/.pyenv/versions/3.10.13/bin/python scripts/dev/assemblyai_loop.py "fix it" "approve fix {fix}" "yes" "grant contract for seven days" "open the pull request"` | the night in ~6 min, ending with `incident status: resolved | contracts: 1` |
+| Hinglish / drop-safety | `make local`, then `ASSEMBLYAI_API_KEY=… .venv/bin/python scripts/dev/assemblyai_audio.py "isko fix kar do" "approve fix {fix}" "!drop"` | Devanagari transcripts, `propose_fix`, then `drop … resume refused; started a fresh session`, status still `awaiting_engineer` |
+| Re-arm the demo alarm | `aws cloudwatch set-alarm-state --alarm-name beacon-demo-infra-errors --state-value OK --state-reason re-arm` | the alarm re-fires within a minute while the rule is still missing (new incident) |
+
+Rotate a secret: rerun the `set-…` target (SSM `--overwrite`) — no redeploy needed for the Telegram token or the GitHub token (read at call time); the AssemblyAI key is read per session.
+
 ## Handoff protocol (any failure, any time)
 
 Paste **verbatim** into chat:
