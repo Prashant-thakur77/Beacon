@@ -41,6 +41,8 @@ export interface VoiceSession {
   greeting?: string;
   keyterms?: string[];
   languageCodes?: string[];
+  /** AssemblyAI voice id (english: alba, eve, george, jane, jean, mary, michael, anna, charles, paul, vera). */
+  voice?: string;
 }
 
 export interface VoiceTransport {

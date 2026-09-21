@@ -25,7 +25,7 @@ from collections import Counter
 from typing import Any
 
 WS_URL = "wss://agents.assemblyai.com/v1/ws"
-TOKEN_URL = "https://api.assemblyai.com/v2/realtime/token"
+TOKEN_URL = "https://agents.assemblyai.com/v1/token?expires_in_seconds=600"
 
 ECHO_TOOL = {
     "type": "function",
@@ -41,10 +41,7 @@ ECHO_TOOL = {
 
 def mint_token(api_key: str) -> str | None:
     req = urllib.request.Request(
-        TOKEN_URL,
-        data=json.dumps({"expires_in": 600}).encode(),
-        headers={"authorization": api_key, "content-type": "application/json"},
-        method="POST",
+        TOKEN_URL, headers={"Authorization": f"Bearer {api_key}"}, method="GET"
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
@@ -61,12 +58,13 @@ async def probe(api_key: str, seconds: int, say: str | None) -> int:
         print("pip install websockets", file=sys.stderr)
         return 2
 
-    attempts: list[tuple[str, str, dict[str, str]]] = [
-        ("header", WS_URL, {"Authorization": f"Bearer {api_key}"}),
-    ]
+    # The browser path first (temporary token in the query string), then the
+    # server-side header, then the raw key in the query as a last resort.
+    attempts: list[tuple[str, str, dict[str, str]]] = []
     token = mint_token(api_key)
     if token:
         attempts.append(("query-token", f"{WS_URL}?token={token}", {}))
+    attempts.append(("header", WS_URL, {"Authorization": f"Bearer {api_key}"}))
     attempts.append(("query-key", f"{WS_URL}?api_key={api_key}", {}))
 
     for label, url, headers in attempts:
@@ -117,8 +115,14 @@ async def session(ws: Any, seconds: int, say: str | None) -> int:
             if say and not said and time.time() - started > 3:
                 said = True
                 # try the text-input shape the transport assumes; if the server rejects it, we learn the real one
-                await ws.send(json.dumps({"type": "input.text", "text": say}))
-                print(f"[send] input.text {say!r}")
+                # no text-input event exists: inject a user message, then ask for a reply
+                await ws.send(
+                    json.dumps(
+                        {"type": "conversation.message", "role": "user", "content": say}
+                    )
+                )
+                await ws.send(json.dumps({"type": "reply.create"}))
+                print(f"[send] conversation.message + reply.create {say!r}")
             continue
         except Exception as exc:
             print(f"[recv] closed: {exc}")

@@ -93,8 +93,10 @@ export class AssemblyAITransport implements VoiceTransport {
               language_codes: session.languageCodes ?? ["en", "hi"],
               ...(session.keyterms?.length ? { keyterms: session.keyterms } : {}),
             },
-            output: { voice: "ivy", format: { encoding: "audio/pcm" } },
-            tools: tools.map((t) => ({ type: "function", name: t.name, description: t.description, parameters: t.parameters })),
+            output: { voice: session.voice ?? "jane", format: { encoding: "audio/pcm" } },
+            // Client-side function tools: the browser gets tool.call and answers with tool.result
+            // (after reply.done); "interactive" lets the agent keep the turn while we run it.
+            tools: tools.map((t) => ({ type: "function", name: t.name, description: t.description, parameters: t.parameters, execution_mode: "interactive", timeout_seconds: 60 })),
           },
         }),
       );
@@ -109,6 +111,14 @@ export class AssemblyAITransport implements VoiceTransport {
     const h = this.h!;
     switch (msg.type) {
       case "session.ready":
+        return;
+      case "input.speech.started":
+        h.onState("listening");
+        return;
+      case "input.speech.stopped":
+        return;
+      case "session.ended":
+        h.onState("idle");
         return;
       case "transcript.user.delta":
         h.onUserTranscript({ text: String(msg.text ?? ""), final: false });
@@ -176,13 +186,27 @@ export class AssemblyAITransport implements VoiceTransport {
 
   async sendText(text: string): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    // There is no text-input event: inject the words as a user message, then ask for a reply.
+    // The typed text is the transcript the server-side consent check will see.
     this.lastFinal = { text, confidence: 1 };
-    this.ws.send(JSON.stringify({ type: "input.text", text }));
+    this.h?.onUserTranscript({ text, final: true, confidence: 1 });
+    this.ws.send(JSON.stringify({ type: "conversation.message", role: "user", content: text }));
+    this.ws.send(JSON.stringify({ type: "reply.create" }));
+  }
+
+  /** Inject a system-side fact (e.g. "the alarm is back to OK") and have the agent speak to it. */
+  async inject(content: string, speak = true): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ type: "conversation.message", role: "system", content }));
+    if (speak) this.ws.send(JSON.stringify({ type: "reply.create" }));
   }
 
   interrupt(): void {
+    // Interruption is turn-detection driven (speaking over the agent yields reply.done{interrupted}).
+    // The button version: stop local playback at once and tell the agent to stop and listen.
+    this.h?.onAgentDone("interrupted");
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(JSON.stringify({ type: "reply.cancel" }));
+    this.ws.send(JSON.stringify({ type: "conversation.message", role: "system", content: "The engineer interrupted you. Stop speaking and wait for them." }));
   }
 
   async stop(): Promise<void> {

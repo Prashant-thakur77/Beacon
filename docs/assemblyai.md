@@ -17,6 +17,19 @@ Facts verified from the docs on 18 Sep (re-verify on day 1, the spike):
 | Tool results | `tool.result { call_id, result: "<json string>", is_error }` — **only when `reply.done` is the latest event** for the turn that carried the call. The transport buffers results until then. |
 | Limits | ~1 s end-to-end latency, 30 s reconnect window. |
 
+## Day-1 spike results (21 Sep, against the live socket with a real key)
+
+| Question | Answer, verified |
+|---|---|
+| Browser auth | `GET https://agents.assemblyai.com/v1/token?expires_in_seconds=600` with `Authorization: Bearer <key>` → `{token, expires_in_seconds}`; connect to `wss://agents.assemblyai.com/v1/ws?token=<token>`. Tokens are single-use: mint one per connection. (`/v2/realtime/token` is the old STT endpoint: 404.) |
+| Typed input | There is no `input.text`. Send `{"type":"conversation.message","role":"user","content":…}` then `{"type":"reply.create"}`. |
+| Server-injected turn | `conversation.message` with `role: "system"` (+ `reply.create` to make the agent speak) — the "alarm is back to OK" turn is possible. |
+| Tools | Declared inline in `session.update` as `{type:"function", name, description, parameters, execution_mode:"interactive", timeout_seconds}`. `tool.call {call_id, name, arguments}` arrives mid-reply; send `tool.result {call_id, result:<JSON string>}` only when `reply.done` is the latest event. Verified: message → `tool.call` → `reply.done` → `tool.result` → spoken reply in ~3 s. |
+| Confidence | `transcript.user` / `transcript.user.delta` carry **no confidence field** (`delta.text` is the full text so far). The consent gate therefore rests on the exact phrase; the "please repeat" path uses a read-back instead of a confidence bar. |
+| Interruption | Turn detection is on by default; speaking over the agent yields `reply.done {status:"interrupted"}` and `transcript.agent {interrupted:true}`. There is no `reply.cancel`; the UI button stops playback locally and injects a system message. |
+| Extras | `session.ready` carries a `resume_token` (reconnect via `session.resume`), `transcript.agent.delta` has `start_ms/end_ms` per word (sentence highlighting for free), `input.speech.started/stopped` markers, `session.ended` with durations. Voices: `jane` (default in our config), `anna`, `george`, … |
+| Model behaviour | The managed LLM invented a tool argument ("hello world" when asked to echo "beacon") — the reason consent is checked against the transcript, never the arguments. |
+
 ## The boundary in code (already on branch `assemblyai`)
 
 - **Browser** `web/src/voice/transport.ts`: `VoiceTransport { start(session, handlers), sendAudio, sendText, interrupt, stop }` with handlers for user transcript (partial/final + confidence), agent text (with `[E#]` citations), agent audio, done/interrupted, tool results, state. `web/src/voice/assemblyai.ts` implements it; the First Commit cascade gets wrapped as `AwsCascadeTransport` on day 2.

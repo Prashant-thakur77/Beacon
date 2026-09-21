@@ -515,15 +515,18 @@ def _mint_assemblyai_token(api_key: str) -> dict[str, Any]:
     """Exchange the long-lived key for a short-lived browser token."""
     import urllib.request
 
+    # Voice Agent API tokens are single-use and ride the socket URL (?token=).
     req = urllib.request.Request(
-        "https://api.assemblyai.com/v2/realtime/token",
-        data=json.dumps({"expires_in": 600}).encode(),
-        headers={"authorization": api_key, "content-type": "application/json"},
-        method="POST",
+        "https://agents.assemblyai.com/v1/token?expires_in_seconds=600",
+        headers={"Authorization": f"Bearer {api_key}"},
+        method="GET",
     )
     with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
         data = json.loads(resp.read().decode())
-    return {"token": data.get("token"), "expires_in_seconds": 600}
+    return {
+        "token": data.get("token"),
+        "expires_in_seconds": int(data.get("expires_in_seconds", 600)),
+    }
 
 
 @app.post("/assemblyai/token")
