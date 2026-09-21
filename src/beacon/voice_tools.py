@@ -269,6 +269,7 @@ def propose_fix() -> dict[str, Any]:
         "action": action,
         "params": params,
         "blast_radius": blast,
+        "blast_radius_spoken": spoken_blast_radius(str(action), params),
         "dry_run": dry_run,
         "expires_at": proposal["expires_at"],
     }
@@ -287,6 +288,7 @@ def propose_fix() -> dict[str, Any]:
             "action": action,
             "dry_run": dry_run,
             "blast_radius": blast,
+            "blast_radius_spoken": spoken_blast_radius(str(action), params),
         },
     )
     card = current().add_evidence("dry_run", f"Dry run of fix {fix_id}", dry_run)
@@ -438,6 +440,56 @@ def _read_back(
     )
 
 
+_SPOKEN_ACTION = {
+    "sg.restore_ingress": "restore the missing security-group rule",
+    "sg.revoke_ingress": "remove that security-group rule again",
+    "ecs.force_redeploy": "force a redeploy of the E C S service",
+}
+
+
+def _spoken_scope(action: str, params: dict[str, Any]) -> str:
+    """The scope as a human says it: no resource ids, port and direction only."""
+    if action.startswith("sg."):
+        return (
+            f"the {params.get('ip_protocol', 'tcp')} port {params.get('from_port')} "
+            "rule from the application security group into the database security group"
+        )
+    if action == "ecs.force_redeploy":
+        return f"the {params.get('service', 'demo')} service on cluster {params.get('cluster', '')}".strip()
+    return "that one resource"
+
+
+def spoken_blast_radius(action: str, params: dict[str, Any]) -> str:
+    """Blast radius for the ear; the exact ids stay on screen."""
+    return (
+        f"One change: {_SPOKEN_ACTION.get(action, action)}, {_spoken_scope(action, params)}. "
+        "Nothing else changes."
+    )
+
+
+def _read_back_spoken(
+    incident: dict[str, Any],
+    action: str,
+    params: dict[str, Any],
+    days: int,
+    max_uses: int,
+) -> str:
+    day_word = {
+        1: "one",
+        2: "two",
+        3: "three",
+        5: "five",
+        7: "seven",
+        14: "fourteen",
+        30: "thirty",
+    }.get(days, str(days))
+    return (
+        f"Read-back: next time this alarm fires, I may {_SPOKEN_ACTION.get(action, action)}, "
+        f"{_spoken_scope(action, params)}, at most {max_uses} times, for {day_word} days. "
+        f"To confirm, say: grant contract for {day_word} days."
+    )
+
+
 @observability.span("tool:grant_sleep_contract")
 def grant_sleep_contract(days: int = 7, max_uses: int = 3) -> dict[str, Any]:
     """Grant a scoped, expiring standing approval; read-back first, then the phrase."""
@@ -490,9 +542,13 @@ def grant_sleep_contract(days: int = 7, max_uses: int = 3) -> dict[str, Any]:
             "granted": False,
             "read_back_pending": True,
             "read_back": read_back,
+            "read_back_spoken": _read_back_spoken(
+                incident, str(action), params, days, max_uses
+            ),
             "error": error,
             "instruction": (
-                "Read the read-back aloud verbatim and wait for the exact phrase."
+                "Speak read_back_spoken aloud verbatim (the exact scope is on screen) "
+                "and wait for the exact phrase."
             ),
         }
 

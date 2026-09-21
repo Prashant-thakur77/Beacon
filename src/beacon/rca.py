@@ -130,3 +130,97 @@ def parse(text: str) -> RcaJson:
 def is_healthy(text: str) -> bool:
     """Return True when the triage ``STATUS`` is ``Healthy``."""
     return parse(text).status.strip().lower() == "healthy"
+
+
+def fallback_analysis(
+    *,
+    alarm_name: str | None,
+    diagnostics: dict[str, Any] | None,
+    changes: list[dict[str, Any]] | None,
+    log_text: str,
+    reason: str,
+) -> str:
+    """The RCA text contract written by code when the model is unavailable.
+
+    Everything downstream (parser, incident, voice tools, console) reads the
+    same headers, so an outage of Bedrock degrades triage to its deterministic
+    sources instead of dropping the incident. The text says so plainly.
+    """
+    missing = (diagnostics or {}).get("missing_rules") or []
+    services = (diagnostics or {}).get("ecs_services") or []
+    change: dict[str, Any] | None = changes[0] if changes else None
+    error_lines = [
+        line.strip()
+        for line in log_text.splitlines()
+        if any(k in line for k in ("ERROR", "CRITICAL", " 5", "Traceback"))
+    ]
+    evidence = [line[:220] for line in error_lines[:6]]
+
+    if missing:
+        m = missing[0]
+        summary = (
+            f"The security group {m.get('group_id')} is missing an ingress rule "
+            f"({m.get('ip_protocol')}/{m.get('from_port')}-{m.get('to_port')} from "
+            f"{m.get('source_group_id')}) that the golden snapshot says should exist; "
+            "the service behind it cannot reach its dependency."
+        )
+        spoken = (
+            "A security group rule that the golden snapshot says should exist is "
+            "missing, so the service can no longer reach its dependency. "
+            "Restoring that one rule should bring it back."
+        )
+        status = "High"
+        affected = m.get("group_id", "")
+        next_steps = ["Restore the missing ingress rule (sg.restore_ingress)."]
+    elif any(
+        (s or {}).get("running", 0) < (s or {}).get("desired", 0) for s in services
+    ):
+        summary = (
+            "An ECS service has fewer running tasks than desired; the alarm fired "
+            "while tasks were unhealthy."
+        )
+        spoken = (
+            "An E C S service is running fewer tasks than it should. A forced "
+            "redeploy should replace the unhealthy tasks."
+        )
+        status = "High"
+        affected = ""
+        next_steps = ["Force a new deployment of the service (ecs.force_redeploy)."]
+    else:
+        summary = (
+            f"Alarm {alarm_name or 'unknown'} fired; {len(error_lines)} error lines "
+            "were found in the window, but no security-group drift or unhealthy "
+            "service was detected."
+        )
+        spoken = (
+            "The alarm fired and the logs show errors, but nothing in the "
+            "deterministic checks points at a cause. A human should look."
+        )
+        status = "Medium" if error_lines else "Unknown"
+        affected = ""
+        next_steps = ["Investigate the error lines; no allowlisted fix applies."]
+
+    correlation = (
+        f"{change.get('event_name')} by {change.get('actor_short', 'unknown')} at "
+        f"{change.get('event_time', '?')} on "
+        f"{', '.join(change.get('resource_ids') or [])} shortly before the alarm."
+        if change
+        else "No write API calls were recorded before the alarm."
+    )
+    lines = [
+        f"STATUS: {status}",
+        f"SUMMARY: {summary}",
+        f"AFFECTED COMPONENTS: {affected}",
+        "EVIDENCE:",
+        *[f"- {e}" for e in evidence],
+        "NEXT STEPS:",
+        *[f"- {s}" for s in next_steps],
+        f"CHANGE CORRELATION: {correlation}",
+        f"SPOKEN SUMMARY: {spoken}",
+        (
+            "NOTE: The model was unavailable ("
+            + reason[:120]
+            + "); this analysis comes from the deterministic checks only."
+        ),
+    ]
+    return "\n".join(lines)

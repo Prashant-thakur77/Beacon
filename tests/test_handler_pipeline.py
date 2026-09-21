@@ -379,3 +379,33 @@ def test_morning_report_mode_emails_last_night(env: Any) -> None:
     assert out["night_of"] == night
     texts = env["messages"]()
     assert any("Good morning" in t for t in texts)
+
+
+def test_triage_degrades_to_deterministic_sources_when_the_model_is_down(
+    env: Any, mocker: Any
+) -> None:
+    """Bedrock refused (new-account hold, outage): the incident is still created
+    from the drift check and the change ledger, with the same RCA contract and
+    a model_unavailable timeline event, so the whole loop still runs."""
+    from beacon import handler, store
+
+    mocker.patch(
+        "beacon.handler.analyze_logs",
+        side_effect=RuntimeError("BedrockException - Operation not allowed"),
+    )
+    mocker.patch(
+        "beacon.handler.triage",
+        side_effect=RuntimeError("AccessDeniedException: account being verified"),
+    )
+    out = handler.handler(env["event"], None)
+    inc = store.get_incident(out["incident_id"], table_name=INCIDENTS)
+    assert inc["status"] == "awaiting_engineer"
+    assert inc["rca_json"]["status"] == "High"
+    assert "missing an ingress rule" in inc["rca_json"]["summary"]
+    assert inc["diagnostics"]["suggested_action"] == "sg.restore_ingress"
+    assert inc["diagnostics"]["action_params"] == env["params"]
+    events = [e["event"] for e in inc["timeline"]]
+    assert "model_unavailable" in events
+    assert "account being verified" in inc["rca"] and "deterministic" in inc["rca"]
+    # the page still went out
+    assert any("Trigger:" in m for m in env["messages"]())

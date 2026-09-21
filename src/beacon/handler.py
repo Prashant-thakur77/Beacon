@@ -183,7 +183,15 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     available = compute_available_tokens(config, system_prompt, trigger_context)
     plans = plan_token_budget(log_sources, available, config)
 
-    combined_input = _process_sources(plans, config, timeline)
+    model_error: str | None = None
+    try:
+        combined_input = _process_sources(plans, config, timeline)
+    except Exception as exc:  # Cordon/embeddings unavailable: keep the raw logs
+        model_error = f"log reduction: {exc}"
+        logger.warning("model unavailable for log reduction: %s", exc)
+        combined_input = "\n\n".join(
+            f"{_build_section_label(plan)}\n{plan.log_text[-6000:]}" for plan in plans
+        )
 
     # Deterministic sources come first: they outrank anything inferred from logs.
     diagnostics = _run_diagnostics(config, timeline)
@@ -199,7 +207,20 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     if prefix_sections:
         combined_input = "\n\n".join([*prefix_sections, combined_input])
 
-    analysis = triage(combined_input, trigger, config)
+    try:
+        analysis = triage(combined_input, trigger, config)
+    except Exception as exc:  # Bedrock unavailable: degrade, never drop the incident
+        model_error = f"triage: {exc}"
+        logger.warning("model unavailable for triage: %s", exc)
+        analysis = rca.fallback_analysis(
+            alarm_name=trigger.alarm_name,
+            diagnostics=diagnostics,
+            changes=change_rows,
+            log_text=combined_input,
+            reason=str(exc),
+        )
+    if model_error:
+        timeline.append(_event("model_unavailable", reason=model_error[:200]))
     parsed = rca.parse(analysis)
     _apply_deterministic_action(parsed, diagnostics)
     timeline.append(
