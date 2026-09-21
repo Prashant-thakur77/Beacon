@@ -147,3 +147,42 @@ def test_turn_requires_passcode(client: Any) -> None:
         ).status_code
         == 401
     )
+
+
+def test_undo_fix_reverses_the_applied_rule_in_local_mode(client: Any) -> None:
+    inc = client.get("/dash/incidents").json()["incidents"][0]["incident_id"]
+    headers = {"x-beacon-passcode": "local"}
+    for text in ("can you fix it", "approve fix 1"):
+        client.post(
+            "/voice/turn",
+            json={
+                "incident_id": inc,
+                "session_id": "s",
+                "text": text,
+                "channel": "typed",
+            },
+            headers=headers,
+        )
+    assert (
+        client.get(f"/dash/incidents/{inc}").json()["incident"]["status"] == "resolved"
+    )
+    out = client.post(
+        "/voice/turn",
+        json={
+            "incident_id": inc,
+            "session_id": "s",
+            "text": "undo fix 1",
+            "channel": "typed",
+        },
+        headers=headers,
+    ).json()
+    assert any(
+        t["name"] == "undo_fix" and "undid" in t["summary"] for t in out["tool_events"]
+    ), out["tool_events"]
+    detail = client.get(f"/dash/incidents/{inc}").json()["incident"]
+    assert detail["status"] == "awaiting_engineer"
+    assert detail["timeline"][-1]["event"] == "undone"
+    audit = client.get("/dash/audit").json()["rows"]
+    assert any(
+        r["action"] == "sg.revoke_ingress" and r["quote"] == "undo fix 1" for r in audit
+    )

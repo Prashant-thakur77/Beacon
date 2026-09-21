@@ -36,4 +36,4 @@ An LLM-driven agent with write access can fail in four ways: it acts without con
 
 - `make dry-run` on a healthy stack returns `InvalidPermission.Duplicate`, which counts as PASSED: the permission check runs before the duplicate check.
 - If the remediator gets `UnauthorizedOperation` naming a `security-group-rule` ARN, the second IAM statement is missing; if it names the `security-group`, the tag is missing (`make tag-remediable`).
-- The Connect/Lex phone path inherited from the upstream project is read-only and not part of the remediation model.
+- The Connect/Lex phone path is read-only and not part of the remediation model.

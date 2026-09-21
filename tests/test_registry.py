@@ -20,8 +20,21 @@ SG_PARAMS = {
 }
 
 
-def test_registry_has_exactly_the_two_allowlisted_actions() -> None:
-    assert set(REGISTRY) == {"sg.restore_ingress", "ecs.force_redeploy"}
+def test_registry_has_exactly_the_allowlisted_actions() -> None:
+    assert set(REGISTRY) == {
+        "sg.restore_ingress",
+        "sg.revoke_ingress",
+        "ecs.force_redeploy",
+    }
+
+
+def test_inverse_actions_share_the_schema_and_only_undo_what_beacon_did() -> None:
+    restore = REGISTRY["sg.restore_ingress"]
+    revoke = REGISTRY[restore.inverse or ""]
+    assert revoke.params_schema == restore.params_schema
+    assert revoke.inverse is None  # undo is one level deep, never a chain
+    assert REGISTRY["ecs.force_redeploy"].inverse is None  # idempotent, nothing to undo
+    assert revoke.iam_actions == ("ec2:RevokeSecurityGroupIngress",)
 
 
 def test_get_action_returns_none_for_unknown_ids() -> None:
@@ -71,8 +84,9 @@ def test_confirmation_phrase_is_approve_fix_n() -> None:
     assert confirmation_phrase(2) == "approve fix 2"
 
 
-def test_iam_write_actions_are_exactly_the_two_calls() -> None:
+def test_iam_write_actions_are_exactly_the_three_calls() -> None:
     assert iam_write_actions() == {
         "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:RevokeSecurityGroupIngress",
         "ecs:UpdateService",
     }

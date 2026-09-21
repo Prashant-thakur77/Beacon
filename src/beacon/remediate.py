@@ -19,7 +19,7 @@ from typing import Any
 
 import boto3
 
-from beacon import approvals, observability, store
+from beacon import approvals, channels, observability, store
 from beacon.remediation import registry
 from beacon.remediation.base import ParamError
 from beacon.remediation.verify import verify_all
@@ -332,6 +332,12 @@ def resolve(event: dict[str, Any]) -> dict[str, Any]:
     if dashboard:
         lines.append(f"Timeline: {dashboard}?incident={incident_id}")
     _notify(f"Beacon - Resolved: {inp.get('action')}", "\n".join(lines))
+    channels.send(
+        "resolved",
+        f"Resolved: {inp.get('action')}",
+        "\n".join(lines),
+        incident_id=incident_id,
+    )
     return {"ok": True, "resolved_at": resolved_at, "handled_by": handled_by}
 
 
@@ -370,6 +376,12 @@ def escalate(event: dict[str, Any]) -> dict[str, Any]:
     if dashboard:
         lines.append(f"Timeline: {dashboard}?incident={incident_id}")
     _notify("Beacon - ESCALATED: human needed", "\n".join(lines))
+    channels.send(
+        "escalated",
+        "ESCALATED: human needed",
+        "\n".join(lines),
+        incident_id=incident_id,
+    )
     return {"ok": True, "escalated": True, "reason": reason}
 
 

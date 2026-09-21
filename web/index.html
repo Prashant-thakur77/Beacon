@@ -3,16 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0b0b0d" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#FFFFEB" />
     <meta name="description" content="Beacon Night Shift: the on-call agent for AWS that fixes the 3 AM page with your voice, verifies the recovery, and does not wake you the second time." />
     <title>Beacon Night Shift</title>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Beacon Night Shift — the 3 AM page, fixed with your voice" />
+    <meta property="og:description" content="An on-call agent for AWS that finds the cause, proposes one safe fix, applies it on your word, proves the recovery, and does not wake you the second time." />
+    <meta property="og:image" content="/landing/board.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Beacon Night Shift" />
+    <meta name="twitter:description" content="The 3 AM page, fixed with your voice. Sleep Contracts mean the repeat never wakes you." />
+    <meta name="twitter:image" content="/landing/board.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Figtree:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <noscript>
+      <div style="font: 16px/1.4 system-ui, sans-serif; padding: 32px; max-width: 60ch; margin: 0 auto; color: #1a1a1a; background: #ffffeb">
+        <strong>Beacon Night Shift</strong> needs JavaScript: the console polls the incident API and talks to the agent from your browser. The README, safety model and demo film are on
+        <a href="https://github.com/Prashant-thakur77/Beacon">GitHub</a>.
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

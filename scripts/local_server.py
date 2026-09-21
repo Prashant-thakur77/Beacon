@@ -314,6 +314,17 @@ class ScriptedAgent:
         elif "system event" in t and "escalated" in t:
             r = self._call("check_recovery", {})
             reply = f"Verification did not pass; status is {r.get('status')}. A human is needed."
+        elif re.search(r"\bundo fix\b", t):
+            m = re.search(r"undo fix (\w+)", t)
+            fix = {"one": 1, "two": 2}.get(m.group(1), 1) if m else 1
+            if m and m.group(1).isdigit():
+                fix = int(m.group(1))
+            r = self._call("undo_fix", {"fix_id": fix, "confirmation_phrase": text})
+            reply = (
+                f"Undone on your word: {r['blast_radius']} You are back to awaiting a decision."
+                if r.get("undone")
+                else f"I could not undo that: {r.get('error')}"
+            )
         elif re.search(r"\bapprove fix\b", t):
             m = re.search(r"approve fix (\w+)", t)
             fix = (
@@ -391,6 +402,7 @@ def _url_event(request: Request, body: bytes, prefix: str) -> dict[str, Any]:
         "routeKey": "$default",
         "rawPath": path,
         "rawQueryString": request.url.query,
+        "queryStringParameters": dict(request.query_params) or None,
         "headers": {k.lower(): v for k, v in request.headers.items()},
         "requestContext": {
             "http": {"method": request.method, "path": path, "sourceIp": "127.0.0.1"},

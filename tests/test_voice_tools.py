@@ -134,16 +134,18 @@ def _ctx(
     )
 
 
-def test_tool_schemas_cover_the_six_tools_with_json_schema() -> None:
+def test_tool_schemas_cover_the_seven_tools_with_json_schema() -> None:
     names = [t["name"] for t in voice_tools.TOOL_SCHEMAS]
     assert names == [
         "get_incident_brief",
         "get_evidence",
         "propose_fix",
         "approve_fix",
+        "undo_fix",
         "grant_sleep_contract",
         "check_recovery",
     ]
+    assert set(names) == set(voice_tools.TOOL_FUNCTIONS)
     for tool in voice_tools.TOOL_SCHEMAS:
         assert tool["parameters"]["type"] == "object"
         assert tool["description"]
@@ -330,3 +332,55 @@ def test_exported_tools_json_matches_tool_schemas() -> None:
     assert json.loads(path.read_text()) == voice_tools.TOOL_SCHEMAS, (
         "run make export-tools"
     )
+
+
+def test_undo_fix_reverses_only_what_beacon_applied_and_needs_the_phrase(
+    env: Any, mocker: Any
+) -> None:
+    inc = env["incident_id"]
+    with turn_context(_ctx(inc, "fix it")):
+        voice_tools.propose_fix()
+    # nothing applied yet: undo must refuse even with the phrase
+    with turn_context(_ctx(inc, "undo fix 1")):
+        out = voice_tools.undo_fix(1, "undo fix 1")
+    assert out["undone"] is False and "not applied" in out["error"]
+
+    with turn_context(_ctx(inc, "approve fix 1")):
+        voice_tools.approve_fix(1, "approve fix 1")
+    # simulate the loop having executed the approval
+    rec = approvals.list_for_incident(inc, table_name=APPROVALS)[-1]
+    approvals.mark_used(rec["approval_id"], table_name=APPROVALS)
+    approvals.record_execution(
+        rec["approval_id"],
+        {"ok": True, "code": "Authorized", "executed_at": "2026-09-20T21:00:00+00:00"},
+        table_name=APPROVALS,
+    )
+    calls: list[dict[str, Any]] = []
+
+    def fake_remediate(payload: dict[str, Any]) -> dict[str, Any]:
+        calls.append(payload)
+        if payload["step"] == "dryrun":
+            return {"ok": True, "code": "DryRunOperation"}
+        return {
+            "ok": True,
+            "code": "Revoked",
+            "executed_at": "2026-09-20T21:05:00+00:00",
+        }
+
+    mocker.patch("beacon.voice_tools._invoke_remediate", side_effect=fake_remediate)
+    with turn_context(_ctx(inc, "please undo fix 1 now")) as ctx:
+        out = voice_tools.undo_fix(1, "undo fix 1")
+    assert out["undone"] is True and out["action"] == "sg.revoke_ingress"
+    assert [c["step"] for c in calls] == ["dryrun", "execute"]
+    assert calls[1]["params"] == PARAMS and calls[1]["action"] == "sg.revoke_ingress"
+    undo_record = approvals.get(calls[1]["approval_id"], table_name=APPROVALS)
+    assert undo_record is not None
+    assert undo_record["transcript_quote"] == "please undo fix 1 now"
+    incident = store.get_incident(inc, table_name=INCIDENTS)
+    assert incident["status"] == "awaiting_engineer"
+    assert incident["timeline"][-1]["event"] == "undone"
+    assert ctx.tool_events[-1]["name"] == "undo_fix"
+
+    with turn_context(_ctx(inc, "yes undo it")):
+        again = voice_tools.undo_fix(1, "undo fix 1")
+    assert again["undone"] is False and "say" in again["error"]

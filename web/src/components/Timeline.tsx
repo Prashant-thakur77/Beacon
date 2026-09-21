@@ -25,13 +25,15 @@ const LABELS: Record<string, string> = {
   contract_granted: "Sleep Contract granted",
   contract_exhausted: "Contract exhausted",
   contract_ignored: "Contract ignored",
+  undone: "↩︎ Undone by phrase",
+  undo_failed: "Undo refused",
 };
 
 function tone(ev: TimelineEvent): string {
   const d = (ev.detail ?? {}) as Record<string, unknown>;
   if (ev.event === "resolved" || ev.event === "executed" || ev.event === "approved") return "ok";
   if (ev.event === "verify_attempt") return d.ok ? "ok" : "warn";
-  if (ev.event === "escalated" || ev.event === "execute_failed") return "bad";
+  if (ev.event === "escalated" || ev.event === "execute_failed" || ev.event === "undone" || ev.event === "undo_failed") return "bad";
   if (ev.event.startsWith("contract")) return "moon";
   if (ev.event === "sns_sent" || ev.event === "fix_proposed" || ev.event === "alarm_received") return "warn";
   return "";
@@ -108,6 +110,14 @@ function Detail({ ev }: { ev: TimelineEvent }) {
       );
     case "escalated":
       return <div className="d">{String(d.reason ?? "")}</div>;
+    case "undone":
+      return (
+        <div className="d undone">
+          fix {String(d.fix_id)} reversed with <code>{String(d.action ?? "")}</code> · “{String(d.transcript_quote ?? "")}” · the fault is back and Beacon is awaiting your word
+        </div>
+      );
+    case "undo_failed":
+      return <div className="d">{String(d.error ?? d.reason ?? "refused")}</div>;
     case "resolved":
       return <div className="d">handled by {String(d.handled_by ?? "voice")}{d.attempts ? ` after ${String(d.attempts)} verify attempt(s)` : ""}</div>;
     default:

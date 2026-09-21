@@ -1,4 +1,4 @@
-"""The six tools the voice agent can call, and their JSON schemas.
+"""The seven tools the voice agent can call, and their JSON schemas.
 
 ``TOOL_SCHEMAS`` is the contract shared by every voice backend (Strands on
 Nova 2 Lite today, the litellm fallback loop, AssemblyAI's Voice Agent API
@@ -23,7 +23,7 @@ import os
 import re
 from typing import TYPE_CHECKING, Any
 
-from beacon import approvals, aws, contracts, observability, store
+from beacon import approvals, aws, channels, contracts, observability, store
 from beacon.remediation import registry
 from beacon.remediation.base import ParamError
 from beacon.turn_context import current
@@ -542,6 +542,122 @@ def grant_sleep_contract(days: int = 7, max_uses: int = 3) -> dict[str, Any]:
     }
 
 
+@observability.span("tool:undo_fix")
+def undo_fix(fix_id: int, confirmation_phrase: str) -> dict[str, Any]:
+    """Reverse fix *fix_id* that Beacon applied, if the engineer said "undo fix <n>".
+
+    Undo is its own allowlisted action (the fix's ``inverse``), goes through the
+    same dry run under the remediator role, is recorded as an approval that
+    quotes the transcript, and executes once. Only fixes Beacon executed for
+    this incident can be undone; the incident goes back to awaiting a human.
+    """
+    ctx = current()
+    phrase = registry.undo_phrase(int(fix_id))
+    refusal: dict[str, Any] = {"undone": False, "fix_id": int(fix_id)}
+    if not ctx.passcode_ok:
+        _tool_event("undo_fix", {"fix_id": fix_id}, "refused: no passcode")
+        return {**refusal, "error": "the session is not authorised (passcode missing)"}
+    if not _apply_enabled():
+        _tool_event("undo_fix", {"fix_id": fix_id}, "refused: apply disabled")
+        return {**refusal, "error": "remediation is disabled (APPLY_ENABLED=false)"}
+    if phrase not in _normalise(ctx.transcript):
+        _tool_event("undo_fix", {"fix_id": fix_id}, "refused: phrase not in transcript")
+        return {**refusal, "error": f"I need you to say exactly '{phrase}' to undo"}
+
+    incident = _incident()
+    done = [
+        a
+        for a in approvals.list_for_incident(
+            incident["incident_id"], table_name=_approvals_table()
+        )
+        if a.get("kind", "approval") == "approval"
+        and a.get("fix_id") == int(fix_id)
+        and a.get("used_at")
+        and (a.get("execute_result") or {}).get("ok")
+    ]
+    if not done:
+        return {**refusal, "error": f"fix {fix_id} was not applied by Beacon here"}
+    applied = done[-1]
+    spec = registry.get_action(str(applied["action"]))
+    inverse = registry.get_action(spec.inverse or "") if spec else None
+    if spec is None or inverse is None:
+        return {**refusal, "error": f"{applied.get('action')} has no undo"}
+    params = dict(applied["params"])
+    dry = _invoke_remediate({"step": "dryrun", "action": inverse.id, "params": params})
+    if not dry.get("ok"):
+        _tool_event("undo_fix", {"fix_id": fix_id}, "dry run failed")
+        return {
+            **refusal,
+            "error": f"undo dry run failed: {dry.get('error') or dry.get('code')}",
+        }
+    record = approvals.create(
+        incident["incident_id"],
+        inverse.id,
+        params,
+        source="voice",
+        channel=ctx.channel,
+        transcript_quote=ctx.transcript.strip(),
+        fix_id=int(fix_id),
+        table_name=_approvals_table(),
+    )
+    result = _invoke_remediate(
+        {
+            "step": "execute",
+            "approval_id": record["approval_id"],
+            "incident_id": incident["incident_id"],
+            "action": inverse.id,
+            "params": params,
+        }
+    )
+    ok = bool(result.get("ok"))
+    store.append_timeline(
+        incident["incident_id"],
+        "undone" if ok else "undo_failed",
+        table_name=_incidents_table(),
+        detail={
+            "fix_id": int(fix_id),
+            "action": inverse.id,
+            "channel": ctx.channel,
+            "transcript_quote": ctx.transcript.strip(),
+            "approval_id": record["approval_id"],
+            "code": result.get("code"),
+        },
+    )
+    if ok:
+        store.update_status(
+            incident["incident_id"],
+            "awaiting_engineer",
+            table_name=_incidents_table(),
+            extra={"undone_at": result.get("executed_at"), "woken": True},
+        )
+    summary = (
+        f"undid fix {fix_id} ({inverse.id})"
+        if ok
+        else f"undo failed: {result.get('code')}"
+    )
+    if ok:
+        channels.send(
+            "undone",
+            f"Undo: {inverse.id} on {incident.get('alarm_name') or 'incident'}",
+            f'"{ctx.transcript.strip()}" — {inverse.blast_radius(params)}',
+            incident_id=incident["incident_id"],
+        )
+    _tool_event("undo_fix", {"fix_id": fix_id}, summary)
+    return {
+        **refusal,
+        "undone": ok,
+        "action": inverse.id,
+        "blast_radius": inverse.blast_radius(params),
+        "result": result,
+        "spoken_hint": (
+            "The rule is removed again and the alarm will return; you are back to "
+            "awaiting a decision."
+            if ok
+            else "The undo did not go through."
+        ),
+    }
+
+
 @observability.span("tool:check_recovery")
 def check_recovery() -> dict[str, Any]:
     """Where the remediation loop is: status, last verify attempt, timings."""
@@ -646,6 +762,28 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "undo_fix",
+        "description": (
+            "Reverse a fix Beacon already applied in this incident. Only succeeds "
+            "if the engineer literally said 'undo fix <n>' in this turn; the server "
+            "checks the transcript. Do not call for fixes that were not applied."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "fix_id": {
+                    "type": "integer",
+                    "description": "The fix number that was applied",
+                },
+                "confirmation_phrase": {
+                    "type": "string",
+                    "description": "What the engineer said, e.g. 'undo fix 1'",
+                },
+            },
+            "required": ["fix_id", "confirmation_phrase"],
+        },
+    },
+    {
         "name": "grant_sleep_contract",
         "description": (
             "Grant Beacon a standing approval to run this same fix for this alarm "
@@ -685,6 +823,7 @@ TOOL_FUNCTIONS: dict[str, Callable[..., dict[str, Any]]] = {
     "get_evidence": get_evidence,
     "propose_fix": propose_fix,
     "approve_fix": approve_fix,
+    "undo_fix": undo_fix,
     "grant_sleep_contract": grant_sleep_contract,
     "check_recovery": check_recovery,
 }

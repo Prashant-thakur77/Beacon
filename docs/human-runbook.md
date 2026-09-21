@@ -37,7 +37,7 @@ Do these in this order. Budget: ~45 min of clicking plus the two long-running bu
 
 7. **Tell the agent**: your account id, `uname -m` (this machine is x86_64), and whether model access is granted. Put them in `docs/QUESTIONS.md` under "Answers".
 
-8. First confirm the RDS engine version the template defaults to is still creatable (AWS deprecates minors; the upstream's 16.4 already was):
+8. First confirm the RDS engine version the template defaults to is still creatable (AWS deprecates minors; 16.4 already was):
    ```bash
    aws rds describe-db-engine-versions --engine postgres --engine-version 16.10 --region us-east-1 --query 'DBEngineVersions[0].EngineVersion' --output text
    ```

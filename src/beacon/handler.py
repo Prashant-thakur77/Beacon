@@ -9,7 +9,7 @@ os.environ.setdefault("TQDM_DISABLE", "1")  # noqa: E402
 
 from typing import Any  # noqa: E402
 
-from beacon import changes, rca
+from beacon import changes, channels, rca
 from beacon.analyzer import analyze_logs
 from beacon.budget import SourcePlan, compute_available_tokens, plan_token_budget
 from beacon.config import BeaconConfig
@@ -110,10 +110,42 @@ def _configure_logging() -> None:
         logging.getLogger(name).setLevel(logging.WARNING)
 
 
+def _morning_report(event: dict[str, Any], config: BeaconConfig) -> dict[str, Any]:
+    """The 07:00 IST schedule: summarise last night and email it via SNS."""
+    import boto3
+
+    from beacon import contracts, reports
+
+    # contracts._scan, not dashboard_api: the triage image has no Powertools.
+    rows = contracts._scan(config.incidents_table_name, boto3.client("dynamodb"))
+    rows.sort(key=lambda r: str(r.get("timestamp", "")), reverse=True)
+    live = contracts.list_active(table_name=os.environ.get("CONTRACTS_TABLE_NAME", ""))
+    report = reports.morning_report(
+        rows, contracts=live, night_of=event.get("night_of")
+    )
+    link = _dashboard_link(config)
+    body = report["text"] + (f"\n\nNight Board: {link}" if link else "")
+    boto3.client("sns").publish(
+        TopicArn=config.sns_topic_arn, Subject=report["subject"][:100], Message=body
+    )
+    logger.info(
+        "morning report sent for %s (%d incidents)",
+        report["night_of"],
+        report["incidents"],
+    )
+    channels.send("morning_report", report["subject"], report["text"])
+    return {
+        "mode": "morning_report",
+        **{k: v for k, v in report.items() if k != "text"},
+    }
+
+
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Lambda entry point: analyse logs, notify via SNS, store the incident."""
     _configure_logging()
     config = BeaconConfig.from_env()
+    if isinstance(event, dict) and event.get("mode") == "morning_report":
+        return _morning_report(event, config)
     trigger = parse_event(event, config)
     timeline: list[dict[str, Any]] = [
         _event(
@@ -211,6 +243,14 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         )
         if incident_id:
             result["incident_id"] = incident_id
+            # the page itself, where the on-call actually is (Slack/PagerDuty),
+            # with a deep link that opens straight onto this incident
+            channels.send(
+                "page",
+                f"Beacon: {trigger.alarm_name or 'incident'} needs you",
+                parsed.summary or analysis[:400],
+                incident_id=incident_id,
+            )
 
     logger.info("Analysis complete and published to SNS")
     return result
@@ -571,6 +611,13 @@ def _remediate_under_contract(
         link=_dashboard_link(config),
         variant="contract",
         contract=contract,
+    )
+    channels.send(
+        "contract",
+        f"Handled under your Sleep Contract: {trigger.alarm_name or 'incident'}",
+        f"You were not woken. Beacon is applying {action} under contract "
+        f"{contract['contract_id']} and will verify recovery.",
+        incident_id=incident_id,
     )
     return {
         "incident_id": incident_id,

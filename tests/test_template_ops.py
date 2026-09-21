@@ -59,7 +59,15 @@ def test_public_and_privileged_functions_have_bounded_concurrency(
     dashboard = stacks["console-template.yaml"]["Resources"]["BeaconDashboardFunction"]
     for fn in (remediate, voice, dashboard):
         limit = fn["Properties"].get("ReservedConcurrentExecutions")
-        assert isinstance(limit, int) and 1 <= limit <= 50
+        # Conditional: a reservation when the account quota allows it, NoValue otherwise
+        # (new accounts have a 10-execution unreserved minimum; any reservation fails).
+        assert isinstance(limit, dict) and "Fn::If" in limit, (
+            "concurrency must be conditional"
+        )
+        cond, value, off = limit["Fn::If"]
+        assert cond == "ReserveConcurrency"
+        assert value == {"Fn::Ref": "ReservedConcurrency"}
+        assert off == {"Fn::Ref": "AWS::NoValue"}
 
 
 def test_lambda_errors_and_escalations_page_the_sns_topic(
@@ -134,8 +142,13 @@ def test_function_urls_only_accept_the_console_origin(
 ) -> None:
     console = stacks["console-template.yaml"]
     urls = _resources(console, "AWS::Lambda::Url")
-    assert len(urls) == 2
+    assert (
+        len(urls) == 3
+    )  # voice, dashboard, and the HTTPS site proxy (no CORS: same origin)
     for name, url in urls.items():
+        if "Cors" not in url["Properties"]:
+            assert name == "BeaconSiteUrl"
+            continue
         cors = url["Properties"]["Cors"]
         assert "*" not in cors["AllowOrigins"], f"{name}: wildcard origin"
         assert any(
@@ -144,3 +157,58 @@ def test_function_urls_only_accept_the_console_origin(
         ), name
         assert "*" not in cors["AllowMethods"], f"{name}: wildcard methods"
         assert set(cors["AllowHeaders"]) == {"content-type", "x-beacon-passcode"}
+
+
+def test_public_function_urls_have_both_permissions(
+    stacks: dict[str, dict[str, Any]],
+) -> None:
+    """AuthType NONE needs InvokeFunctionUrl and InvokeFunction via the URL."""
+    console = stacks["console-template.yaml"]
+    perms = _resources(console, "AWS::Lambda::Permission")
+    for fn in (
+        "BeaconVoiceTurnFunction",
+        "BeaconDashboardFunction",
+        "BeaconSiteFunction",
+    ):
+        mine = [
+            p["Properties"]
+            for p in perms.values()
+            if _ref_name(p["Properties"]["FunctionName"]) == fn
+        ]
+        actions = {
+            (p["Action"], p.get("FunctionUrlAuthType"), p.get("InvokedViaFunctionUrl"))
+            for p in mine
+        }
+        assert ("lambda:InvokeFunctionUrl", "NONE", None) in actions, fn
+        assert ("lambda:InvokeFunction", None, True) in actions, fn
+
+
+def test_morning_report_is_scheduled_at_seven_ist(
+    stacks: dict[str, dict[str, Any]],
+) -> None:
+    base = stacks["template.yaml"]["Resources"]
+    rule = base["BeaconMorningReportRule"]["Properties"]
+    assert rule["ScheduleExpression"] == "cron(30 1 * * ? *)"  # 07:00 IST
+    target = rule["Targets"][0]
+    assert '"mode": "morning_report"' in target["Input"]
+    perm = base["BeaconMorningReportPermission"]["Properties"]
+    assert perm["Principal"] == "events.amazonaws.com"
+
+
+def test_paging_channels_are_wired_into_every_function_that_pages(
+    stacks: dict[str, dict[str, Any]],
+) -> None:
+    """WEBHOOK_URL / PAGERDUTY_ROUTING_KEY (NoEcho) reach triage, remediate and
+    voice-turn, and each has DASHBOARD_URL for the deep link."""
+    for name, fn in (
+        ("template.yaml", "BeaconFunction"),
+        ("remediation-template.yaml", "BeaconRemediateFunction"),
+        ("console-template.yaml", "BeaconVoiceTurnFunction"),
+    ):
+        t = stacks[name]
+        for param in ("WebhookUrl", "PagerDutyRoutingKey"):
+            assert t["Parameters"][param].get("NoEcho") is True, f"{name}: {param}"
+        env = t["Resources"][fn]["Properties"]["Environment"]["Variables"]
+        assert env["WEBHOOK_URL"] == {"Fn::Ref": "WebhookUrl"}, name
+        assert env["PAGERDUTY_ROUTING_KEY"] == {"Fn::Ref": "PagerDutyRoutingKey"}, name
+        assert "DASHBOARD_URL" in env, name

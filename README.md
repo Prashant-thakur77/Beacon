@@ -2,13 +2,29 @@
 
 **The on-call agent that fixes the 3 AM page with your voice — and the second time it happens, does not wake you at all.**
 
+[![CI](https://github.com/Prashant-thakur77/Beacon/actions/workflows/build.yaml/badge.svg)](https://github.com/Prashant-thakur77/Beacon/actions/workflows/build.yaml)
+[![Release](https://img.shields.io/github/v/release/Prashant-thakur77/Beacon?label=release)](https://github.com/Prashant-thakur77/Beacon/releases/latest)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12-3776ab)](pyproject.toml)
+[![Built on AWS](https://img.shields.io/badge/built%20on-AWS-ff9900)](docs/architecture.md)
+
+**Live console:** https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/ · **Demo film:** [YouTube](https://youtu.be/a3SxZHvIkCo) · [3-minute cut](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.2.0/Beacon-Night-Shift-3min.mp4) · [full cut](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.2.0/Beacon-Night-Shift-full.mp4) · **Blog:** [Why the transcript is the safety artifact](https://builder.aws.com/post/3Jb5v7ouXDReILJ7WMuHrlB1leL_p/why-transcript-is-the-safety-artifactvoice-approved-aws-remediation-with-strands-and-step-functions) · **Architecture:** [docs/architecture.md](docs/architecture.md) (Mermaid) · **Try it locally:** `make setup && make local`
+
 It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. You need four answers: *is it real, what changed, what do I do, can I go back to sleep.*
 
 Beacon reads the logs on Amazon Bedrock, finds the CloudTrail change that caused the outage, proves it against a golden snapshot, proposes one allowlisted fix, dry-runs it under a locked-down role, and waits for your word. You say **"approve fix one"** into your browser. A Step Functions loop applies the fix and refuses to say *recovered* until CloudWatch agrees. Then Beacon asks: *handle this myself next time?* You say yes, for a week. That sentence becomes a **Sleep Contract**: a scoped, expiring standing approval, with your own words as the record. The next time the same thing breaks, Beacon fixes it, verifies it, and emails you in the morning. Zero humans woken.
 
 Built solo in a weekend for the AWS *First Commit* hackathon. Everything below is live code with tests, not a slide.
 
-![The Night Board during a scripted night: brief, propose, approve, verified, contract offered](docs/assets/night-board.png)
+![Beacon Night Shift](docs/assets/landing.gif)
+
+<table><tr>
+<td><img src="docs/assets/night-board.png" alt="Night Board" /></td>
+<td><img src="docs/assets/analytics.png" alt="Analytics" /></td>
+</tr><tr>
+<td align="center"><sub>Night Board: the incident, the conversation, the evidence</sub></td>
+<td align="center"><sub>Analytics: recovery, sleep and cost across nights</sub></td>
+</tr></table>
 
 ## Try it in two minutes, no AWS account
 
@@ -23,7 +39,13 @@ Open <http://localhost:8000/?night=1> (or press **▶ Run the night** on the boa
 
 ## What it does, in one incident
 
+![Beacon Night Shift architecture](docs/assets/architecture.gif)
+
+<details><summary>Static diagram</summary>
+
 ![Beacon Night Shift architecture](docs/assets/architecture.svg)
+
+</details>
 
 ```
 CloudWatch alarm fires ──▶ Lambda (Nova 2 Lite on Bedrock)   RCA + change correlation
@@ -34,7 +56,7 @@ CloudWatch alarm fires ──▶ Lambda (Nova 2 Lite on Bedrock)   RCA + change 
                      DynamoDB incident ──▶ Night Board (S3 + CloudFront)
                                                 │
               you, in the browser ◀────────────▶ Strands agent on Nova 2 Lite
-              (Transcribe streaming STT,          six tools · every sentence cites its evidence
+              (Transcribe streaming STT,          seven tools · every sentence cites its evidence
                Polly TTS with speech marks)       "can you fix it?"  → propose_fix (dry run, blast radius)
                                                   "approve fix one"  → approve_fix (checked against YOUR transcript)
                                                                          │
@@ -63,7 +85,7 @@ The second incident under a contract runs the same loop with `source: contract` 
 | **AWS Lambda** + Function URLs | triage, voice turn, remediate, change ledger, dashboard | all five functions |
 | **Amazon DynamoDB** | incidents, approvals, contracts (TTL), change ledger, idempotency | `store.py`, `approvals.py`, `contracts.py` |
 | **Amazon SNS** | pages, "not woken" emails, resolved / escalated | `notifier.py`, `remediate.py` |
-| **Amazon S3 + CloudFront** | the Night Board console (HTTPS for the mic) | `console-template.yaml` |
+| **Amazon S3 + CloudFront** (or a Lambda Function URL proxy while a new account is under verification) | the Night Board console over HTTPS | `console-template.yaml`, `static_site.py` |
 | **Amazon CloudWatch** (alarms, metrics, logs) | the trigger and the verification oracle | `events.py`, `remediation/verify.py` |
 | **Amazon EC2 / ECS / RDS** | the patient: a real Fargate app behind a security group | `demo/` |
 | **AWS IAM** | two roles, one direction (see Safety) | all three templates |
@@ -72,14 +94,16 @@ The second incident under a contract runs the same loop with `source: contract` 
 
 Auto-remediation is only worth shipping if it cannot do the wrong thing. Beacon's controls are in code and IAM, not in a prompt:
 
-1. **Allowlist by code.** Exactly two actions exist: `sg.restore_ingress` and `ecs.force_redeploy` (`src/beacon/remediation/registry.py`). Params must match the schema exactly.
+1. **Allowlist by code.** Exactly three actions exist: `sg.restore_ingress`, its inverse `sg.revoke_ingress` ("undo fix 1", only for a rule Beacon itself restored) and `ecs.force_redeploy` (`src/beacon/remediation/registry.py`). Params must match the schema exactly.
 2. **Allowlist by data.** A security-group restore must exist in the *golden snapshot* taken on a healthy stack (`make snapshot-sg`).
 3. **Dry run first, under the executing role.** EC2 only tells the truth about permissions to the caller that will execute, so `propose_fix` dry-runs through the remediator Lambda, and the loop dry-runs again before Execute.
 4. **Consent is checked against your transcript, never the model's claim.** `approve_fix` reads the raw text of the current turn and requires the exact phrase `approve fix <n>` (`src/beacon/turn_context.py`). A Sleep Contract needs a read-back turn *and then* `grant contract for <n> days` (or the Hinglish equivalent); "yes" alone never grants.
 5. **Executes exactly once.** The approval record is consumed atomically; retries replay the stored result.
+5b. **Undo is a first-class action.** `undo fix <n>` runs the fix's inverse through the same dry run, approval record and single execute, only for a fix Beacon itself applied; the incident goes back to awaiting a human.
 6. **Two roles, one direction.** The agent you talk to has zero EC2/ECS write actions. The remediator role holds only the two allowlisted writes, scoped by `aws:ResourceTag/beacon:remediable=true` (plus the untaggable `security-group-rule/*` statement that trips everyone up). `tests/test_template_safety.py` parses the real CloudFormation and fails if this ever changes.
 7. **Recovered means proven.** Verify requires all three: the alarm is `OK` *and its state changed after the execute time*, the alarm's own metric is at zero, and the action's post-condition holds. Anything else escalates to a human.
 8. **Contracts are scoped and expire.** Alarm + action + exact resources, a use counter, a TTL, and your quote. Revoke from the console.
+9. **Undo by phrase.** Every fix has an allowlisted inverse (`sg.revoke_ingress`); saying `undo fix 1` reverses exactly what Beacon applied, records it in the audit, and hands the incident back to you. Pages reach you where you are: Slack and PagerDuty, deep-linked to `#board/<incident_id>`.
 9. **One switch stops every write path.** `make apply-off` sets `APPLY_ENABLED=false` on the triage, voice and remediate functions.
 
 Details: [`docs/safety.md`](docs/safety.md).
@@ -112,7 +136,11 @@ make set-passcode PASSCODE=<word> && make deploy-console   # S3 + CloudFront + v
 make break-demo                                    # revoke the RDS rule; the alarm fires in 2-3 min
 ```
 
-Then open the console URL. Full runbook with expected outputs: [`docs/human-runbook.md`](docs/human-runbook.md). Prerequisites: Bedrock model access for Nova 2 Lite and Nova 2 Multimodal Embeddings, and a CloudTrail trail in the region (the change ledger listens to EventBridge).
+Then open the console URL. Full runbook with expected outputs: [`docs/human-runbook.md`](docs/human-runbook.md). The same steps run from GitHub Actions: **Actions → Deploy → Run workflow** (`.github/workflows/deploy.yaml`, OIDC role + passcode as secrets).
+
+New AWS accounts sit under a verification hold for a while: CloudFront and Bedrock refuse to create/serve until it clears. `make deploy-console USE_CLOUDFRONT=false` serves the console from S3 website hosting in the meantime (HTTP, typed input; flip the flag back for HTTPS and the mic). Prerequisites: Bedrock model access for Nova 2 Lite and Nova 2 Multimodal Embeddings, and a CloudTrail trail in the region (the change ledger listens to EventBridge).
+
+Paging channels: pass `WEBHOOK_URL=<Slack-compatible incoming webhook>` and/or `PAGERDUTY_ROUTING_KEY=<Events v2 key>` to `make deploy`, `make deploy-remediation` and `make deploy-console`; every page, contract run, resolution, escalation, undo and morning report is posted with a deep link to the incident (PagerDuty incidents open on a page and close on resolution).
 
 Operator shortcuts: `make propose`, `make approve FIX=1`, `make replay-approval APPROVAL=<id>` (proves idempotency), `make demo-reset`, `make demo-sleep` (a real second outage), `make demo-rehearse` (the whole cycle unattended), `make apply-off`.
 
@@ -127,20 +155,22 @@ src/beacon/
   store.py / approvals.py / contracts.py   DynamoDB: incidents, approvals, Sleep Contracts
   remediation/          registry (the allowlist), actions_sg, actions_ecs, verify (three checks)
   remediate.py          remediate Lambda: dryrun · require_approval · execute · verify · resolve · escalate · all
-  voice_tools.py        six tools + TOOL_SCHEMAS (shared across voice backends)
+  voice_tools.py        seven tools + TOOL_SCHEMAS (shared across voice backends)
   turn_context.py       the raw transcript of the current turn; consent is decided here
   voice_turn.py         Function URL: /session (STS mic creds), /turn (Strands agent + Polly), tool_only
   voice_loop.py         litellm fallback engine, same tools
-  dashboard_api.py      read-only Function URL for the console (redacts account ids / ARNs)
+  dashboard_api.py      read-only Function URL for the console (redacts account ids / ARNs); GET /analytics aggregates nights, recovery percentiles, cost
   observability.py      Powertools EMF metrics + X-Ray spans, one dimension set, incident id as metadata
   aws.py                boto3 clients with bounded timeouts and retries
-web/                    Vite + React console: Night Board, Talk, Contracts, Safety, replay, "Run the night"
+web/                    Vite + React console: Night Board, Talk, Analytics, Contracts, Safety, replay, "Run the night"
 template.yaml           base stack (triage)          remediation-template.yaml   console-template.yaml
 demo/                   the patient: VPC + RDS + Fargate app + alarm, and the sticky-wedge failure mode
 requirements/           pinned image dependencies (triage.txt, agent.txt)
 scripts/                gate.sh · commit.sh · local_server.py (make local) · preflight, capture, replay builders
 tests/                  244 tests: moto for AWS, FakeAgent for the model, template safety + ops, local mode
-docs/                   safety.md · human-runbook.md · demo-script.md · submission.md · blog.md · LEARNINGS.md
+docs/                   architecture.md (Mermaid) · safety.md · human-runbook.md · demo-script.md · submission.md · blog.md · LEARNINGS.md
+video/                  how the demo film is generated (Chatterbox narration, three.js scenes, Playwright captures, ffmpeg)
+.github/                CI (gate + console build), manual Deploy workflow, issue/PR templates
 ```
 
 ## Development
@@ -176,10 +206,6 @@ What "production grade" means here, and where each claim is enforced:
 | Image dependencies are pinned to the versions the suite ran against; a test fails if the pins drift a minor version from the environment | `requirements/*.txt`, `tests/test_hardening.py` |
 
 Known gaps, on purpose for a hackathon: a single passcode instead of per-user identity (Cognito would replace `_passcode_ok` in one place), no WAF in front of the Function URLs (reserved concurrency is the blast-radius limit), and the demo RDS has no backups.
-
-## Provenance
-
-Beacon started from an open-source Apache-2.0 log-triage project (see `LICENSE`; the git tag `base-upstream` marks the untouched import). Everything from that tag forward — the change ledger, diagnostics, the remediation loop, approvals and Sleep Contracts, the voice agent and its tools, the console, the three-stack deployment and the safety tests — was built for this hackathon. `git log base-upstream..HEAD` is the honest diff.
 
 ## License
 

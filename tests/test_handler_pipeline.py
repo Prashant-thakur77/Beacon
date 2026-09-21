@@ -351,3 +351,31 @@ def test_model_proposed_action_with_unconfigured_service_is_dropped(
     )["Item"]
     bj = {k: d.deserialize(v) for k, v in item.items()}["rca_json"]["beacon_json"]
     assert bj["suggested_action"] is None and bj.get("action_source") == "rejected"
+
+
+def test_morning_report_mode_emails_last_night(env: Any) -> None:
+    """``{"mode": "morning_report"}`` (the 07:00 IST schedule) summarises the
+    night from the incidents table and publishes it to SNS."""
+    from datetime import UTC, datetime
+
+    from beacon import handler, reports, store
+    from beacon.events import TriggerInfo, TriggerType
+
+    now = datetime.now(tz=UTC)
+    store.put_incident(
+        "STATUS: High\nSUMMARY: db unreachable",
+        TriggerInfo(
+            trigger_type=TriggerType.ALARM, alarm_name="beacon-demo-infra-errors"
+        ),
+        table_name=INCIDENTS,
+        rca_json={"status": "High", "summary": "db unreachable"},
+        status="resolved",
+        woken=False,
+        timeline=[{"t": now.isoformat(), "event": "resolved"}],
+    )
+    night = reports.night_of(now.isoformat())
+    out = handler.handler({"mode": "morning_report", "night_of": night}, None)
+    assert out["mode"] == "morning_report" and out["incidents"] == 1
+    assert out["night_of"] == night
+    texts = env["messages"]()
+    assert any("Good morning" in t for t in texts)

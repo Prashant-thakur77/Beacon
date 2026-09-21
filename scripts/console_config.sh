@@ -36,6 +36,7 @@ JSON
 aws s3 cp web/dist/config.json "s3://${BUCKET}/config.json" \
     --cache-control "no-cache, no-store, must-revalidate" --content-type application/json --region "$REGION"
 
+if [ "$DIST_ID" = "none" ]; then echo "No CloudFront distribution (S3 website mode); nothing to invalidate."; exit 0; fi
 INV_ID="$(aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths '/*' --query 'Invalidation.Id' --output text)"
 echo "==> Invalidation $INV_ID created; waiting (1-3 min)..."
 aws cloudfront wait invalidation-completed --distribution-id "$DIST_ID" --id "$INV_ID"

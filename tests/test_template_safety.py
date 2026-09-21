@@ -13,7 +13,11 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).parent.parent
-WRITE_ACTIONS = {"ec2:AuthorizeSecurityGroupIngress", "ecs:UpdateService"}
+WRITE_ACTIONS = {
+    "ec2:AuthorizeSecurityGroupIngress",
+    "ec2:RevokeSecurityGroupIngress",
+    "ecs:UpdateService",
+}
 FORBIDDEN_PREFIXES = (
     "ec2:",
     "ecs:",
@@ -108,15 +112,14 @@ def test_remediator_write_actions_are_exactly_the_allowlist(
     assert writes == WRITE_ACTIONS
 
 
+@pytest.mark.parametrize(
+    "action", ["ec2:AuthorizeSecurityGroupIngress", "ec2:RevokeSecurityGroupIngress"]
+)
 def test_remediator_sg_action_has_tag_condition_and_rule_statement(
-    remediation: dict[str, Any],
+    remediation: dict[str, Any], action: str
 ) -> None:
     role = remediation["Resources"]["BeaconRemediatorRole"]
-    sg_statements = [
-        s
-        for s in _statements(role)
-        if "ec2:AuthorizeSecurityGroupIngress" in _actions(s)
-    ]
+    sg_statements = [s for s in _statements(role) if action in _actions(s)]
     assert len(sg_statements) == 2, (
         "need one tagged security-group statement and one security-group-rule statement"
     )

@@ -168,6 +168,57 @@ def test_image_requirement_pins_match_the_tested_environment() -> None:
         assert pins, name
         for pkg, pinned in pins:
             installed = version(pkg)
-            assert installed.split(".")[:2] == pinned.split(".")[:2], (
+            # Same major, and never older than the pin: a fresh install may resolve
+            # a newer minor (litellm ships minors weekly); the image stays pinned.
+            assert installed.split(".")[0] == pinned.split(".")[0], (
                 f"{name}: {pkg} pinned {pinned}, env {installed}; bump the pin"
             )
+            key = lambda v: tuple(int(x) for x in v.split("+")[0].split(".")[:3])  # noqa: E731
+            assert key(installed) >= key(pinned), f"{name}: {pkg} env older than pin"
+
+
+def test_triage_entry_points_do_not_import_powertools() -> None:
+    """The torch triage image has no aws_lambda_powertools; every module the
+    triage handler can reach (incl. the morning-report path) must stay clear."""
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).parent.parent / "src" / "beacon"
+    forbidden = {
+        "beacon.dashboard_api",
+        "beacon.voice_turn",
+        "beacon.voice_tools",
+        "beacon.remediate",
+    }
+    seen: set[str] = set()
+    todo = ["beacon.handler"]
+    while todo:
+        mod = todo.pop()
+        if mod in seen or not mod.startswith("beacon"):
+            continue
+        seen.add(mod)
+        path = root / (mod.split(".", 1)[1].replace(".", "/") + ".py")
+        if not path.exists():
+            path = root / mod.split(".", 1)[1].replace(".", "/") / "__init__.py"
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                base = node.module
+                if base == "beacon":
+                    for alias in node.names:
+                        todo.append(f"beacon.{alias.name}")
+                elif base.startswith("beacon"):
+                    todo.append(base)
+                assert not base.startswith("aws_lambda_powertools"), (
+                    f"{mod} imports Powertools"
+                )
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    assert not alias.name.startswith("aws_lambda_powertools"), (
+                        f"{mod} imports Powertools"
+                    )
+                    if alias.name.startswith("beacon"):
+                        todo.append(alias.name)
+    assert not (seen & forbidden), (
+        f"triage reaches Powertools-dependent modules: {seen & forbidden}"
+    )

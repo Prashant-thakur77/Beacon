@@ -148,6 +148,8 @@ endif
 ifneq ($(REMEDIABLE_ECS_SERVICES),)
 	OVERRIDES += RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES)
 endif
+# Paging channels (optional; both NoEcho). Shared by all three stacks.
+CHANNELS = $(if $(WEBHOOK_URL),WebhookUrl=$(WEBHOOK_URL),) $(if $(PAGERDUTY_ROUTING_KEY),PagerDutyRoutingKey=$(PAGERDUTY_ROUTING_KEY),) $(if $(DASHBOARD_URL),DashboardUrl=$(DASHBOARD_URL),)
 REMEDIABLE_ECS_SERVICES ?=
 
 # Console stack
@@ -223,7 +225,7 @@ deploy: check-image-tags
 		--stack-name $(STACK_NAME) \
 		--region $(REGION) \
 		--capabilities CAPABILITY_IAM \
-		--parameter-overrides $(OVERRIDES) LambdaArchitecture=$(LAMBDA_ARCH)
+		--parameter-overrides $(OVERRIDES) LambdaArchitecture=$(LAMBDA_ARCH) $(CHANNELS)
 	$(call save_env,EMAIL,$(EMAIL))
 	$(call save_env,LOG_GROUP_PATTERNS,$(LOG_GROUP_PATTERNS))
 	$(call save_env,REGION,$(REGION))
@@ -408,7 +410,7 @@ deploy-remediation:
 		--parameter-overrides BaseStackName=$(STACK_NAME) AgentImageUri=$(AGENT_IMAGE_URI) \
 			SnsTopicArn=$$SNS_ARN CreateIncidentsTable=$(CREATE_INCIDENTS_TABLE) \
 			LambdaArchitecture=$(LAMBDA_ARCH) $(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),) \
-			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),)
+			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),) $(CHANNELS)
 	$(call save_env,AGENT_IMAGE_URI,$(AGENT_IMAGE_URI))
 	@echo "Done. Next: make snapshot-sg && make tag-remediable && make dry-run"
 
@@ -464,7 +466,8 @@ dry-run:
 	PAYLOAD="{\"step\":\"dryrun\",\"action\":\"sg.restore_ingress\",\"params\":$$PARAMS}" && \
 	echo "==> invoking beacon-remediate-$(STACK_NAME) with $$PAYLOAD" && \
 	aws lambda invoke --function-name beacon-remediate-$(STACK_NAME) --region $(REGION) \
-		--cli-binary-format raw-in-base64-out --payload "$$PAYLOAD" /dev/stdout | $(PYTHON) -c 'import json,sys; d=json.loads(sys.stdin.read().split("\n")[0]); print(json.dumps(d, indent=1)); sys.exit(0 if d.get("ok") else 1)' \
+		--cli-binary-format raw-in-base64-out --payload "$$PAYLOAD" /tmp/beacon-dryrun.json > /dev/null && \
+	$(PYTHON) -c 'import json,sys; d=json.load(open("/tmp/beacon-dryrun.json")); print(json.dumps(d, indent=1)); sys.exit(0 if d.get("ok") else 1)' \
 		&& echo "DRY RUN PASSED" || (echo "DRY RUN FAILED (see error above)"; exit 1)
 
 # Proof that Cordon/Nova Embeddings ran on the last triage (greps the Lambda log).
@@ -495,6 +498,8 @@ incidents:
 set-passcode:
 	$(call check_param,PASSCODE)
 	$(call save_env,PASSCODE,$(PASSCODE))
+	$(if $(WEBHOOK_URL),$(call save_env,WEBHOOK_URL,$(WEBHOOK_URL)),)
+	$(if $(PAGERDUTY_ROUTING_KEY),$(call save_env,PAGERDUTY_ROUTING_KEY,$(PAGERDUTY_ROUTING_KEY)),)
 	@echo "Passcode saved to .beacon.env"
 
 # Builds web/dist if the Vite app exists; otherwise uses the placeholder page.
@@ -519,7 +524,7 @@ deploy-console: web-build
 		--capabilities CAPABILITY_NAMED_IAM \
 		--parameter-overrides BaseStackName=$(STACK_NAME) AgentImageUri=$(AGENT_IMAGE_URI) \
 			LambdaArchitecture=$(LAMBDA_ARCH) RemediateFunctionArn=$$REMEDIATE_ARN Passcode=$(PASSCODE) \
-			SnsTopicArn=$$SNS_ARN \
+			SnsTopicArn=$$SNS_ARN UseCloudFront=$(USE_CLOUDFRONT) $(CHANNELS) \
 			PollyVoiceId=$(POLLY_VOICE_ID) SttLanguage=$(STT_LANGUAGE) VoiceEngine=$(VOICE_ENGINE) \
 			$(if $(APPLY_ENABLED),ApplyEnabled=$(APPLY_ENABLED),) \
 			$(if $(REMEDIABLE_ECS_SERVICES),RemediableEcsServices=$(REMEDIABLE_ECS_SERVICES),) \
@@ -587,7 +592,8 @@ replay-approval:
 	PARAMS=$$(REGION=$(REGION) bash scripts/demo_params.sh) && \
 	PAYLOAD="{\"step\":\"execute\",\"approval_id\":\"$(APPROVAL)\",\"incident_id\":\"$$INC\",\"action\":\"sg.restore_ingress\",\"params\":$$PARAMS}" && \
 	aws lambda invoke --function-name beacon-remediate-$(STACK_NAME) --region $(REGION) \
-		--cli-binary-format raw-in-base64-out --payload "$$PAYLOAD" /dev/stdout | head -1 | $(PYTHON) -m json.tool && \
+		--cli-binary-format raw-in-base64-out --payload "$$PAYLOAD" /tmp/beacon-replay.json > /dev/null && \
+	$(PYTHON) -m json.tool /tmp/beacon-replay.json && \
 	echo "(idempotent_replay: true means the stored result was returned and nothing was re-executed)"
 
 # Force the alarm into ALARM without waiting for metric evaluation (retakes only; the recorded take uses the real alarm).
@@ -664,6 +670,7 @@ warm:
 # ---------- Local / Build It mode (no AWS account) ----------
 
 LOCAL_PORT     ?= 8000
+USE_CLOUDFRONT ?= true
 LOCAL_PASSCODE ?= local
 
 # The whole product on localhost against an in-process moto AWS: real tools,

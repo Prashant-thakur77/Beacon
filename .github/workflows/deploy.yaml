@@ -1,0 +1,84 @@
+name: Deploy
+
+# Manual deploys from GitHub, one stack at a time, in the runbook's order.
+# Needs an OIDC role in the target account with the deploy permissions
+# (secret AWS_DEPLOY_ROLE_ARN) and the console passcode (secret BEACON_PASSCODE).
+# Images are built and pushed by the same job so the git-SHA tag guard holds.
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: Which stack to deploy
+        required: true
+        type: choice
+        options: [demo, images, base, remediation, console, all]
+      region:
+        description: AWS region
+        default: us-east-1
+        type: string
+      use_cloudfront:
+        description: CloudFront in front of the console (false for accounts still under new-account verification)
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: aws
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ inputs.region }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install cfn-lint
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Demo workload (VPC, RDS, Fargate app, alarm)
+        if: inputs.stack == 'demo' || inputs.stack == 'all'
+        run: make deploy-demo REGION=${{ inputs.region }} CFN_LINT=cfn-lint
+
+      - name: Container images (git-SHA tags)
+        if: inputs.stack == 'images' || inputs.stack == 'all'
+        run: |
+          make setup-image REGION=${{ inputs.region }}
+          make setup-agent-image REGION=${{ inputs.region }}
+
+      - name: Base stack (triage)
+        if: inputs.stack == 'base' || inputs.stack == 'all'
+        run: >-
+          make deploy REGION=${{ inputs.region }} CFN_LINT=cfn-lint
+          EMAIL=${{ vars.BEACON_EMAIL }} LOG_GROUP_PATTERNS=/ecs/beacon-demo
+          ENABLE_ALARM=true ALARM_NAME_PREFIX=beacon-demo TOKEN_BUDGET=6000 INCIDENTS_ENABLED=true
+
+      - name: Remediation stack + golden snapshot + dry run
+        if: inputs.stack == 'remediation' || inputs.stack == 'all'
+        run: |
+          make deploy-remediation REGION=${{ inputs.region }} CFN_LINT=cfn-lint
+          make snapshot-sg REGION=${{ inputs.region }}
+          make tag-remediable REGION=${{ inputs.region }}
+          make remediable-ecs REGION=${{ inputs.region }}
+          make dry-run REGION=${{ inputs.region }} PYTHON=python
+
+      - name: Console stack (S3 + CloudFront + Function URLs)
+        if: inputs.stack == 'console' || inputs.stack == 'all'
+        run: >-
+          make deploy-console REGION=${{ inputs.region }} CFN_LINT=cfn-lint
+          PASSCODE=${{ secrets.BEACON_PASSCODE }} USE_CLOUDFRONT=${{ inputs.use_cloudfront }}

@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="fonts/geist.css">
+<style>
+html,body{margin:0;width:1920px;height:1080px;background:#0b0b0d;color:#e7e7e4;font-family:"Geist Mono",monospace;overflow:hidden}
+.win{position:absolute;left:160px;top:110px;width:1600px;height:860px;border:1px solid #26262b;border-radius:16px;background:#0e0e11;box-shadow:0 40px 120px rgba(0,0,0,.7);overflow:hidden}
+.bar{height:44px;border-bottom:1px solid #1c1c21;display:flex;align-items:center;gap:8px;padding:0 18px;color:#55555c;font-size:15px}
+.bar i{width:12px;height:12px;border-radius:50%;background:#2a2a30;display:inline-block}
+pre{margin:0;padding:26px 30px;font-size:21px;line-height:1.5;white-space:pre-wrap;color:#c9c9c4}
+pre .p{color:#b4a7ff} pre .ok{color:#6ee7a0} pre .warn{color:#f5b942}
+.kicker{position:absolute;left:160px;top:56px;font-family:"Geist",sans-serif;font-size:20px;letter-spacing:.18em;text-transform:uppercase;color:#55555c;font-weight:600}
+</style></head><body>
+<div class="kicker" id="k"></div>
+<div class="win"><div class="bar"><i></i><i></i><i></i>&nbsp; prashant@laptop — bash</div><pre id="out"></pre></div>
+<script>
+const q = new URLSearchParams(location.search); const file = q.get('file') || 'real-cli.txt'; document.getElementById('k').textContent = q.get('title') || '';
+fetch(file).then(r => r.text()).then(txt => {
+  const out = document.getElementById('out'); const lines = txt.split('\n'); let i = 0;
+  const colour = (l) => l.startsWith('$ ') ? `<span class="p">${l.replace(/</g,'&lt;')}</span>` : /PASSED|ALARM|COMPLETE|passed|ok": true/.test(l) ? `<span class="ok">${l.replace(/</g,'&lt;')}</span>` : l.replace(/</g,'&lt;');
+  const step = () => { if (i >= lines.length) return; const l = lines[i++]; out.innerHTML += colour(l) + '\n'; const win = out.parentElement; win.scrollTop = win.scrollHeight; setTimeout(step, l.startsWith('$ ') ? 900 : 120); };
+  setTimeout(step, 600);
+});
+</script></body></html>

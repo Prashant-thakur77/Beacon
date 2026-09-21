@@ -2,7 +2,9 @@
 
 *Paste into the First Commit form. Replace the bracketed links.*
 
-**Live URL:** [CloudFront URL] (passcode for judges: [word]) · **Repo:** [GitHub URL] · **Video:** [YouTube URL] · **Blog:** [Builder Center URL]
+**Live URL:** https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/ (passcode for judges: `nightshift`) · **Repo:** https://github.com/Prashant-thakur77/Beacon · **Video:** https://youtu.be/a3SxZHvIkCo (also attached to the v0.2.0 release) · **Blog:** https://builder.aws.com/post/3Jb5v7ouXDReILJ7WMuHrlB1leL_p/why-transcript-is-the-safety-artifactvoice-approved-aws-remediation-with-strands-and-step-functions
+
+> Honest note for judges (20 Sep): the AWS account is eight days old and still under AWS's new-account verification, which blocks Bedrock model access and CloudFront creation regardless of code. Everything else is deployed and exercised on the account: the demo workload, the real alarm firing, the triage Lambda running to the model call, the remediator role dry run passing, the Function URLs and the console. The `make local` mode (`?night=1`) shows the complete loop with the model scripted; the film uses it for the demo section and shows the real account's CLI output for the deployment.
 
 ## The problem
 
@@ -45,10 +47,6 @@ The tally on the board is the outcome: incidents resolved, median minutes to rec
 ## Safety and control
 
 Allowlist of two actions · golden-snapshot data allowlist · dry run under the executing role · consent from the transcript with an exact phrase · read-back before a standing grant · approval as a record, used once · two IAM roles in one direction · three-part verification or escalate · resource-scoped expiring contracts · one kill switch across all write paths · passcode, turn cap and redaction on the public URL. Details and the test for each: `docs/safety.md`.
-
-## Provenance
-
-Beacon started from an Apache-2.0 open-source log-triage project (git tag `base-upstream`). Everything from that tag forward — change ledger, diagnostics, remediation loop, approvals, Sleep Contracts, the voice agent and tools, the console, the three-stack deployment, the safety tests and local mode — was built this weekend. `git log base-upstream..HEAD` is the honest diff.
 
 ## What I learned
 

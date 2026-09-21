@@ -75,8 +75,44 @@ Parameters:
     AllowedValues: [strands, litellm]
     Description: strands = Strands Agents SDK loop; litellm = fallback tool-calling loop with the same schemas
 
+  ReservedConcurrency:
+    Type: Number
+    Default: 0
+    Description: >
+      Reserved concurrency for the voice-turn and dashboard Lambdas (0 = none). New
+      accounts have a 10-execution unreserved minimum that makes any reservation fail.
+
+  UseCloudFront:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >
+      false = serve the console from S3 website hosting (HTTP) instead of CloudFront. Only for
+      accounts still under AWS's new-account verification, which blocks CloudFront creation;
+      the mic needs HTTPS, typed input works either way. Redeploy with true once verified.
+
+  DashboardUrl:
+    Type: String
+    Default: ""
+    Description: Console URL used for deep links in pages (blank = no links)
+
+  WebhookUrl:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Slack-compatible incoming webhook; every page/resolve/escalation/undo/morning report is posted there with a deep link (blank = off)
+
+  PagerDutyRoutingKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: PagerDuty Events v2 routing key; pages open an incident keyed by the Beacon incident id and resolutions close it (blank = off)
+
 Conditions:
   PageOnErrors: !Not [!Equals [!Ref SnsTopicArn, ""]]
+  UseCloudFront: !Equals [!Ref UseCloudFront, "true"]
+  UseS3Website: !Not [!Equals [!Ref UseCloudFront, "true"]]
+  ReserveConcurrency: !Not [!Equals [!Ref ReservedConcurrency, 0]]
 
 Resources:
 
@@ -88,12 +124,18 @@ Resources:
       BucketName: !Sub "beacon-console-${AWS::AccountId}-${AWS::Region}"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
-        BlockPublicPolicy: true
+        BlockPublicPolicy: !If [UseCloudFront, true, false]
         IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+        RestrictPublicBuckets: !If [UseCloudFront, true, false]
+      WebsiteConfiguration: !If
+        - UseS3Website
+        - IndexDocument: index.html
+          ErrorDocument: index.html
+        - !Ref AWS::NoValue
 
   BeaconConsoleOAC:
     Type: AWS::CloudFront::OriginAccessControl
+    Condition: UseCloudFront
     Properties:
       OriginAccessControlConfig:
         Name: !Sub "beacon-console-${BaseStackName}"
@@ -103,6 +145,7 @@ Resources:
 
   BeaconConsoleHeaders:
     Type: AWS::CloudFront::ResponseHeadersPolicy
+    Condition: UseCloudFront
     Properties:
       ResponseHeadersPolicyConfig:
         Name: !Sub "beacon-console-${BaseStackName}"
@@ -148,6 +191,7 @@ Resources:
 
   BeaconConsoleDistribution:
     Type: AWS::CloudFront::Distribution
+    Condition: UseCloudFront
     Properties:
       DistributionConfig:
         Enabled: true
@@ -200,6 +244,7 @@ Resources:
 
   BeaconConsoleBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    Condition: UseCloudFront
     Properties:
       Bucket: !Ref BeaconConsoleBucket
       PolicyDocument:
@@ -214,6 +259,100 @@ Resources:
             Condition:
               StringEquals:
                 AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${BeaconConsoleDistribution}"
+
+  BeaconConsoleWebsitePolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: UseS3Website
+    Properties:
+      Bucket: !Ref BeaconConsoleBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadForWebsite
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${BeaconConsoleBucket.Arn}/*"
+
+  # ---------- HTTPS console without CloudFront: a Function URL proxying the bucket ----------
+
+  BeaconSiteRole:
+    Type: AWS::IAM::Role
+    Condition: UseS3Website
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BeaconSiteRead
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub "${BeaconConsoleBucket.Arn}/*"
+
+  BeaconSiteLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: UseS3Website
+    Properties:
+      LogGroupName: !Sub "/beacon/${BaseStackName}/site"
+      RetentionInDays: 14
+
+  BeaconSiteFunction:
+    Type: AWS::Lambda::Function
+    Condition: UseS3Website
+    Properties:
+      FunctionName: !Sub "beacon-site-${BaseStackName}"
+      PackageType: Image
+      Architectures:
+        - !Ref LambdaArchitecture
+      Code:
+        ImageUri: !Ref AgentImageUri
+      ImageConfig:
+        Command: ["beacon.static_site.handler"]
+      Role: !GetAtt BeaconSiteRole.Arn
+      MemorySize: 512
+      Timeout: 10
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref BeaconSiteLogGroup
+      Environment:
+        Variables:
+          CONSOLE_BUCKET: !Ref BeaconConsoleBucket
+          POWERTOOLS_SERVICE_NAME: beacon-site
+          LITELLM_LOCAL_MODEL_COST_MAP: "True"
+
+  BeaconSiteUrl:
+    Type: AWS::Lambda::Url
+    Condition: UseS3Website
+    Properties:
+      TargetFunctionArn: !GetAtt BeaconSiteFunction.Arn
+      AuthType: NONE
+
+  BeaconSiteUrlPermission:
+    Type: AWS::Lambda::Permission
+    Condition: UseS3Website
+    Properties:
+      FunctionName: !Ref BeaconSiteFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+  BeaconSiteUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: UseS3Website
+    Properties:
+      FunctionName: !Ref BeaconSiteFunction
+      Action: lambda:InvokeFunction
+      Principal: "*"
+      InvokedViaFunctionUrl: true
 
   # ---------- Voice turn (read-only agent role) ----------
 
@@ -352,7 +491,7 @@ Resources:
       MemorySize: 2048
       Timeout: 45
       # Public URL behind a passcode: cap the blast radius of a flood (each turn is a Bedrock call).
-      ReservedConcurrentExecutions: 10
+      ReservedConcurrentExecutions: !If [ReserveConcurrency, !Ref ReservedConcurrency, !Ref AWS::NoValue]
       LoggingConfig:
         LogFormat: JSON
         LogGroup: !Ref BeaconVoiceTurnLogGroup
@@ -379,6 +518,10 @@ Resources:
           ASSEMBLYAI_KEY_PARAM: !Ref AssemblyAIKeyParam
           SESSION_CAP_TURNS: "30"
           POWERTOOLS_SERVICE_NAME: beacon-voice-turn
+          DASHBOARD_URL: !Ref DashboardUrl
+          WEBHOOK_URL: !Ref WebhookUrl
+          PAGERDUTY_ROUTING_KEY: !Ref PagerDutyRoutingKey
+          BEACON_VERSION: "0.2.0"
           POWERTOOLS_METRICS_NAMESPACE: Beacon
           LITELLM_LOCAL_MODEL_COST_MAP: "True"
 
@@ -390,7 +533,14 @@ Resources:
       Cors:
         # Only the console (and a local Vite dev server) may call this from a browser.
         AllowOrigins:
-          - !Sub "https://${BeaconConsoleDistribution.DomainName}"
+          - !If
+            - UseCloudFront
+            - !Sub "https://${BeaconConsoleDistribution.DomainName}"
+            - !Sub "http://${BeaconConsoleBucket}.s3-website-${AWS::Region}.amazonaws.com"
+          - !If
+            - UseS3Website
+            - !Join ["", ["https://", !Select [0, !Split ["/", !Select [1, !Split ["https://", !GetAtt BeaconSiteUrl.FunctionUrl]]]]]]
+            - http://localhost:5173
           - http://localhost:5173
         AllowHeaders: ["content-type", "x-beacon-passcode"]
         AllowMethods: [GET, POST]
@@ -403,6 +553,15 @@ Resources:
       Action: lambda:InvokeFunctionUrl
       Principal: "*"
       FunctionUrlAuthType: NONE
+
+  # Since 2025 a public Function URL also needs InvokeFunction scoped to URL invocations.
+  BeaconVoiceTurnUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BeaconVoiceTurnFunction
+      Action: lambda:InvokeFunction
+      Principal: "*"
+      InvokedViaFunctionUrl: true
 
   BeaconVoiceTurnWarmRule:
     Type: AWS::Events::Rule
@@ -491,7 +650,7 @@ Resources:
       Role: !GetAtt BeaconDashboardRole.Arn
       MemorySize: 512
       Timeout: 15
-      ReservedConcurrentExecutions: 20
+      ReservedConcurrentExecutions: !If [ReserveConcurrency, !Ref ReservedConcurrency, !Ref AWS::NoValue]
       LoggingConfig:
         LogFormat: JSON
         LogGroup: !Ref BeaconDashboardLogGroup
@@ -505,6 +664,7 @@ Resources:
           CHANGES_TABLE_NAME: !Sub "beacon-changes-${BaseStackName}"
           STATE_MACHINE_ARN: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:beacon-remediate-${BaseStackName}"
           POWERTOOLS_SERVICE_NAME: beacon-dashboard
+          BEACON_VERSION: "0.2.0"
           LITELLM_LOCAL_MODEL_COST_MAP: "True"
 
   BeaconDashboardUrl:
@@ -514,7 +674,14 @@ Resources:
       AuthType: NONE
       Cors:
         AllowOrigins:
-          - !Sub "https://${BeaconConsoleDistribution.DomainName}"
+          - !If
+            - UseCloudFront
+            - !Sub "https://${BeaconConsoleDistribution.DomainName}"
+            - !Sub "http://${BeaconConsoleBucket}.s3-website-${AWS::Region}.amazonaws.com"
+          - !If
+            - UseS3Website
+            - !Join ["", ["https://", !Select [0, !Split ["/", !Select [1, !Split ["https://", !GetAtt BeaconSiteUrl.FunctionUrl]]]]]]
+            - http://localhost:5173
           - http://localhost:5173
         AllowHeaders: ["content-type", "x-beacon-passcode"]
         AllowMethods: [GET, POST, DELETE]
@@ -527,6 +694,15 @@ Resources:
       Action: lambda:InvokeFunctionUrl
       Principal: "*"
       FunctionUrlAuthType: NONE
+
+  # Since 2025 a public Function URL also needs InvokeFunction scoped to URL invocations.
+  BeaconDashboardUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BeaconDashboardFunction
+      Action: lambda:InvokeFunction
+      Principal: "*"
+      InvokedViaFunctionUrl: true
 
   # ---------- Paging: a broken voice or dashboard function reaches the SNS topic ----------
 
@@ -572,7 +748,15 @@ Resources:
 
 Outputs:
   ConsoleUrl:
-    Value: !Sub "https://${BeaconConsoleDistribution.DomainName}"
+    Value: !If
+      - UseCloudFront
+      - !Sub "https://${BeaconConsoleDistribution.DomainName}"
+      - !GetAtt BeaconSiteUrl.FunctionUrl
+  ConsoleHttpUrl:
+    Value: !If
+      - UseCloudFront
+      - "none"
+      - !Sub "http://${BeaconConsoleBucket}.s3-website-${AWS::Region}.amazonaws.com"
   VoiceTurnUrl:
     Value: !GetAtt BeaconVoiceTurnUrl.FunctionUrl
   DashboardUrl:
@@ -580,7 +764,7 @@ Outputs:
   BucketName:
     Value: !Ref BeaconConsoleBucket
   DistributionId:
-    Value: !Ref BeaconConsoleDistribution
+    Value: !If [UseCloudFront, !Ref BeaconConsoleDistribution, "none"]
   VoiceTurnFunctionName:
     Value: !Ref BeaconVoiceTurnFunction
   DashboardFunctionName:

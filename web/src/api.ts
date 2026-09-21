@@ -1,5 +1,5 @@
 import { trimSlash, type Config } from "./config";
-import type { Contract, Incident, MetricSeries, Safety, Tally, TurnResponse } from "./types";
+import type { Analytics, AuditRow, Contract, Health, Incident, MetricSeries, MorningReport, Safety, Tally, TurnResponse } from "./types";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -39,6 +39,22 @@ async function request<T>(url: string, init: RequestInit = {}, passcode?: string
   return body as T;
 }
 
+async function requestText(url: string, timeoutMs = READ_TIMEOUT_MS): Promise<string> {
+  const ctl = new AbortController();
+  const timer = window.setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const resp = await fetch(url, { signal: ctl.signal });
+    const text = await resp.text();
+    if (!resp.ok) throw new ApiError(resp.status, text || `${resp.status} ${resp.statusText}`);
+    return text;
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    throw new ApiError(0, ctl.signal.aborted ? "timed out" : e instanceof Error ? e.message : String(e));
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export function makeApi(config: Config, passcode: () => string) {
   const dash = trimSlash(config.dashboardUrl);
   const voice = trimSlash(config.voiceUrl);
@@ -50,6 +66,12 @@ export function makeApi(config: Config, passcode: () => string) {
     incident: (id: string) => request<{ incident: Incident }>(`${dash}/incidents/${id}`),
     execution: (id: string) => request<{ execution_arn: string; status: string | null; events: Array<{ t: string; type: string; state: string | null }> }>(`${dash}/incidents/${id}/execution`),
     tally: () => request<Tally>(`${dash}/tally`),
+    analytics: () => request<Analytics>(`${dash}/analytics`),
+    postmortem: (id: string) => requestText(`${dash}/incidents/${id}/postmortem`),
+    audit: () => request<{ rows: AuditRow[]; count: number }>(`${dash}/audit`),
+    auditCsvUrl: `${dash}/audit?format=csv`,
+    report: (night?: string) => request<MorningReport>(`${dash}/report/latest${night ? `?night=${encodeURIComponent(night)}` : ""}`),
+    health: () => request<Health>(`${dash}/health`),
     metric: (id: string) => request<MetricSeries>(`${dash}/incidents/${id}/metric`),
     contracts: () => request<{ contracts: Contract[] }>(`${dash}/contracts`),
     revoke: (id: string) => request<{ ok: boolean }>(`${dash}/contracts/${id}`, { method: "DELETE" }, passcode()),

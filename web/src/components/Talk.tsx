@@ -48,7 +48,25 @@ export function EvidenceCard({ ev, hot }: { ev: Evidence; hot: boolean }) {
   );
 }
 
-export function FixCard({ incident, proposal, series }: { incident: Incident; proposal: Proposal | null; series: MetricSeries | null }) {
+/** The last fix Beacon executed here that has an allowlisted inverse and has not been undone since. */
+function undoableFix(incident: Incident): number | null {
+  if (incident.handled_by === "contract") return null;
+  const tl = incident.timeline ?? [];
+  let fix: number | null = null;
+  let action = "";
+  for (const e of tl) {
+    const d = (e.detail ?? {}) as Record<string, unknown>;
+    if (e.event === "fix_proposed") {
+      fix = Number(d.fix_id ?? fix ?? 1);
+      action = String(d.action ?? "");
+    }
+    if (e.event === "undone") fix = null;
+  }
+  const executed = tl.some((e) => e.event === "executed");
+  return fix != null && executed && action === "sg.restore_ingress" ? fix : null;
+}
+
+export function FixCard({ incident, proposal, series, onPrefill }: { incident: Incident; proposal: Proposal | null; series: MetricSeries | null; onPrefill?: (text: string) => void }) {
   const status = incident.status;
   if (status === "resolved") {
     const verifies = (incident.timeline ?? []).filter((e) => e.event === "verify_attempt");
@@ -62,6 +80,14 @@ export function FixCard({ incident, proposal, series }: { incident: Incident; pr
         </div>
         <div className="small dim">alarm OK after the fix · error count zero · rule present</div>
         <RecoverySparkline series={series} />
+        {undoableFix(incident) != null && onPrefill ? (
+          <div className="undo-row">
+            <button type="button" className="btn ghost small" onClick={() => onPrefill(`undo fix ${undoableFix(incident)}`)}>
+              ↩︎ Undo fix {undoableFix(incident)}
+            </button>
+            <span className="faint small">the fault will return; Beacon asks you to confirm by phrase</span>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -139,6 +165,19 @@ export function Talk({
   const [hotSentence, setHotSentence] = useState<{ msg: number; idx: number } | null>(null);
   const [hotEvidence, setHotEvidence] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
+  // phone-first incident mode: one thumb, big mic, phrase chips, sticky composer
+  const [phone, setPhone] = useState(() => typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(max-width: 760px)").matches);
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 760px)");
+    const on = () => setPhone(mq.matches);
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  const prefill = useCallback((text: string) => {
+    setTyped(text);
+    window.setTimeout(() => document.getElementById("typed-input")?.focus(), 0);
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [latency, setLatency] = useState<{ stt?: number; agent?: number; tts?: number }>({});
   const [activeStt, setActiveStt] = useState<SttChoice>(stt);
@@ -351,7 +390,7 @@ export function Talk({
   };
 
   return (
-    <div className="talk">
+    <div className={`talk${phone ? " phone" : ""}`}>
       <div className="panel">
         <div className="panel-h">
           <h2>Talk to Beacon</h2>
@@ -360,7 +399,7 @@ export function Talk({
         <div className="panel-b stack">
           <div className="mic-wrap">
             <button
-              className={`mic${state === "listening" ? " live" : ""}${state === "speaking" ? " speaking" : ""}`}
+              className={`mic${state === "listening" ? " live" : ""}${state === "speaking" ? " speaking" : ""}${state === "thinking" ? " thinking" : ""}`}
               onPointerDown={startListening}
               onPointerUp={stopListening}
               onPointerLeave={() => state === "listening" && void stopListening()}
@@ -368,11 +407,29 @@ export function Talk({
               aria-label="Hold to talk"
               title="Hold to talk"
             >
-              {state === "speaking" ? "◉" : "🎙"}
+              {state === "listening" ? (
+                <span className="wave" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              ) : state === "speaking" ? (
+                "◉"
+              ) : (
+                "🎙"
+              )}
             </button>
             <div className="stack" style={{ gap: 4 }}>
-              <div className={`state ${state}`} role="status">{stateLabel[state]}</div>
-              <div className="partial">{partial || (state === "listening" ? "…" : unlocked || replayTurns ? "hold the mic and speak, or type below" : "enter the passcode on the left to talk")}</div>
+              <div className={`state ${state}`} role="status">
+                <span key={state} className="state-text">
+                  {stateLabel[state]}
+                </span>
+              </div>
+              <div className={`partial${partial ? " ribbon" : ""}`} key={partial ? "p" : "hint"}>
+                {partial || (state === "listening" ? "…" : unlocked || replayTurns ? "hold the mic and speak, or type below" : "enter the passcode on the left to talk")}
+              </div>
               <div className="row small">
                 <label className="faint small" htmlFor="stt-select">mic</label>
                 <select className="input" style={{ width: "auto", padding: "4px 8px" }} value={activeStt} onChange={(e) => setActiveStt(e.target.value as SttChoice)} id="stt-select">
@@ -383,6 +440,15 @@ export function Talk({
               </div>
             </div>
           </div>
+          {phone && !replayTurns ? (
+            <div className="phone-chips" role="group" aria-label="Say one of these">
+              {["what changed", "can you fix it", undoableFix(incident) != null && incident.status === "resolved" ? `undo fix ${undoableFix(incident)}` : `approve fix ${proposal?.fix_id ?? 1}`].map((t) => (
+                <button key={t} type="button" className="chip-btn" disabled={state === "thinking" || !unlocked} onClick={() => send(t, "typed")}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {error ? <div className="err">{error}</div> : null}
 
           <div className="bubbles" aria-live="polite" aria-label="Conversation with Beacon">
@@ -430,7 +496,7 @@ export function Talk({
             <input
               id="typed-input"
               className="input"
-              placeholder={proposal && incident.status === "awaiting_engineer" ? `type: approve fix ${proposal.fix_id}` : "type instead of speaking…"}
+              placeholder={proposal && incident.status === "awaiting_engineer" ? `type: approve fix ${proposal.fix_id}` : "try: what changed · can you fix it · approve fix 1"}
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               disabled={!!replayTurns || state === "thinking"}
@@ -447,7 +513,7 @@ export function Talk({
         </div>
       </div>
 
-      <FixCard incident={incident} proposal={proposal} series={series} />
+      <FixCard incident={incident} proposal={proposal} series={series} onPrefill={replayTurns ? undefined : prefill} />
 
       {incident.contract_readback_pending ? (
         <div className="fix lilac">

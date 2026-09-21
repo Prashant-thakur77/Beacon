@@ -40,8 +40,34 @@ Parameters:
     AllowedValues: ["true", "false"]
     Description: Kill switch. When false the Execute step refuses to run any action.
 
+  ReservedConcurrency:
+    Type: Number
+    Default: 0
+    Description: >
+      Reserved concurrency for the remediate Lambda (0 = none). New accounts have a
+      10-execution unreserved minimum, which makes any reservation fail; raise once the
+      account's Lambda concurrency quota is above the default.
+
+  DashboardUrl:
+    Type: String
+    Default: ""
+    Description: Console URL used for deep links in pages (blank = no links)
+
+  WebhookUrl:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Slack-compatible incoming webhook; every page/resolve/escalation/undo/morning report is posted there with a deep link (blank = off)
+
+  PagerDutyRoutingKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: PagerDuty Events v2 routing key; pages open an incident keyed by the Beacon incident id and resolutions close it (blank = off)
+
 Conditions:
   CreateIncidents: !Equals [!Ref CreateIncidentsTable, "true"]
+  ReserveConcurrency: !Not [!Equals [!Ref ReservedConcurrency, 0]]
 
 Resources:
 
@@ -171,6 +197,18 @@ Resources:
                 Effect: Allow
                 Action: ec2:AuthorizeSecurityGroupIngress
                 Resource: !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group-rule/*"
+              # sg.revoke_ingress ("undo fix <n>"): the inverse, same two-resource shape.
+              - Sid: UndoIngressOnTaggedGroups
+                Effect: Allow
+                Action: ec2:RevokeSecurityGroupIngress
+                Resource: !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/beacon:remediable: "true"
+              - Sid: UndoIngressRuleResource
+                Effect: Allow
+                Action: ec2:RevokeSecurityGroupIngress
+                Resource: !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group-rule/*"
               - Sid: ForceRedeployTaggedServices
                 Effect: Allow
                 Action: ecs:UpdateService
@@ -237,7 +275,7 @@ Resources:
       MemorySize: 1024
       Timeout: 300
       # The only function that writes to infrastructure: a handful of loops at once is plenty.
-      ReservedConcurrentExecutions: 5
+      ReservedConcurrentExecutions: !If [ReserveConcurrency, !Ref ReservedConcurrency, !Ref AWS::NoValue]
       LoggingConfig:
         LogFormat: JSON
         LogGroup: !Ref BeaconRemediateLogGroup
@@ -254,6 +292,9 @@ Resources:
           IDEMPOTENCY_TABLE_NAME: !Ref BeaconIdempotencyTable
           SNS_TOPIC_ARN: !Ref SnsTopicArn
           POWERTOOLS_SERVICE_NAME: beacon-remediate
+          DASHBOARD_URL: !Ref DashboardUrl
+          WEBHOOK_URL: !Ref WebhookUrl
+          PAGERDUTY_ROUTING_KEY: !Ref PagerDutyRoutingKey
           LITELLM_LOCAL_MODEL_COST_MAP: "True"
 
   # ---------- Change ledger (CloudTrail -> EventBridge -> DynamoDB) ----------
