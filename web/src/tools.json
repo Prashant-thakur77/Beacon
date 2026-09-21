@@ -103,7 +103,7 @@
   },
   {
     "name": "grant_sleep_contract",
-    "description": "Grant Beacon a standing approval to run this same fix for this alarm next time without waking anyone. First call returns a read-back to speak aloud; it is granted only when the engineer then says 'grant contract for <n> days'.",
+    "description": "Grant Beacon a standing approval to run this same fix for this alarm next time without waking anyone. Two calls, never ask questions in between: (1) the moment the engineer agrees to a contract in any words (yes, sure, haan, go ahead, do it) call it with days 7 and max_uses 3; it returns read_back_spoken to say aloud and the phrase to wait for. (2) when the engineer says 'grant contract for <n> days' call it again with days <n>; only then is it granted.",
     "parameters": {
       "type": "object",
       "properties": {

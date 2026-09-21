@@ -141,7 +141,7 @@ async def session(ws: Any, seconds: int, say: str | None) -> int:
         kind = str(msg.get("type", "?"))
         seen[kind] += 1
         if kind == "reply.audio":
-            audio_bytes += len(msg.get("audio", ""))
+            audio_bytes += len(msg.get("data") or msg.get("audio") or "")
         elif kind not in samples:
             samples[kind] = {
                 k: (v if len(str(v)) < 120 else str(v)[:120] + "…")

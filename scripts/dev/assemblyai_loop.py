@@ -46,6 +46,8 @@ async def main():
                 except Exception:
                     return
                 t = d.get("type")
+                if t == "reply.audio":
+                    state["audio"] = state.get("audio", 0) + len(d.get("data") or "")
                 if t == "reply.started":
                     state["busy"] = True
                     state["log"].append((time.time() - t0, "reply.start", ""))
@@ -134,7 +136,14 @@ async def main():
         c = await pg.evaluate(
             "fetch('/dash/contracts').then(r=>r.json()).then(d=>d.contracts.length)"
         )
-        print("incident status:", d["status"], "| contracts:", c)
+        print(
+            "incident status:",
+            d["status"],
+            "| contracts:",
+            c,
+            "| agent audio b64 bytes:",
+            state.get("audio", 0),
+        )
         await b.close()
 
 

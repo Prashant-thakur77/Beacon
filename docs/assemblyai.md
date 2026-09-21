@@ -12,7 +12,7 @@ Facts verified from the docs on 18 Sep (re-verify on day 1, the spike):
 |---|---|
 | Endpoint | `wss://agents.assemblyai.com/v1/ws`; auth documented as `Authorization: Bearer <key>` (header) — browsers cannot set WS headers, so the spike must confirm the temporary-token or query-param path. `voice_turn._mint_assemblyai_token` is the single function to adjust. |
 | First message | `session.update { session: { system_prompt, greeting, input:{format:{encoding:"audio/pcm"}, turn_detection:{vad_threshold}, transcription_mode, language_codes, voice_focus}, output:{voice, format}, tools:[{type:"function", name, description, parameters}] } }`; re-sendable mid-call. |
-| Audio | in: `input.audio { audio: base64 PCM16 24 kHz mono, ~50 ms chunks }`; out: `reply.audio` base64 PCM16 24 kHz. |
+| Audio | in: `input.audio { audio: base64 PCM16 24 kHz mono, ~50 ms chunks }`; out: `reply.audio { data }` base64 PCM16 24 kHz mono (the field is `data`, not `audio`; verified by saving a reply and transcribing it). |
 | Events | `session.ready`, `transcript.user.delta` (partial, overwrite), `transcript.user` (final), `reply.started`, `reply.audio`, `transcript.agent` (full, trimmed if interrupted), `tool.call { call_id, name, arguments }`, `reply.done { status: completed \| interrupted }`, `session.error`. |
 | Tool results | `tool.result { call_id, result: "<json string>", is_error }` — **only when `reply.done` is the latest event** for the turn that carried the call. The transport buffers results until then. |
 | Limits | ~1 s end-to-end latency, 30 s reconnect window. |

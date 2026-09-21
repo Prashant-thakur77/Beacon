@@ -5,7 +5,7 @@
  *   client → session.update { system_prompt, greeting, input{format, turn_detection, language_codes},
  *                             output{voice, format}, tools[{type:"function", name, description, parameters}] }
  *   client → input.audio { audio: base64 PCM16 24 kHz mono, ~50 ms chunks }
- *   server → session.ready | transcript.user.delta | transcript.user | reply.started | reply.audio
+ *   server → session.ready | transcript.user.delta | transcript.user | reply.started | reply.audio { data }
  *          | transcript.agent | tool.call { call_id, name, arguments } | reply.done { status } | session.error
  *   client → tool.result { call_id, result: JSON string }   — only after reply.done for that turn
  *
@@ -133,7 +133,9 @@ export class AssemblyAITransport implements VoiceTransport {
         h.onState("speaking");
         return;
       case "reply.audio":
-        h.onAgentAudio(fromB64(String(msg.audio ?? "")), OUT_RATE);
+        // The payload field is `data` (verified 21 Sep against the live API); `audio` is
+        // kept as a fallback in case the field is renamed to match input.audio.
+        h.onAgentAudio(fromB64(String(msg.data ?? msg.audio ?? "")), OUT_RATE);
         return;
       case "transcript.agent": {
         const text = String(msg.text ?? "");

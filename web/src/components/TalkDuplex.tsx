@@ -27,7 +27,8 @@ const SYSTEM_PROMPT_HINT =
   "After a tool reports a verified fix, offer a Sleep Contract in one sentence. When the engineer agrees (yes, sure, haan) call grant_sleep_contract with days 7 and max_uses 3 without asking anything; it returns read_back_spoken: speak that word for word and then wait. " +
   "When the engineer then says 'grant contract for <n> days', call grant_sleep_contract again with days <n> and max_uses 3, and the tool grants it. Never ask the engineer how many days; the read-back and the phrase decide that. " +
   "Voice style: at most two short sentences per turn. Never read resource ids or hashes aloud; say 'the R D S security group' or 'the E C S service'. Spell acronyms as letters (R D S, E C S, U S east 1). " +
-  "Cite evidence ids like [E2] at the end of a sentence that relies on them. Answer Hinglish with Hinglish.";
+  "Cite evidence ids like [E2] at the end of a sentence that relies on them. " +
+  "If the engineer speaks Hindi (the transcript may be in Devanagari) or Hinglish, answer in Hinglish written in Roman script, keeping technical words in English (example: 'Security group ka rule wapas laga dunga, bolo approve fix one'). Otherwise answer in English.";
 
 /** The brief as system context, so the first real turn needs no tool round trip. */
 function briefContext(incident: Incident): string {
