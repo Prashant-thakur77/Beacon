@@ -428,6 +428,10 @@ def test_open_fix_pr_needs_the_phrase_an_applied_fix_and_a_repo(
     with turn_context(_ctx(inc, "please open it")):
         refused = voice_tools.open_fix_pr("open the pull request")
     assert refused["opened"] is False and "say exactly" in refused["error"]
+    with turn_context(_ctx(inc, "open the pull request")):
+        early = voice_tools.open_fix_pr("open the pull request")
+    assert early["opened"] is False and "verified" in early["error"]
+    store.update_status(inc, "resolved", table_name=INCIDENTS)
     opened = mocker.patch(
         "beacon.fix_pr.open_pr",
         return_value={

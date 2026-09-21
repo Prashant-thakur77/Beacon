@@ -800,6 +800,15 @@ def open_fix_pr(confirmation_phrase: str = "") -> dict[str, Any]:
             **refusal,
             "error": "no fix has been applied on this incident; approve one first",
         }
+    if incident.get("status") != "resolved":
+        _tool_event("open_fix_pr", {}, f"refused: status {incident.get('status')}")
+        return {
+            **refusal,
+            "error": (
+                f"the incident is {str(incident.get('status', '')).replace('_', ' ')}; "
+                "I open the pull request only once the fix has verified"
+            ),
+        }
     approval = applied[-1]
     postmortem_md = reports.postmortem(
         incident,
