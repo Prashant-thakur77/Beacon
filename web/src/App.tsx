@@ -59,6 +59,8 @@ export default function App() {
   const [config, setConfig] = useState<Config | null>(null);
   const [replay, setReplay] = useState<ReplayBundle | null>(null);
   const [passcode, setPasscode] = useLocalState("beacon.passcode", "");
+  // Side-by-side for the judges: the live AssemblyAI backend or the AWS cascade, per browser.
+  const [voicePick, setVoicePick] = useLocalState("beacon.voiceBackend", "");
   const [route, deepId] = useRoute();
   const [filter, setFilter] = useState<"all" | "needs" | "progress" | "resolved" | "contract">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -482,34 +484,44 @@ export default function App() {
               )}
             </div>
           </section>
-          {current && api && config && !replay && chooseBackend(config) === "assemblyai" ? (
+          {current ? (
             <section>
-              <TalkDuplex
-                key={`duplex-${current.incident_id}`}
-                api={api}
-                config={config}
-                backend="assemblyai"
-                incident={current}
-                stt={stt}
-                passcode={() => passcode}
-                onIncident={onIncident}
-                series={null}
-              />
-            </section>
-          ) : current ? (
-            <section>
-              <Talk
-                key={current.incident_id}
-                api={api}
-                incident={current}
-                stt={stt}
-                replayTurns={replay ? replay.turns[current.incident_id] ?? [] : undefined}
-                onIncident={onIncident}
-                unlocked={!!passcode}
-                sttLanguage={config?.sttLanguage}
-                script={night === "first" ? NIGHT_SCRIPT : undefined}
-                onScriptDone={onNightScriptDone}
-              />
+              {api && config && !replay && chooseBackend(config) === "assemblyai" ? (
+                <div className="backend-switch" role="tablist" aria-label="Voice backend">
+                  <button role="tab" aria-selected={voicePick !== "aws"} className={`seg${voicePick !== "aws" ? " on" : ""}`} onClick={() => setVoicePick("assemblyai")}>
+                    AssemblyAI · full duplex
+                  </button>
+                  <button role="tab" aria-selected={voicePick === "aws"} className={`seg${voicePick === "aws" ? " on" : ""}`} onClick={() => setVoicePick("aws")}>
+                    AWS cascade · push to talk
+                  </button>
+                </div>
+              ) : null}
+              {api && config && !replay && chooseBackend(config) === "assemblyai" && voicePick !== "aws" ? (
+                <TalkDuplex
+                  key={`duplex-${current.incident_id}`}
+                  api={api}
+                  config={config}
+                  backend="assemblyai"
+                  incident={current}
+                  stt={stt}
+                  passcode={() => passcode}
+                  onIncident={onIncident}
+                  series={null}
+                />
+              ) : (
+                <Talk
+                  key={current.incident_id}
+                  api={api}
+                  incident={current}
+                  stt={stt}
+                  replayTurns={replay ? replay.turns[current.incident_id] ?? [] : undefined}
+                  onIncident={onIncident}
+                  unlocked={!!passcode}
+                  sttLanguage={config?.sttLanguage}
+                  script={night === "first" ? NIGHT_SCRIPT : undefined}
+                  onScriptDone={onNightScriptDone}
+                />
+              )}
             </section>
           ) : null}
         </main>

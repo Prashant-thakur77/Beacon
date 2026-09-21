@@ -30,6 +30,8 @@ export interface VoiceTransportHandlers {
   onAgentAudio: (pcm16: Int16Array, sampleRate: number) => void;
   onAgentDone: (status: "completed" | "interrupted") => void;
   onToolResult: (name: string, args: Record<string, unknown>, result: unknown, events: ToolEvent[], evidence: Evidence[]) => void;
+  /** A tool call has arrived and is about to run (for the latency overlay). */
+  onToolStart?: (name: string) => void;
   onState: (state: "connecting" | "listening" | "thinking" | "speaking" | "idle" | "error") => void;
   onError: (message: string) => void;
 }

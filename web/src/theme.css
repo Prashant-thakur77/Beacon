@@ -157,6 +157,12 @@ h1.display { font-size: 48px; }
 .btn.primary:hover { background: #e9c8ff; transform: translateY(-1px); }
 .btn.danger { color: var(--red); }
 .btn.danger:hover { border-color: var(--coral); }
+.latency { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 18px; border-bottom: 1px dashed var(--line); font-family: var(--mono); font-size: 11.5px; color: var(--dim); background: var(--paper); }
+.latency b { color: var(--deep); font-weight: 700; }
+.backend-switch { display: inline-flex; width: fit-content; justify-self: start; align-self: flex-start; gap: 4px; padding: 4px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--paper); margin: 0 0 10px; }
+.backend-switch .seg { border: 0; background: transparent; color: var(--dim); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 999px; cursor: pointer; transition: background 160ms, color 160ms; }
+.backend-switch .seg:hover { color: var(--ink); }
+.backend-switch .seg.on { background: var(--ink); color: var(--cream); }
 .btn.ghost { border-color: transparent; background: transparent; color: var(--dim); padding-inline: 8px; }
 .btn.ghost:hover { color: var(--ink); background: var(--beige); }
 .input {

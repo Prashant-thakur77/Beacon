@@ -15,6 +15,7 @@ import time
 from playwright.async_api import async_playwright
 
 BASE = os.environ.get("BEACON_LOCAL_URL", "http://localhost:8000")
+PASSCODE = os.environ.get("BEACON_PASSCODE", "local")
 LINES = sys.argv[1:] or [
     "can you fix it",
     "approve fix 1",
@@ -81,7 +82,7 @@ async def main():
         pg.on("websocket", onws)
         await pg.goto(f"{BASE}/?voice=assemblyai#board")
         await pg.wait_for_timeout(3000)
-        await pg.fill("#passcode", "local")
+        await pg.fill("#passcode", PASSCODE)
         await pg.click("text=Unlock voice")
         await pg.wait_for_timeout(1200)
         await pg.click("[aria-label='Connect']")
@@ -131,10 +132,12 @@ async def main():
         for t, k, v in state["log"]:
             print(f"{t:6.1f} {k:9} {v}")
         d = await pg.evaluate(
-            "fetch('/dash/incidents').then(r=>r.json()).then(d=>d.incidents[0])"
+            "fetch('/config.json').then(r=>r.json()).then(c=>fetch(c.dashboardUrl.replace(/\\/$/,'')+'/incidents',"
+            f"{{headers:{{'x-beacon-passcode':'{PASSCODE}'}}}})).then(r=>r.json()).then(d=>d.incidents[0])"
         )
         c = await pg.evaluate(
-            "fetch('/dash/contracts').then(r=>r.json()).then(d=>d.contracts.length)"
+            "fetch('/config.json').then(r=>r.json()).then(c=>fetch(c.dashboardUrl.replace(/\\/$/,'')+'/contracts',"
+            f"{{headers:{{'x-beacon-passcode':'{PASSCODE}'}}}})).then(r=>r.json()).then(d=>d.contracts.length)"
         )
         print(
             "incident status:",

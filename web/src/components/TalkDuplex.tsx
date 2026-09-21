@@ -79,6 +79,9 @@ export function TalkDuplex({
   /** fix_id proposed inside the reply now being spoken; interrupting that reply withdraws it. */
   const proposalInReply = useRef<number | null>(null);
   const replySpoke = useRef(false);
+  /** Live latency, measured in the browser: turn end → first audio, tool round trip, turn total. */
+  const lat = useRef<{ turnEnd: number | null; firstAudio: number | null; toolStart: number | null }>({ turnEnd: null, firstAudio: null, toolStart: null });
+  const [latency, setLatency] = useState<{ ttfa?: number; tool?: number; toolName?: string; turn?: number; turns: number }>({ turns: 0 });
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [hotEvidence, setHotEvidence] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
@@ -118,6 +121,7 @@ export function TalkDuplex({
       {
         onUserTranscript: (e) => {
           if (e.final) {
+            lat.current = { turnEnd: performance.now(), firstAudio: null, toolStart: null };
             setHeard({ text: e.text, confidence: e.confidence });
             setPartial("");
             setMessages((prev) => [...prev, { role: "user", text: e.text, channel: backend, at: new Date().toISOString() }]);
@@ -131,12 +135,28 @@ export function TalkDuplex({
           const first = e.cited[0];
           if (first) setHotEvidence(first);
         },
-        onAgentAudio: (pcm, rate) => player.push(pcm, rate),
+        onAgentAudio: (pcm, rate) => {
+          const l = lat.current;
+          if (l.turnEnd !== null && l.firstAudio === null) {
+            l.firstAudio = performance.now();
+            setLatency((prev) => ({ ...prev, ttfa: l.firstAudio! - l.turnEnd! }));
+          }
+          player.push(pcm, rate);
+        },
+        onToolStart: (name) => {
+          lat.current.toolStart = performance.now();
+          setLatency((prev) => ({ ...prev, toolName: name }));
+        },
         onAgentDone: (status) => {
           // A tool call closes one reply and the read-back is the next one, so the proposal
           // stays armed until a reply that actually spoke completes.
           const spoke = replySpoke.current;
           replySpoke.current = false;
+          if (spoke && lat.current.turnEnd !== null) {
+            const total = performance.now() - lat.current.turnEnd;
+            lat.current.turnEnd = null;
+            setLatency((prev) => ({ ...prev, turn: total, turns: prev.turns + 1 }));
+          }
           const proposal = proposalInReply.current;
           if (status === "completed" && spoke) proposalInReply.current = null;
           if (status === "interrupted") {
@@ -164,6 +184,11 @@ export function TalkDuplex({
           setHotEvidence(null);
         },
         onToolResult: (name, args, result, events, cards) => {
+          if (lat.current.toolStart !== null) {
+            const ms = performance.now() - lat.current.toolStart;
+            lat.current.toolStart = null;
+            setLatency((prev) => ({ ...prev, tool: ms, toolName: name }));
+          }
           const fixId = (result as { fix_id?: number } | null)?.fix_id;
           if (name === "propose_fix" && typeof fixId === "number") proposalInReply.current = fixId;
           else if (name === "approve_fix" || name === "cancel_proposal") proposalInReply.current = null;
@@ -261,6 +286,13 @@ export function TalkDuplex({
           <h2>Talk to Beacon</h2>
           <span className="meta">{backend === "assemblyai" ? "AssemblyAI · Universal-3 Pro" : "AWS cascade"}</span>
         </div>
+        {live && latency.turns + (latency.ttfa ? 1 : 0) > 0 ? (
+          <div className="latency" title="Measured in this browser: your turn ends → Beacon's first audio; tool call → result back from the Lambda; whole turn until Beacon finishes.">
+            <span><b>{latency.ttfa != null ? `${(latency.ttfa / 1000).toFixed(1)} s` : "—"}</b> to first audio</span>
+            <span><b>{latency.tool != null ? `${Math.round(latency.tool)} ms` : "—"}</b> {latency.toolName ?? "tool"} round trip</span>
+            <span><b>{latency.turn != null ? `${(latency.turn / 1000).toFixed(1)} s` : "—"}</b> last turn</span>
+          </div>
+        ) : null}
         <div className="panel-b stack">
           <div className="mic-wrap">
             <button
@@ -328,6 +360,7 @@ export function TalkDuplex({
               e.preventDefault();
               const text = typed.trim();
               if (!text) return;
+              lat.current = { turnEnd: performance.now(), firstAudio: null, toolStart: null };
               setMessages((prev) => [...prev, { role: "user", text, channel: "typed", at: new Date().toISOString() }]);
               void transport.current?.sendText(text);
               setTyped("");

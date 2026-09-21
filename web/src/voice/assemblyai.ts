@@ -145,6 +145,7 @@ export class AssemblyAITransport implements VoiceTransport {
       case "tool.call": {
         const call = msg as unknown as ToolCallMsg;
         const s = this.session!;
+        h.onToolStart?.(call.name);
         const out = await this.runTool(call.name, call.arguments ?? {}, {
           incidentId: s.incidentId,
           sessionId: s.sessionId,
