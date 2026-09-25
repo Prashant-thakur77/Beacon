@@ -24,6 +24,18 @@ It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. Eve
 
 **Where the model is and is not.** The model decides whether to call a tool, after your words. Code decides whether the call is allowed, what the fix is, what the patch is, and what the reports say. No model writes to AWS or to the repository.
 
+## Business value (the form's own field, and slide 8–9)
+
+**Who.** A backend engineer on a team of one to five running production on AWS for users in another time zone — a four-person startup in Bengaluru serving New York, the single DevOps hire at a 30-person SaaS. No follow-the-sun rotation, no second shift, a small and repetitive failure surface, no budget for an SRE platform.
+
+**What it saves.** Industry MTTR is 53 minutes and has improved 12 % in five years against a tripling of monitoring spend; downtime runs from Gartner's $5,600/min baseline upward; 74 % of DevOps engineers report burnout with on-call load the leading indicator. On our live account a real alarm reaches a verified recovery in 2.4–5.5 minutes without a laptop being opened, and under a Sleep Contract the repeat fault is fixed with nobody woken at all.
+
+**Market.** TAM $4.8 B incident management (→ $12.99 B by 2035, 11.7 % CAGR); SAM ≈ $1.2 B for alert response and auto-remediation, of which PagerDuty alone books $493 M; SOM ≈ $125 M/yr bottom-up — roughly 120k small AWS teams × 3 responders × $29/month.
+
+**Revenue.** $29 per responder per month; **$2 per verified remediation** — charged only when a fix was applied and CloudWatch agreed, so we earn nothing from noisy alerts; $15k/year self-hosted in the customer's own account (three CloudFormation stacks, no data leaves their boundary).
+
+**Why it needed this generation of AI.** Consent is checked against the words Universal-3 Pro actually returned, including half-asleep Hinglish — DTMF cannot express *which* fix on *which* resource, and older ASR could not carry that responsibility. Barge-in has to be observable (`reply.done {interrupted}`) for an interruption to withdraw a pending fix. Nine tools have to be callable mid-turn with results feeding the next sentence. Full reasoning: [docs/business-case.md](business-case.md).
+
 ## Links
 
 - Live console (passcode in the form): https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/
@@ -35,6 +47,15 @@ It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. Eve
 ## Tags
 
 Voice Agent API · Universal-3 Pro · pre-recorded transcription · tool calling · barge-in · Hinglish · AWS · Step Functions · Telegram · GitHub · on-call · SRE
+
+## The video (4–5 min, per lablab's structure)
+
+| Time | Content |
+|---|---|
+| 0:00–0:30 | The problem: 03:12, one-person rotation, the numbers |
+| 0:30–2:30 | Live demo: page → Telegram voice note → read-back → barge-in withdraws the fix → *approve fix one* → verified → contract → *open the pull request* → the recording in the audit |
+| 2:30–4:00 | Business case: who it is for, market, revenue model, why it needed this generation of AI |
+| 4:00–4:45 | Built solo in ten days; what is next; the live URL and passcode |
 
 ## Judge's 90 seconds
 
