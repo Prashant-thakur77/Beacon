@@ -21,6 +21,17 @@ Beacon finds the CloudTrail change behind the alarm, proves it against a golden 
 > 3. **Without an AWS account** — `make setup && make local`, same thing on your laptop against in-process moto.
 > 4. **The proof** — the *Audit* page plays back the **session recording** behind every approval; [PR #2](https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2) is a pull request Beacon opened by voice.
 
+<table><tr>
+<td width="52%"><img src="docs/assets/bargein.gif" alt="Speaking over the read-back withdraws the proposed fix" /></td>
+<td><b>Interrupt it, and the fix is withdrawn.</b><br/><br/>
+A real run on the deployed account. Beacon is reading the blast radius back; the engineer speaks over it.
+The reply is marked <i>interrupted</i>, <code>cancel_proposal</code> runs, and the console says
+<i>“Fix 1 withdrawn — you spoke over the read-back, so nothing was applied.”</i><br/><br/>
+Saying <code>approve fix 1</code> now is refused: the proposal is gone until it is proposed again.
+Turn-taking, with a safety meaning.<br/><br/>
+<sub>Test: <code>tests/test_voice_tools.py::test_cancel_proposal_withdraws_the_pending_fix</code></sub></td>
+</tr></table>
+
 ![Beacon Night Shift](docs/assets/landing.gif)
 
 <table><tr>
