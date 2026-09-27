@@ -251,10 +251,18 @@ SCENARIOS: list[Scenario] = [
 # ---------------------------------------------------------------------------
 
 
-def _get(url: str, headers: dict[str, str] | None = None) -> Any:
-    req = urllib.request.Request(url, headers=headers or {})
-    with urllib.request.urlopen(req, timeout=25) as resp:  # noqa: S310
-        return json.loads(resp.read().decode())
+def _get(url: str, headers: dict[str, str] | None = None, tries: int = 3) -> Any:
+    """A home network blip should not fail a scenario; retry briefly."""
+    for attempt in range(tries):
+        try:
+            req = urllib.request.Request(url, headers=headers or {})
+            with urllib.request.urlopen(req, timeout=25) as resp:  # noqa: S310
+                return json.loads(resp.read().decode())
+        except Exception:
+            if attempt == tries - 1:
+                raise
+            time.sleep(2 * (attempt + 1))
+    return None
 
 
 def _post(url: str, body: dict[str, Any]) -> Any:
