@@ -1,0 +1,41 @@
+# Beacon Night Shift — AssemblyAI cut (4:30)
+
+Structured to how this hackathon is judged: **0:00–0:30 problem · 0:30–2:30 live demo · 2:30–4:00 business case · 4:00–4:30 who and what is next.** Clarity over polish: the demo is the longest section and it is real footage from the deployed account.
+
+Palette and type follow the console (near-black, one lilac accent, amber for "needs you"). Music: an ambient bed, ducked under speech. Narration by Chatterbox, one `vo-aai/NN.wav` per row.
+
+`scene:` = rendered from `scenes/scenes.html?scene=…` · `CAPTURE` = recorded from the live console, Telegram or GitHub · `AGENT AUDIO` = the AssemblyAI agent's own voice, used raw.
+
+| # | Section | On screen | Narration | Secs |
+|---|---|---|---|---|
+| 1 | problem | Black, then a phone lighting up in the dark: **03:12 · CloudWatch ALARM · payments-errors**. (scene: `phone`) | It is three in the morning, payments are failing, and the only person awake is you. | 7 |
+| 2 | problem | Three figures land one at a time: **53 min** median time to recovery · **74 %** of DevOps engineers report burnout · **$5.6k** a minute of downtime. (scene: `problem-stats`) | Industry recovery time is fifty-three minutes and has barely moved in five years. Three quarters of on-call engineers report burnout. And on a team of four, there is nobody to escalate to. | 13 |
+| 3 | title | Logo dot pulses. **Beacon Night Shift** — *the on-call agent you can interrupt*. (scene: `title`) | Beacon Night Shift is an on-call agent for AWS that you answer by voice, and it holds write access to production. | 8 |
+| 4 | demo | CAPTURE `telegram`: the phone thread — the page arrives with **Talk · Fix 1 · Ack**, one line of cause. | The page reaches the place the engineer actually is. Not an inbox. Telegram, with the cause in one line and three buttons. | 9 |
+| 5 | demo | CAPTURE `telegram-voice`: a voice note is sent; the reply comes back as text and as a voice note. Overlay: *heard: "isko fix kar do" · Hindi detected*. | You reply the way people talk at night — a voice note, in Hinglish. AssemblyAI's pre-recorded model transcribes it with per-word confidence, and the same tools run that the browser would run. | 13 |
+| 6 | demo | CAPTURE `board`: the Night Board, incident *awaiting your word*, evidence cards, the security-group drift and the CloudTrail change. | On a laptop it is the same night. One incident, the rule that vanished, and the CloudTrail entry that took it — found before any model spoke. | 11 |
+| 7 | demo | CAPTURE `talk-connect`: press Connect, the latency strip appears: *0.2 s to first audio*. Then **AGENT AUDIO** raw: "Say fix it, and I will propose the fix." | This is the AssemblyAI Voice Agent API: one socket, full duplex, nine of Beacon's tools declared as functions on it. Two tenths of a second to the first word. | 12 |
+| 8 | demo | CAPTURE `propose`: *"fix it"* → `propose_fix` chip → the dry-run card, blast radius, **DryRunOperation** under the remediator role. | Ask it to fix, and it proposes exactly one allowlisted action, dry-run under the role that would execute it. Nothing has changed yet. | 10 |
+| 9 | demo | CAPTURE `bargein`: the read-back is cut mid-sentence; an *interrupted* pill; the console note **Fix 1 withdrawn — you spoke over the read-back**; then the approval phrase is refused. | Now the part only a live socket makes possible. Speak over the read-back and Beacon does not just stop talking — it withdraws the fix. Afterwards, the approval phrase no longer works. | 14 |
+| 10 | demo | CAPTURE `approve`: *"fix it"* again → *"approve fix two"* → `approve_fix` chip → Step Functions loop → verify 5/5 → **resolved**. Overlay: *checked against the transcript, not the model's argument*. | Say it again, and approve. Those words are checked against the transcript AssemblyAI produced — never against the argument the model wrote. Then a Step Functions loop applies the fix and refuses to say recovered until CloudWatch agrees. | 16 |
+| 11 | demo | CAPTURE `contract`: read-back, then *"grant contract for seven days"* → contract granted; the Contracts tab shows the quote. | Then: should I handle this myself next time? Only the exact phrase grants it, and your own words are stored as the record. The next time this breaks, nobody is woken. | 12 |
+| 12 | demo | CAPTURE `pr`: *"open the pull request"* → PR on GitHub, the eleven-line template diff, the body quoting the approval and the verify checks. | And the night ends where incidents should end. The rule is restored in the CloudFormation template, with the postmortem and the words that approved it. Beacon opens the pull request. It never merges. | 14 |
+| 13 | demo | CAPTURE `audit`: the audit row, *AssemblyAI live · 100 % confidence*, **▶ Listen** pressed, the recording plays. | Every approval keeps its session recording. The audit page plays back the words behind the fix. The transcript is the safety artifact — now it is an audio one. | 11 |
+| 14 | business | Scene `who`: one card — *a team of one to five, production on AWS, customers in another time zone*. | This is for the team of one to five running production for another time zone. No follow-the-sun rotation, no second shift, and a handful of faults that keep repeating. | 12 |
+| 15 | business | Scene `market`: TAM **$4.8 B** · SAM **$1.2 B** · SOM **$125 M**, assumptions in small type. | Incident management is a four point eight billion dollar market growing to thirteen. The slice we start in — small teams on AWS with a one-person rotation — is a hundred and twenty-five million a year at list price. | 15 |
+| 16 | business | Scene `revenue`: three tiers, the middle one highlighted: **$2 per verified remediation**. | Twenty-nine dollars per responder, fifteen thousand a year to run it inside your own account, and two dollars per verified remediation — charged only when a fix was applied and CloudWatch agreed. We earn nothing from noisy alerts. | 16 |
+| 17 | business | Scene `whyai`: three lines — *consent from a transcript* · *an interruption that withdraws an action* · *nine tools mid-conversation*. | None of this was buildable two years ago. Consent has to rest on words an engineer actually said, half asleep, in two languages. An interruption has to be an event the application can act on. And the model has to call tools mid-sentence while the answer is still being spoken. | 18 |
+| 18 | close | Scene `safety`: the controls with the file that enforces each. | The model only decides whether to call a tool. Code decides whether the call is allowed, what the fix is, and what the pull request says. That is why it can hold the credential. | 13 |
+| 19 | close | Scene `next`: 121 commits, 302 tests, three stacks — then *next: WhatsApp · voice regression tests · contract policies*. | Built by one engineer in ten days, deployed and tested — three hundred tests, including one that kills the socket mid-approval to prove nothing runs. | 12 |
+| 20 | close | Scene `close`: the live URL, the repo, the passcode line. | The link is in the submission. Open it with a microphone and run the night yourself — or run the whole thing on your laptop with no AWS account at all. | 11 |
+
+**Target total:** ≈ 4 min 30 s of narration plus breathing room at the cuts.
+
+## Shot list
+
+| Capture | How |
+|---|---|
+| `telegram`, `telegram-voice` | Phone screen recording of the real chat with the bot after `make break-demo` — **human supplies**; fallback is Telegram Web driven the same way |
+| `board`, `talk-connect`, `propose`, `bargein`, `approve`, `contract`, `pr`, `audit` | `video/capture_aai.py` against the **live** console: a Polly track is fed to Chromium as the microphone, so the console hears real speech; DOM milestones are logged with timestamps for the cut points |
+| **AGENT AUDIO** | the same capture's page audio, or `scripts/dev/assemblyai_audio.py` with `BEACON_SAVE_AGENT_WAV` |
+| `phone`, `problem-stats`, `title`, `who`, `market`, `revenue`, `whyai`, `safety`, `next`, `close` | `scenes/scenes.html?scene=…` via `render_scene.py` |

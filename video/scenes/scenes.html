@@ -21,6 +21,41 @@
   .d1{animation-delay:.2s}.d2{animation-delay:1.2s}.d3{animation-delay:2.2s}.d4{animation-delay:3.2s}.d5{animation-delay:4.2s}.d6{animation-delay:5.2s}
   .dot { width:22px; height:22px; border-radius:50%; background:var(--amber); box-shadow:0 0 40px 8px rgba(245,185,66,.45); animation: pulse 2.4s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{transform:scale(1);opacity:.9} 50%{transform:scale(1.25);opacity:1} }
+
+  /* AssemblyAI cut */
+  .stats { display:flex; gap:64px; align-items:flex-start; justify-content:center; }
+  .stat { text-align:left; max-width:420px; }
+  .stat .n { font-size:132px; font-weight:600; letter-spacing:-.04em; line-height:1; }
+  .stat .n.warn { color:var(--amber); } .stat .n.bad { color:var(--red); }
+  .stat .l { font-size:26px; color:var(--dim); margin-top:14px; line-height:1.35; }
+  .stat .src { font-size:17px; color:var(--faint); margin-top:12px; }
+  .funnel { display:flex; flex-direction:column; gap:22px; align-items:center; }
+  .band { border:1px solid var(--line); border-radius:22px; padding:26px 44px; display:flex; align-items:baseline; gap:28px; background:rgba(255,255,255,.02); }
+  .band .tag { font-size:20px; letter-spacing:.16em; text-transform:uppercase; color:var(--faint); width:90px; }
+  .band .v { font-size:72px; font-weight:600; letter-spacing:-.03em; }
+  .band .d { font-size:24px; color:var(--dim); max-width:640px; line-height:1.3; text-align:left; }
+  .band.som { border-color:var(--lilac); box-shadow:0 0 60px rgba(180,167,255,.14); }
+  .band.som .v { color:var(--lilac); }
+  .assume { font-size:19px; color:var(--faint); margin-top:10px; }
+  .tiers { display:flex; gap:28px; }
+  .tier { border:1px solid var(--line); border-radius:24px; padding:34px 36px; width:420px; background:rgba(255,255,255,.02); text-align:left; }
+  .tier .p { font-size:56px; font-weight:600; letter-spacing:-.03em; }
+  .tier .u { font-size:22px; color:var(--dim); margin-top:10px; line-height:1.35; }
+  .tier.hero { border-color:var(--green); box-shadow:0 0 70px rgba(110,231,160,.16); }
+  .tier.hero .p { color:var(--green); }
+  .lines { display:flex; flex-direction:column; gap:30px; max-width:1350px; text-align:left; }
+  .line { display:flex; gap:26px; align-items:baseline; }
+  .line .i { font-size:22px; color:var(--faint); font-family:"Geist Mono",monospace; }
+  .line .t { font-size:40px; font-weight:500; line-height:1.25; }
+  .line .t i { color:var(--lilac); font-style:normal; }
+  .who-card { text-align:left; border:1px solid var(--line); border-radius:26px; padding:46px 54px; max-width:1250px; background:rgba(255,255,255,.02); }
+  .who-card .big { font-size:52px; font-weight:600; letter-spacing:-.02em; line-height:1.25; }
+  .who-card .row2 { display:flex; gap:44px; margin-top:34px; }
+  .who-card .row2 div { font-size:25px; color:var(--dim); line-height:1.35; flex:1; }
+  .next-grid { display:flex; gap:70px; text-align:left; }
+  .next-grid .h { font-size:22px; letter-spacing:.16em; text-transform:uppercase; color:var(--faint); margin-bottom:18px; }
+  .next-grid .b { font-size:30px; line-height:1.5; }
+  .next-grid .b .dimx { color:var(--dim); }
   .grain { position:absolute; inset:0; pointer-events:none; background:radial-gradient(1200px 700px at 50% 60%, rgba(180,167,255,.06), transparent 70%); }
 
   /* phone */
@@ -206,6 +241,78 @@ ranked: destructive verbs first · Beacon's own writes tagged</pre></div>
 </section>
 
 <!-- 21 close -->
+
+<!-- AssemblyAI cut -->
+<section class="scene" id="problem-stats">
+  <div class="center" style="gap:56px">
+    <div class="kicker fade d1">What on-call actually costs</div>
+    <div class="stats">
+      <div class="stat fade d2"><div class="n">53<span style="font-size:52px"> min</span></div><div class="l">median time to recovery, industry-wide</div><div class="src">12 % better in five years — against 3× the monitoring spend</div></div>
+      <div class="stat fade d3"><div class="n warn">74<span style="font-size:52px"> %</span></div><div class="l">of DevOps engineers report burnout</div><div class="src">on-call load is the leading indicator; seniors leave first</div></div>
+      <div class="stat fade d4"><div class="n bad">$5.6k</div><div class="l">per minute of downtime, Gartner baseline</div><div class="src">and on a team of four there is nobody to escalate to</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="scene" id="who">
+  <div class="center" style="gap:44px">
+    <div class="kicker fade d1">Who this is for</div>
+    <div class="who-card fade d2">
+      <div class="big">A backend engineer on a team of <b>one to five</b>,<br/>running production on AWS for users in <b>another time zone</b>.</div>
+      <div class="row2">
+        <div class="fade d3">No follow-the-sun rotation. There is no second shift to escalate to.</div>
+        <div class="fade d4">A small, repeating failure surface: a rule dropped by a deploy, a service that needs a redeploy.</div>
+        <div class="fade d5">No budget for an SRE platform, and nobody to run one.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scene" id="market">
+  <div class="center" style="gap:40px">
+    <div class="kicker fade d1">Market</div>
+    <div class="funnel">
+      <div class="band fade d2"><span class="tag">TAM</span><span class="v">$4.8 B</span><span class="d">incident management software, 2026 &rarr; $12.99 B by 2035</span></div>
+      <div class="band fade d3"><span class="tag">SAM</span><span class="v">$1.2 B</span><span class="d">alert response and auto-remediation &mdash; PagerDuty alone books $493 M</span></div>
+      <div class="band som fade d4"><span class="tag">SOM</span><span class="v">$125 M</span><span class="d">small AWS teams with a one-person rotation, at list price</span></div>
+    </div>
+    <div class="assume fade d5">120,000 teams of ten or fewer &times; 3 responders &times; $29/month &middot; assumptions stated, argue with them</div>
+  </div>
+</section>
+
+<section class="scene" id="revenue">
+  <div class="center" style="gap:46px">
+    <div class="kicker fade d1">How it earns</div>
+    <div class="tiers">
+      <div class="tier fade d2"><div class="p">$29</div><div class="u">per responder, per month<br/><span style="color:var(--faint)">PagerDuty is $21&ndash;41 a seat</span></div></div>
+      <div class="tier hero fade d3"><div class="p">$2</div><div class="u">per <b>verified</b> remediation &mdash; charged only when the fix was applied <i>and</i> CloudWatch agreed<br/><span style="color:var(--faint)">we earn nothing from noisy alerts</span></div></div>
+      <div class="tier fade d4"><div class="p">$15k</div><div class="u">per year, self-hosted<br/><span style="color:var(--faint)">three stacks in your own account; no data leaves</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="scene" id="whyai">
+  <div class="center" style="gap:52px">
+    <div class="kicker fade d1">Why this needed <span style="color:var(--lilac)">this</span> generation of models</div>
+    <div class="lines">
+      <div class="line fade d2"><span class="i">01</span><span class="t">Consent has to rest on <i>words an engineer actually said</i> &mdash; half asleep, in two languages. A keypad cannot say <i>which</i> fix on <i>which</i> resource.</span></div>
+      <div class="line fade d3"><span class="i">02</span><span class="t">An interruption has to be an <i>event the application can act on</i>. Speaking over the read-back withdraws the fix.</span></div>
+      <div class="line fade d4"><span class="i">03</span><span class="t">Nine tools have to be callable <i>mid-sentence</i>, with each result feeding the next thing said.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="scene" id="next">
+  <div class="center" style="gap:50px">
+    <div class="kicker fade d1">Built solo, in ten days</div>
+    <div class="next-grid">
+      <div class="col fade d2"><div class="h">Shipped</div><div class="b"><b>121</b> commits<br/><b>302</b> tests<br/><b>3</b> CloudFormation stacks<br/><span class="dimx">live URL, open during judging</span></div></div>
+      <div class="col fade d3"><div class="h">Proven, not claimed</div><div class="b">socket killed mid-approval &rarr; <b>nothing ran</b><br/>barge-in &rarr; <b>fix withdrawn</b><br/>Hinglish audio &rarr; <b>tools called</b><br/><span class="dimx">each one is a test or a harness run</span></div></div>
+      <div class="col fade d4"><div class="h">Next</div><div class="b">WhatsApp as the second channel<br/>voice regression tests<br/>contract policies for teams<br/><span class="dimx">a second cloud</span></div></div>
+    </div>
+  </div>
+</section>
+
 <section class="scene" id="close">
   <div class="center">
     <div class="dot fade d1"></div>
