@@ -40,7 +40,7 @@ SLIDES: list[tuple[str, str]] = [
         c="The Voice Agent API is the mouth and the ears; every <b>tool.call</b> returns to the browser, "
           "which runs it on our Lambda with the transcript the API produced.")),
     ("06-why", f"{BASE}/scenes.html?scene=whyai"),
-    ("07-telegram", f"{BASE}/scenes.html?scene=telegram"),
+    ("07-voicetest", f"{BASE}/scenes.html?scene=voicetest"),
     ("08-market", f"{BASE}/scenes.html?scene=market"),
     ("09-revenue", f"{BASE}/scenes.html?scene=revenue"),
     ("10-next", f"{BASE}/scenes.html?scene=next"),
@@ -61,7 +61,7 @@ async def shoot() -> list[Path]:
             await page.goto(url)
             await page.evaluate("document.fonts.ready")
             # let the staggered entrances finish so nothing is mid-fade
-            await page.wait_for_timeout(6500)
+            await page.wait_for_timeout(7000)
             out = SLIDES_DIR / f"{name}.png"
             await page.screenshot(path=str(out))
             paths.append(out)

@@ -65,6 +65,24 @@ Everything below ran unattended by `scripts/dev/assemblyai_loop.py` (typed lines
 | **Drop-safety** (automated, `scripts/dev/assemblyai_audio.py … "approve fix {fix}" "!drop"`) | The approval is spoken, the socket is aborted before `tool.call` arrives: nothing executes, no approval row exists, the incident stays `awaiting_engineer`. Execution is a Lambda call the browser makes after `tool.call`, so a dead socket cannot approve anything. |
 | `session.resume` | Documented as `session.resume { session_id }` within 30 s with a fresh temp token. Every combination tried (fresh token, `resume_token` as the credential, API-key header) was refused with `unauthorized: Resume credential is invalid for this session` or `session_not_found`. The transport tries once and then starts a fresh session with the same config (the brief is in the system prompt, so nothing is lost but the greeting); the console shows a note. |
 
+## Beyond the socket (27–28 Sep)
+
+Three AssemblyAI products now do three different jobs, and two of them were added after the first submission draft:
+
+| Product | Job | Verified |
+|---|---|---|
+| Voice Agent API | the live conversation: Universal-3 Pro, turn detection, barge-in, nine client-side tools | since 21 Sep, live on the deployed console |
+| Pre-recorded transcription | Telegram voice notes, with **word confidence** (the 85 % consent gate) and now **PII redaction** (`redact_pii`, hashed) — consent is checked against the words as heard, in memory; the redacted text is what gets written to the approval row, the audit and the pull request | 27 Sep |
+| Summarization (`conversational`, bullets) | *"Summarise the session"* in the audit: AssemblyAI transcribes **its own recording** of the conversation and summarises it; the result is cached on the incident and printed in the postmortem as *the night in the engineer's words* | 27 Sep |
+
+LeMUR was probed on this key and answers 404, so the summary uses the pre-recorded API's own `summarization` rather than an LLM over the transcript.
+
+**Session endpoints are region-sharded.** `agents.assemblyai.com` is geo-DNS: a browser in India creates its session on the EU cluster while a Lambda in us-east-1 resolves to the US one, and each answers `session_not_found` for the other's sessions. `aai.py` asks each regional host in turn (`ASSEMBLYAI_SESSION_HOSTS`).
+
+## Tests that speak
+
+`make voice-test` runs six scenarios that speak real audio into the Voice Agent API and assert on what was heard, which tools ran, and how the incident ended — see [voice-testing.md](voice-testing.md). It is the only way to test the properties that matter here (*agreement is not consent*; *interrupting withdraws the fix*), and writing it found three real bugs: a non-idempotent `local/break`, a clipped first word that made the server correctly refuse a grant, and the assumption that the fix number is always one.
+
 Backend switch: the Talk panel has an *AssemblyAI · full duplex / AWS cascade · push to talk* toggle, remembered per browser, for the side-by-side.
 
 ## Day by day
