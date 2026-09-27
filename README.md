@@ -8,13 +8,18 @@
 [![Python](https://img.shields.io/badge/python-3.12-3776ab)](pyproject.toml)
 [![Built on AWS](https://img.shields.io/badge/built%20on-AWS-ff9900)](docs/architecture.md)
 
-**Live console:** https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/ · **Demo film:** [YouTube](https://youtu.be/a3SxZHvIkCo) · [3-minute cut](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.2.0/Beacon-Night-Shift-3min.mp4) · [full cut](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.2.0/Beacon-Night-Shift-full.mp4) · **Blog:** [Why the transcript is the safety artifact](https://builder.aws.com/post/3Jb5v7ouXDReILJ7WMuHrlB1leL_p/why-transcript-is-the-safety-artifactvoice-approved-aws-remediation-with-strands-and-step-functions) · **Architecture:** [docs/architecture.md](docs/architecture.md) (Mermaid) · **Try it locally:** `make setup && make local`
+**Live console:** https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/ · **Architecture:** [the voice path](#architecture) · **Business case:** [docs/business-case.md](docs/business-case.md) · **Built on AssemblyAI:** [what runs where](#built-on-assemblyai-the-voice-you-can-interrupt) · **Try it locally, no AWS:** `make setup && make local`
 
-It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. You need four answers: *is it real, what changed, what do I do, can I go back to sleep.*
+It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. You need four answers — *is it real, what changed, what do I do, can I go back to sleep* — and today's tools answer, at most, the first one.
 
-Beacon reads the logs on Amazon Bedrock, finds the CloudTrail change that caused the outage, proves it against a golden snapshot, proposes one allowlisted fix, dry-runs it under a locked-down role, and waits for your word. You say **"approve fix one"** into your browser. A Step Functions loop applies the fix and refuses to say *recovered* until CloudWatch agrees. Then Beacon asks: *handle this myself next time?* You say yes, for a week. That sentence becomes a **Sleep Contract**: a scoped, expiring standing approval, with your own words as the record. The next time the same thing breaks, Beacon fixes it, verifies it, and emails you in the morning. Zero humans woken.
+Beacon finds the CloudTrail change behind the alarm, proves it against a golden snapshot of the security groups, proposes exactly one allowlisted fix and dry-runs it under a locked-down role. Then it waits for your voice. You say **"approve fix one"**; those words — the ones AssemblyAI actually transcribed, not an argument a model wrote — are what unlock the change. A Step Functions loop applies it and refuses to say *recovered* until CloudWatch agrees. You say **"grant contract for seven days"**, and the next time the same fault fires it is fixed while you sleep. You say **"open the pull request"**, and the rule is restored in the CloudFormation template with the postmortem attached — because the alarm clearing was never the end of the incident.
 
-Built solo in a weekend for the AWS *First Commit* hackathon. Everything below is live code with tests, not a slide.
+> ### Judge this in 90 seconds
+>
+> 1. **With a microphone** — open the [live console](https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/), enter the passcode from the submission, press **Connect** and say *"what happened"*, then *"fix it"*. **Interrupt the read-back while it speaks** — the fix is withdrawn and the approval phrase stops working. Say *"fix it"* again, then *"approve fix two"*, and watch the verify loop.
+> 2. **Without a microphone** — press **▶ Run the night** on the board, or open `?night=1`. The whole night plays unattended.
+> 3. **Without an AWS account** — `make setup && make local`, same thing on your laptop against in-process moto.
+> 4. **The proof** — the *Audit* page plays back the **session recording** behind every approval; [PR #2](https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2) is a pull request Beacon opened by voice.
 
 ![Beacon Night Shift](docs/assets/landing.gif)
 
@@ -70,6 +75,12 @@ CloudWatch alarm fires ──▶ Lambda (Nova 2 Lite on Bedrock)   RCA + change 
 
 The second incident under a contract runs the same loop with `source: contract` and sends the *"you were not woken"* email instead of a page.
 
+## Architecture
+
+<img src="docs/assets/architecture-voice.png" alt="The voice path: where the engineer is, consent decided in code, and what may change production" />
+
+Three planes, and the middle one is the product: **the model decides whether to call a tool; code decides whether the call is allowed.** A full description is in [docs/architecture.md](docs/architecture.md); the safety argument is in [docs/safety.md](docs/safety.md).
+
 ## Where AWS fits
 
 | Service / AWS open source | Role | Where |
@@ -102,6 +113,14 @@ The console's default voice path is the **AssemblyAI Voice Agent API**; the AWS 
 | Temporary tokens (`GET /v1/token`) | The browser never sees the API key; the Lambda mints a 10-minute token per session. | `voice_turn.py` (`POST /assemblyai/token`) |
 
 Three behaviours the socket makes possible, each with a test or a harness run behind it: **barge-in withdraws the fix** (`cancel_proposal`, the interrupted read-back cannot be approved), **drop-safety** (an approval spoken before the socket dies never executes — execution is a Lambda call after `tool.call`, never socket state), and **the night ends with a pull request** (`open the pull request` → `open_fix_pr` restores the rule in the CloudFormation template and files the postmortem; nothing is merged). Details and measured latencies: [docs/assemblyai.md](docs/assemblyai.md); the plan: [docs/assemblyai-roadmap.md](docs/assemblyai-roadmap.md); Telegram: [docs/telegram.md](docs/telegram.md); the PR: [docs/fix-at-source.md](docs/fix-at-source.md).
+
+## Who it is for, and what it is worth
+
+**A backend engineer on a team of one to five, running production on AWS for users in another time zone** — a four-person startup in Bengaluru serving New York, the single DevOps hire at a 30-person SaaS. No follow-the-sun rotation, no second shift, a handful of faults that keep repeating.
+
+Industry MTTR is **53 minutes** and has improved 12 % in five years against a tripling of monitoring spend; **74 %** of DevOps engineers report burnout, with on-call load the leading indicator. On the live account a real alarm reaches a **verified** recovery in **2.4–5.5 minutes** without a laptop being opened — and under a Sleep Contract the repeat fault is fixed with **nobody woken**.
+
+Market, pricing and the reason this needed this generation of models: [docs/business-case.md](docs/business-case.md).
 
 ## Safety model (the part that matters)
 
