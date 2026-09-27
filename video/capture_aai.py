@@ -51,6 +51,23 @@ PLANS = {
         ("haan", 34),
         ("saat din ke liye contract do", 26),
     ],
+    # the contract beat on its own: an en-US voice, because Polly's en-IN accent routes
+    # "grant contract for seven days" to Hindi when language_codes includes hi
+    "contract": [
+        ("what happened", 6),
+        ("fix it", 24),
+        ("approve fix one", 30),
+        ("yes", 34),
+        ("grant contract for seven days", 26),
+    ],
+    # the grant is two phrases: the first returns the read-back, the second grants it
+    "contract2": [
+        ("fix it", 8),
+        ("approve fix one", 30),
+        ("yes", 34),
+        ("grant contract for seven days", 26),
+        ("grant contract for seven days", 34),
+    ],
     "short": [
         ("what happened", 6),
         ("fix it", 26),
@@ -59,10 +76,10 @@ PLANS = {
 }
 
 
-def say(polly, text: str) -> bytes:
+def say(polly, text: str, voice: str = "Kajal") -> bytes:
     """One line as 16-bit PCM at RATE (Polly gives 16 kHz; ffmpeg resamples)."""
     pcm = polly.synthesize_speech(
-        Text=text, OutputFormat="pcm", SampleRate="16000", VoiceId="Kajal", Engine="neural"
+        Text=text, OutputFormat="pcm", SampleRate="16000", VoiceId=voice, Engine="neural"
     )["AudioStream"].read()
     return subprocess.run(
         ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "s16le", "-ar", "16000",
@@ -71,7 +88,7 @@ def say(polly, text: str) -> bytes:
     ).stdout
 
 
-def build_audio(plan: list[tuple[str, int]], path: Path) -> list[tuple[float, str]]:
+def build_audio(plan: list[tuple[str, int]], path: Path, voice: str = "Kajal") -> list[tuple[float, str]]:
     """Write the microphone track; return (start seconds, text) for the log."""
     import boto3  # only needed when the track is (re)built
 
@@ -81,7 +98,7 @@ def build_audio(plan: list[tuple[str, int]], path: Path) -> list[tuple[float, st
     for text, gap in plan:
         track += b"\x00\x00" * int(RATE * gap)
         marks.append((len(track) / 2 / RATE, text))
-        track += say(polly, text)
+        track += say(polly, text, voice)
     track += b"\x00\x00" * (RATE * 25)  # tail: let the last reply finish
     with wave.open(str(path), "wb") as w:
         w.setnchannels(1)
@@ -181,16 +198,17 @@ def main() -> None:
     ap.add_argument("--plan", default="default", choices=sorted(PLANS))
     ap.add_argument("--build-audio-only", action="store_true")
     ap.add_argument("--rebuild-audio", action="store_true")
+    ap.add_argument("--voice", default="Kajal", help="Polly voice for the engineer's lines")
     ap.add_argument("--tail", type=float, default=45.0, help="seconds to keep recording after the last line")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    wav = out / f"mic-{a.plan}.wav"
-    marks_file = out / f"mic-{a.plan}.json"
+    wav = out / f"mic-{a.plan}-{a.voice.lower()}.wav"
+    marks_file = out / f"mic-{a.plan}-{a.voice.lower()}.json"
     if wav.exists() and marks_file.exists() and not a.rebuild_audio:
         marks = [(m["t"], m["said"]) for m in json.loads(marks_file.read_text())]
     else:
-        marks = build_audio(PLANS[a.plan], wav)
+        marks = build_audio(PLANS[a.plan], wav, a.voice)
         marks_file.write_text(json.dumps([{"t": t, "said": s} for t, s in marks], indent=1))
     print(f"microphone track: {wav} ({wav.stat().st_size // 1024} KB)")
     for t, s in marks:
