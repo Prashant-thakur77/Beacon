@@ -29,11 +29,22 @@ def run(args: list[str]) -> None:
 
 
 def dur(path: Path, stream: str = "v") -> float:
-    sel = ["-select_streams", stream] if str(path).endswith(".mp4") else []
+    """Seconds. Playwright's webm has no stream duration, so fall back to the container
+    and then to decoding, which is slow but always right."""
+    for args in (["-select_streams", stream, "-show_entries", "stream=duration"],
+                 ["-show_entries", "format=duration"]):
+        txt = subprocess.check_output(
+            ["ffprobe", "-v", "error", *args, "-of", "csv=p=0", str(path)]
+        ).decode().strip().splitlines()
+        if txt and txt[0] not in ("", "N/A"):
+            return float(txt[0])
     txt = subprocess.check_output(
-        ["ffprobe", "-v", "error", *sel, "-show_entries", "stream=duration",
-         "-of", "csv=p=0", str(path)]).decode().strip().splitlines()[0]
-    return float(txt)
+        ["ffprobe", "-v", "error", "-select_streams", stream, "-count_packets",
+         "-show_entries", "stream=nb_read_packets,avg_frame_rate", "-of", "csv=p=0", str(path)]
+    ).decode().strip().split(",")
+    num, den = (txt[0].split("/") + ["1"])[:2]
+    fps = float(num) / float(den or 1)
+    return int(txt[1]) / fps if fps else 0.0
 
 
 def vo(n: int) -> Path:
@@ -98,7 +109,9 @@ BUILD = {
     19: lambda s: scene_clip(19, s),
     20: lambda s: scene_clip(20, s),
 }
-TAILS = {1: 1.4, 3: 1.4, 13: 1.0, 20: 2.2}
+# the live-capture rows hold after the narration so the UI is readable
+TAILS = {1: 1.4, 3: 1.4, 20: 2.2,
+         6: 2.4, 7: 2.4, 8: 2.6, 9: 3.0, 10: 2.6, 11: 2.6, 12: 2.8, 13: 2.6}
 
 
 def main() -> None:
