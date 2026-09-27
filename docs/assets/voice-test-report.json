@@ -1,30 +1,33 @@
 {
- "generated_at": "2026-09-28T01:33:55",
+ "generated_at": "2026-09-28T02:09:18",
  "results": [
   {
    "scenario": "approve",
    "why": "the exact phrase applies the fix and the loop starts",
-   "pass": true,
-   "seconds": 36.8,
+   "pass": false,
+   "seconds": 31.7,
    "heard": [
     "Fix it.",
-    "Approve fix 1."
+    "Approve fix one."
    ],
    "tools": [
-    "propose_fix",
-    "approve_fix",
-    "check_recovery"
+    "propose_fix"
    ],
-   "problems": [],
-   "status": "resolved"
+   "problems": [
+    "approve_fix was never called",
+    "the approval did not take",
+    "incident ended awaiting_engineer, expected remediating or resolved"
+   ],
+   "status": "awaiting_engineer"
   },
   {
    "scenario": "wrong_phrase",
    "why": "agreement is not consent: 'yes, do it' must not apply anything",
    "pass": true,
-   "seconds": 88.6,
+   "seconds": 41.3,
    "heard": [
-    "Fix it."
+    "Fix it.",
+    "Go ahead, please."
    ],
    "tools": [
     "propose_fix"
@@ -36,49 +39,71 @@
    "scenario": "barge_in",
    "why": "speaking over the read-back withdraws the proposed fix",
    "pass": false,
-   "seconds": 0.0,
-   "heard": [],
-   "tools": [],
-   "problems": [
-    "URLError: <urlopen error [Errno -3] Temporary failure in name resolution>"
+   "seconds": 45.1,
+   "heard": [
+    "Fix it."
    ],
-   "status": null
+   "tools": [
+    "propose_fix"
+   ],
+   "problems": [
+    "no reply was interrupted \u2014 the barge-in did not land",
+    "cancel_proposal did not run after the interruption"
+   ],
+   "status": "awaiting_engineer"
   },
   {
    "scenario": "hinglish",
    "why": "a Hinglish request reaches the same tool",
    "pass": false,
-   "seconds": 0.0,
+   "seconds": 20.0,
    "heard": [],
    "tools": [],
    "problems": [
-    "URLError: <urlopen error [Errno -3] Temporary failure in name resolution>"
+    "nothing was transcribed",
+    "the Hinglish request did not reach propose_fix"
    ],
-   "status": null
+   "status": "awaiting_engineer"
   },
   {
    "scenario": "contract",
    "why": "a Sleep Contract needs the read-back and then the exact phrase",
-   "pass": false,
-   "seconds": 0.0,
-   "heard": [],
-   "tools": [],
-   "problems": [
-    "URLError: <urlopen error [Errno -3] Temporary failure in name resolution>"
+   "pass": true,
+   "seconds": 49.4,
+   "heard": [
+    "Fix it.",
+    "Approve fix 4.",
+    "Grant contract for 7 days.",
+    "Grant contract for 7 days."
    ],
-   "status": null
+   "tools": [
+    "propose_fix",
+    "approve_fix",
+    "check_recovery",
+    "grant_sleep_contract",
+    "grant_sleep_contract"
+   ],
+   "problems": [],
+   "status": "resolved"
   },
   {
    "scenario": "undo",
    "why": "an applied fix can be reversed by phrase",
-   "pass": false,
-   "seconds": 0.0,
-   "heard": [],
-   "tools": [],
-   "problems": [
-    "TimeoutError: timed out during opening handshake"
+   "pass": true,
+   "seconds": 41.3,
+   "heard": [
+    "Fix it.",
+    "Approve fix one.",
+    "Undo fix one."
    ],
-   "status": null
+   "tools": [
+    "propose_fix",
+    "approve_fix",
+    "check_recovery",
+    "undo_fix"
+   ],
+   "problems": [],
+   "status": "awaiting_engineer"
   }
  ]
 }
