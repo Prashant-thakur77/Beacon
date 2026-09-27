@@ -1,6 +1,6 @@
 # Runtime of the slim agent image (Dockerfile.agent): voice turn, remediation,
 # change ledger, dashboard. Pinned to the versions the test suite ran against.
-boto3==1.43.97
+boto3==1.43.101
 strands-agents==1.56.0
 aws-lambda-powertools[tracer]==3.35.0
 pydantic==2.13.5
