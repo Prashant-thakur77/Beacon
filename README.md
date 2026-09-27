@@ -127,6 +127,19 @@ The console's default voice path is the **AssemblyAI Voice Agent API**; the AWS 
 
 Three behaviours the socket makes possible, each with a test or a harness run behind it: **barge-in withdraws the fix** (`cancel_proposal`, the interrupted read-back cannot be approved), **drop-safety** (an approval spoken before the socket dies never executes — execution is a Lambda call after `tool.call`, never socket state), and **the night ends with a pull request** (`open the pull request` → `open_fix_pr` restores the rule in the CloudFormation template and files the postmortem; nothing is merged). Details and measured latencies: [docs/assemblyai.md](docs/assemblyai.md); the plan: [docs/assemblyai-roadmap.md](docs/assemblyai-roadmap.md); Telegram: [docs/telegram.md](docs/telegram.md); the PR: [docs/fix-at-source.md](docs/fix-at-source.md).
 
+## Two faults, three actions, one allowlist
+
+Beacon answers two kinds of night, and refuses the rest:
+
+| What is wrong | How it is found | What it proposes |
+|---|---|---|
+| A security-group rule vanished | golden-snapshot drift + the CloudTrail change that took it | `sg.restore_ingress` with the exact ids — a diagnosis |
+| A service is short of tasks, or its deployment failed | `describe-services` against the remediable allowlist | `ecs.force_redeploy` with the reason |
+| Nothing explains the alarm, one service is restartable | everything else came back clean | a **last-resort restart**, and it says so: *"a remedy, not a diagnosis"* |
+| Anything else | — | nothing. It escalates to a human and says why |
+
+Each proposal is dry-run under the executor role, gated on your spoken phrase, and verified afterwards — with a **budget that fits the action**: a restored rule proves itself in a minute, a replaced task gets eight. That last number came from a live run where Beacon escalated a restart that had actually worked.
+
 ## Tests that speak
 
 Unit tests prove the tools are safe. They cannot prove that *saying* something runs the right tool,

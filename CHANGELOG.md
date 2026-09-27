@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.5.0 — 28 Sep 2026 (the core answers a second fault)
+
+Added
+- **A second fault class, end to end.** `diagnose.py` now proposes `ecs.force_redeploy` when a service is short of tasks or its newest deployment failed, and — only when nothing else explains the alarm and exactly one service is remediable — offers a **clearly-labelled last-resort restart**. Security-group drift still outranks both: it names the exact rule that vanished. Until now the action existed but nothing ever proposed it, so any non-drift fault produced an incident with no fix.
+- **Honesty about what a restart is.** The degraded brief, the proposal (`is_last_resort`, `reason`), the agent's prompt and the fix card all say plainly when Beacon is offering a remedy rather than a diagnosis. Spoken live: *"Nothing explains the alarm, and this is a restart rather than a fix."*
+
+Fixed
+- **The ECS post-condition meant nothing** — "the service is ACTIVE and has a deployment" is true of a service that is still crashlooping. It now requires the new deployment to have finished rolling out, every task running, and the old deployment gone.
+- **The verification budget is per action.** A restored rule proves itself in a minute; a replaced task has to start, warm up and then produce clean CloudWatch periods. A live run escalated a restart that had actually worked — the wrong answer in the wrong direction. The state machine now takes its wait and attempt cap from the action (`registry.verify_budget`), and the same wedge fault now resolves on attempt 5 with all three checks genuinely true.
+
 ## v0.4.0 — 27–28 Sep 2026 (deeper into AssemblyAI)
 
 Added
