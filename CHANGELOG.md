@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.0 — 27–28 Sep 2026 (deeper into AssemblyAI)
+
+Added
+- **Tests that speak** (`make voice-test`): six spoken regression scenarios — the exact phrase applies a fix, *"yes, do it"* does not, barge-in withdraws the proposal, Hinglish reaches the same tool, a Sleep Contract needs the read-back then the phrase, and an applied fix can be undone. Each renders the engineer's lines with Polly, streams them into the Voice Agent API as microphone audio, runs every `tool.call` against `make local`, and asserts on what was heard, which tools ran and how the incident ended. Report at `docs/assets/voice-test-report.json`; write-up in `docs/voice-testing.md`.
+- **Session summaries** (`aai.py`, `POST /sessions/<id>/summary`): AssemblyAI transcribes its own recording of a voice session and summarises it; the result is cached on the incident and printed in the postmortem as *the night in the engineer's words*. A **Summarise the session** control sits beside **▶ Listen** in the audit.
+- **PII redaction on voice notes**: consent is still checked against the words as heard, in memory, but the redacted text is what is written to the approval row, the audit, the postmortem and the pull request.
+- Console: phrase chips (questions vs consent phrases, the approve chip matching the incident's latest proposal), a confidence meter on what was heard, and a noisy-room turn-detection preset.
+
+Fixed
+- `local/break` is idempotent, so a scenario can start by breaking an already-broken demo.
+- Voice-suite assertions are scoped to the scenario, since `make local` reuses an open incident inside its dedup window.
+
 ## v0.3.0 — 21–22 Sep 2026 (AssemblyAI Voice Agent phase, branch `assemblyai`)
 
 Added

@@ -83,6 +83,15 @@ export function TalkDuplex({
   /** The fix number Beacon last proposed, so the phrase chips say the right one. */
   const [lastFix, setLastFix] = useState<number | null>(null);
   const fixPhrase = `approve fix ${lastFix ?? 1}`;
+  // On load the chip should match the card: take the newest proposal from the incident
+  // until a live propose_fix in this session supersedes it.
+  useEffect(() => {
+    const proposed = [...(incident.timeline ?? [])]
+      .reverse()
+      .find((e) => e.event === "fix_proposed");
+    const id = (proposed?.detail as { fix_id?: number } | undefined)?.fix_id;
+    if (typeof id === "number") setLastFix((cur) => cur ?? id);
+  }, [incident.timeline]);
   // Noisy room: a higher VAD threshold and a longer confident-silence window, so a
   // fan or a TV does not open turns and short pauses do not close them.
   const [noisy, setNoisy] = useLocalState("beacon.noisyRoom", "");
