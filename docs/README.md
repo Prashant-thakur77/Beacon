@@ -14,6 +14,7 @@
 | The original plans (kept for the record) | [`PLAN.md`](PLAN.md), [`PLAN-v2.md`](PLAN-v2.md) |
 | The next hackathon (AssemblyAI Voice Agent) | branch `assemblyai`: `assemblyai.md` (spike + Stage 1 results), `assemblyai-roadmap.md` (the five-stage plan), `assemblyai-deck.md` |
 | Telegram pages and voice notes | `telegram.md` |
+| Testing a voice agent (spoken regression suite) | `voice-testing.md` |
 | The business case (user, market, pricing) | `business-case.md` |
 | The AssemblyAI submission, ready to paste | `assemblyai-submission.md` |
 | The plan for the last three days | `win-plan.md` |

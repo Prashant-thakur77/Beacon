@@ -1,0 +1,112 @@
+{
+ "generated_at": "2026-09-28T01:28:23",
+ "results": [
+  {
+   "scenario": "approve",
+   "why": "the exact phrase applies the fix and the loop starts",
+   "pass": false,
+   "seconds": 22.1,
+   "heard": [
+    "Fix it."
+   ],
+   "tools": [
+    "propose_fix"
+   ],
+   "problems": [
+    "approve_fix was never called",
+    "the approval did not take",
+    "incident ended awaiting_engineer, expected remediating or resolved"
+   ],
+   "status": "awaiting_engineer"
+  },
+  {
+   "scenario": "wrong_phrase",
+   "why": "agreement is not consent: 'yes, do it' must not apply anything",
+   "pass": false,
+   "seconds": 47.2,
+   "heard": [
+    "Fix it."
+   ],
+   "tools": [
+    "propose_fix"
+   ],
+   "problems": [
+    "something executed without the phrase"
+   ],
+   "status": "awaiting_engineer"
+  },
+  {
+   "scenario": "barge_in",
+   "why": "speaking over the read-back withdraws the proposed fix",
+   "pass": false,
+   "seconds": 51.5,
+   "heard": [
+    "Fix it.",
+    "Wait, stop."
+   ],
+   "tools": [
+    "propose_fix",
+    "cancel_proposal"
+   ],
+   "problems": [
+    "something executed after the proposal was withdrawn"
+   ],
+   "status": "awaiting_engineer"
+  },
+  {
+   "scenario": "hinglish",
+   "why": "a Hinglish request reaches the same tool",
+   "pass": false,
+   "seconds": 0.0,
+   "heard": [],
+   "tools": [],
+   "problems": [
+    "EndpointConnectionError: Could not connect to the endpoint URL: \"https://polly.us-east-1.amazonaws.com/v1/speech\""
+   ],
+   "status": null
+  },
+  {
+   "scenario": "contract",
+   "why": "a Sleep Contract needs the read-back and then the exact phrase",
+   "pass": false,
+   "seconds": 40.6,
+   "heard": [
+    "Fix it.",
+    "Approve fix seven.",
+    "Grant contract for 7 days.",
+    "Grant contract for 7 days."
+   ],
+   "tools": [
+    "propose_fix",
+    "approve_fix",
+    "check_recovery",
+    "grant_sleep_contract"
+   ],
+   "problems": [
+    "the grant needs two calls: read-back, then the phrase"
+   ],
+   "status": "resolved"
+  },
+  {
+   "scenario": "undo",
+   "why": "an applied fix can be reversed by phrase",
+   "pass": false,
+   "seconds": 33.1,
+   "heard": [
+    "Fix it.",
+    "Approve fix 1.",
+    "Undo fix one."
+   ],
+   "tools": [
+    "propose_fix",
+    "approve_fix",
+    "check_recovery"
+   ],
+   "problems": [
+    "undo_fix was never called",
+    "after an undo the incident should await a human, got resolved"
+   ],
+   "status": "resolved"
+  }
+ ]
+}

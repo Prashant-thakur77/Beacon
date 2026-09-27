@@ -244,3 +244,28 @@ def test_reports_carry_the_pull_request() -> None:
     assert report["pull_requests"] == ["https://github.com/o/r/pull/2"]
     assert "Durable fix: pull request https://github.com/o/r/pull/2" in report["text"]
     assert "1 pull request(s) opened for review" in report["text"]
+
+
+def test_postmortem_quotes_the_session_summary() -> None:
+    """When AssemblyAI has summarised the voice session, the postmortem says so."""
+    from beacon import reports
+
+    inc = {
+        "incident_id": "i2",
+        "alarm_name": "beacon-demo-infra-errors",
+        "timestamp": "2026-09-27T20:41:00+00:00",
+        "status": "resolved",
+        "rca_json": {"summary": "x"},
+        "timeline": [],
+        "voice_summary": {
+            "sess_" + "a" * 32: {
+                "summary": "- The engineer approved fix one after the read-back.\n"
+                "- A Sleep Contract was granted for seven days.",
+                "seconds": 142.8,
+            }
+        },
+    }
+    pm = reports.postmortem(inc, contracts=[], approvals=[])
+    assert "## The night, in the engineer's words" in pm
+    assert "approved fix one after the read-back" in pm
+    assert "2m 22s" in pm and "redacted" in pm

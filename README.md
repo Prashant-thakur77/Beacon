@@ -121,9 +121,38 @@ The console's default voice path is the **AssemblyAI Voice Agent API**; the AWS 
 | **Voice Agent API** (`wss://agents.assemblyai.com/v1/ws`) | Full duplex in the browser: Universal-3 Pro STT, turn detection, barge-in, the managed LLM, TTS, and the nine Beacon tools declared as client-side functions — every `tool.call` comes back to the browser, which runs it on the voice Lambda with the transcript the API produced. English and Hinglish in and out. | `web/src/voice/assemblyai.ts`, `voice_turn.py` (`POST /tools/<name>`) |
 | **Pre-recorded transcription** (`/v2/transcript`, language detection, `keyterms_prompt`) | Telegram voice notes: the file is uploaded from the Lambda, transcribed with **word-level confidence**, and a mumbled "approve fix one" is refused with the confidence it was heard at. | `telegram.py`, `telegram_bot.py` |
 | **Session recordings** (`GET /v1/sessions/{id}`) | Every approval and contract made in a live session stores the session id; the audit page plays the recording behind the quote (**▶ Listen**), and the postmortem cites it. | `voice_turn.py` (`GET /recordings/<id>`), `web/src/components/Reports.tsx` |
+| **Summarization** (`summary_model: conversational`) | *"Summarise the session"* on an audit row: AssemblyAI transcribes its own recording of the conversation and summarises it, redacted; the result is kept on the incident and printed in the postmortem as **the night in the engineer's words**. | `aai.py`, `voice_turn.py` (`POST /sessions/<id>/summary`) |
+| **PII redaction** (`redact_pii`, hashed) | A voice note at 3 AM can carry a colleague's name or a customer's number. Consent is checked against the words as heard, in memory; what is *written* to the approval row, the audit and the pull request is the redacted text. | `telegram.py`, `voice_tools.py` (`_quote`) |
 | Temporary tokens (`GET /v1/token`) | The browser never sees the API key; the Lambda mints a 10-minute token per session. | `voice_turn.py` (`POST /assemblyai/token`) |
 
 Three behaviours the socket makes possible, each with a test or a harness run behind it: **barge-in withdraws the fix** (`cancel_proposal`, the interrupted read-back cannot be approved), **drop-safety** (an approval spoken before the socket dies never executes — execution is a Lambda call after `tool.call`, never socket state), and **the night ends with a pull request** (`open the pull request` → `open_fix_pr` restores the rule in the CloudFormation template and files the postmortem; nothing is merged). Details and measured latencies: [docs/assemblyai.md](docs/assemblyai.md); the plan: [docs/assemblyai-roadmap.md](docs/assemblyai-roadmap.md); Telegram: [docs/telegram.md](docs/telegram.md); the PR: [docs/fix-at-source.md](docs/fix-at-source.md).
+
+## Tests that speak
+
+Unit tests prove the tools are safe. They cannot prove that *saying* something runs the right tool,
+that agreement is not consent, or that interrupting a read-back really withdraws a fix — those
+properties live in speech and turn-taking.
+
+```bash
+make local && make voice-test        # six spoken scenarios; ONLY=barge_in runs one
+```
+
+Each scenario renders the engineer's lines with Polly, streams them into the **AssemblyAI Voice
+Agent API** as microphone audio, runs every resulting `tool.call` against the local Beacon exactly
+as the browser would, and asserts on what was heard, which tools ran, and how the incident ended.
+
+| Scenario | The property it defends |
+|---|---|
+| `approve` | the exact phrase applies the fix and the verify loop starts |
+| `wrong_phrase` | *"yes, do it"* changes **nothing** — agreement is not consent |
+| `barge_in` | speaking over the read-back withdraws the proposal; nothing executes after |
+| `hinglish` | *"isko fix kar do"* reaches the same tool as *"fix it"* |
+| `contract` | a Sleep Contract needs the read-back **and** then the exact phrase |
+| `undo` | an applied fix can be reversed by phrase |
+
+Writing it was not ceremony — it found a non-idempotent `local/break`, a first-word clip that made
+the server (correctly) refuse a grant, and the fact that the fix number is not always one. Details,
+including what it is *not*: [docs/voice-testing.md](docs/voice-testing.md).
 
 ## Who it is for, and what it is worth
 

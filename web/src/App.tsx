@@ -546,6 +546,22 @@ export default function App() {
             csvUrl={api?.auditCsvUrl}
             onReplay={!replay ? startReplay : undefined}
             replay={!!replay}
+            onSummarise={
+              api && config
+                ? (sid, incidentId) => {
+                    let code = passcode;
+                    if (!code) {
+                      code = window.prompt("Passcode (the summary is produced through the voice Lambda)") ?? "";
+                      if (!code) return Promise.resolve(null);
+                      setPasscode(code);
+                    }
+                    return makeApi(config, () => code)
+                      .sessionSummary(sid, incidentId)
+                      .then((r) => r.summary || null)
+                      .catch(() => null);
+                  }
+                : undefined
+            }
             onListen={
               api
                 ? (id) => {

@@ -357,6 +357,9 @@ def handle_update(update: dict[str, Any]) -> dict[str, Any]:
                 "language": heard.get("language"),
                 "telegram_file_id": file_id,
                 "assemblyai_transcript_id": heard.get("transcript_id"),
+                # what the audit and the postmortem will show: names, numbers and
+                # addresses hashed out by AssemblyAI before the row is written
+                "redacted_quote": heard.get("redacted") or heard["text"],
             }
         )
         if not text.strip():

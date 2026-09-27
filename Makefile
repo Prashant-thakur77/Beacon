@@ -1,4 +1,4 @@
-.PHONY: deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
+.PHONY: voice-test deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
        test lint check-image-tags smoke-strands export-tools deploy-remediation teardown-remediation \
        snapshot-sg tag-remediable dry-run changes incidents lint-templates remediable-ecs break-demo-deploy fix-demo-deploy \
@@ -20,6 +20,7 @@ help:  ## every target with a "##" comment, grouped as the runbook uses them
 	@echo "  local-break        cut the demo's database rule again (second incident, handled under a contract)"
 	@echo "  local-fix          restore the rule by hand"
 	@echo "  test / lint        pytest · ruff + mypy + cfn-lint     (bash scripts/gate.sh runs everything)"
+	@echo "  voice-test         spoken regression: real audio → the Voice Agent API → the real tools"
 	@echo
 	@echo "Deploy (in this order; docs/human-runbook.md has expected outputs):"
 	@echo "  deploy-demo        the patient: VPC + RDS + Fargate app + alarm"
@@ -769,6 +770,13 @@ export-tools:
 
 test:
 	pytest -v
+
+# Spoken regression tests: real audio into the Voice Agent API, every tool call
+# against `make local`. Needs ASSEMBLYAI_API_KEY and AWS credentials (Polly speaks
+# the engineer's lines). ONLY=barge_in runs one scenario.
+voice-test:
+	$(call check_param,ASSEMBLYAI_API_KEY)
+	$(PYTHON) scripts/voice_test.py $(if $(ONLY),--only $(ONLY),) --json docs/assets/voice-test-report.json
 
 lint:
 	ruff check src/ tests/

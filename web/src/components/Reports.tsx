@@ -153,9 +153,11 @@ export function Postmortem({ id, api, fallback, onToast }: { id: string; api: Ap
 type AuditFilter = "all" | "approvals" | "contracts" | "executed";
 
 /** Where the words came from — and, for AssemblyAI sessions, the recording itself. */
-function Attestation({ row, onListen }: { row: AuditRow; onListen?: (sessionId: string) => Promise<string | null> }) {
+function Attestation({ row, onListen, onSummarise }: { row: AuditRow; onListen?: (sessionId: string) => Promise<string | null>; onSummarise?: (sessionId: string, incidentId: string) => Promise<string | null> }) {
   const [state, setState] = useState<"idle" | "loading" | "playing" | "gone">("idle");
   const [src, setSrc] = useState<string | null>(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summarising, setSummarising] = useState(false);
   const a = row.attestation ?? {};
   const session = a.session_id && a.session_id.startsWith("sess_") ? a.session_id : null;
   const bits: string[] = [];
@@ -190,11 +192,34 @@ function Attestation({ row, onListen }: { row: AuditRow; onListen?: (sessionId: 
           </button>
         )
       ) : null}
+      {session && onSummarise && row.incident_id ? (
+        <button
+          className="btn ghost small"
+          disabled={summarising}
+          title="AssemblyAI transcribes its own recording of this session and summarises it; the result is kept on the incident and printed in the postmortem"
+          onClick={() => {
+            setSummarising(true);
+            void onSummarise(session, row.incident_id!)
+              .then((text) => setSummary(text ?? "No summary available."))
+              .finally(() => setSummarising(false));
+          }}
+        >
+          {summarising ? "Summarising…" : "✦ Summarise the session"}
+        </button>
+      ) : null}
+      {summary ? (
+        <div className="session-summary">
+          <div className="eyebrow">What was said · summarised by AssemblyAI</div>
+          {summary.split("\n").filter(Boolean).map((line, i) => (
+            <div key={i}>{line.replace(/^[-*]\s*/, "• ")}</div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-export function Audit({ rows, loading, csvUrl, onReplay, replay, onListen }: { rows: AuditRow[] | null; loading: boolean; csvUrl?: string; onReplay?: () => void; replay: boolean; onListen?: (sessionId: string) => Promise<string | null> }) {
+export function Audit({ rows, loading, csvUrl, onReplay, replay, onListen, onSummarise }: { rows: AuditRow[] | null; loading: boolean; csvUrl?: string; onReplay?: () => void; replay: boolean; onListen?: (sessionId: string) => Promise<string | null>; onSummarise?: (sessionId: string, incidentId: string) => Promise<string | null> }) {
   const [filter, setFilter] = useState<AuditFilter>("all");
   const list = (rows ?? []).filter((r) => (filter === "all" ? true : filter === "approvals" ? r.kind === "approval" : filter === "contracts" ? r.kind === "contract" : !!r.executed));
   const json = () => download("beacon-audit.json", JSON.stringify({ rows: rows ?? [], count: rows?.length ?? 0 }, null, 2), "application/json");
@@ -269,7 +294,7 @@ export function Audit({ rows, loading, csvUrl, onReplay, replay, onListen }: { r
                   </td>
                   <td className="quote-cell">
                     “{r.quote}”
-                    <Attestation row={r} onListen={onListen} />
+                    <Attestation row={r} onListen={onListen} onSummarise={onSummarise} />
                   </td>
                   <td className="small dim">
                     {r.channel}

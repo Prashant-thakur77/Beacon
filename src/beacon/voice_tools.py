@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any
 from beacon import approvals, aws, channels, contracts, observability, store
 from beacon.remediation import registry
 from beacon.remediation.base import ParamError
-from beacon.turn_context import current
+from beacon.turn_context import TurnContext, current
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -53,6 +53,17 @@ _GRANT_PATTERNS = (
     re.compile(r"\bcontract (?:do|de do|dedo|grant karo)\b"),
     re.compile(r"\bcontract (?:grant|de) (?:kar|kar do|karo)\b"),
 )
+
+
+def _quote(ctx: TurnContext) -> str:
+    """What goes on the record.
+
+    Consent is checked against the words as heard, in memory. What is *written* —
+    the approval row, the audit, the postmortem, the pull request body — is the
+    redacted version when the channel produced one (Telegram voice notes ask
+    AssemblyAI to hash out names, numbers and addresses).
+    """
+    return str(ctx.attestation.get("redacted_quote") or ctx.transcript).strip()
 
 
 def _incidents_table() -> str:
@@ -359,7 +370,7 @@ def approve_fix(fix_id: int, confirmation_phrase: str) -> dict[str, Any]:
         dict(proposal["params"]),
         source="voice",
         channel=ctx.channel,
-        transcript_quote=ctx.transcript.strip(),
+        transcript_quote=_quote(ctx),
         fix_id=int(fix_id),
         table_name=_approvals_table(),
         attestation=ctx.attestation,
@@ -568,7 +579,7 @@ def grant_sleep_contract(days: int = 7, max_uses: int = 3) -> dict[str, Any]:
         params=params,
         days=int(pending.get("days", days)),
         max_uses=int(pending.get("max_uses", max_uses)),
-        transcript_quote=ctx.transcript.strip(),
+        transcript_quote=_quote(ctx),
         granted_by=ctx.channel,
         incident_id=incident["incident_id"],
         table_name=_contracts_table(),
@@ -700,7 +711,7 @@ def undo_fix(fix_id: int, confirmation_phrase: str) -> dict[str, Any]:
         params,
         source="voice",
         channel=ctx.channel,
-        transcript_quote=ctx.transcript.strip(),
+        transcript_quote=_quote(ctx),
         fix_id=int(fix_id),
         table_name=_approvals_table(),
         attestation=ctx.attestation,

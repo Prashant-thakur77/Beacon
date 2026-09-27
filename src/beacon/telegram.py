@@ -248,6 +248,21 @@ def transcribe(audio: bytes, *, keyterms: list[str]) -> dict[str, Any]:
     body: dict[str, Any] = {
         "audio_url": upload["upload_url"],
         "language_detection": True,
+        # A voice note at 3 AM can carry a colleague's name or a customer's number.
+        # The consent check runs on the raw text in memory; only the redacted version
+        # is written to the approval row, the audit and the postmortem.
+        "redact_pii": True,
+        "redact_pii_audio": False,
+        "redact_pii_policies": [
+            "person_name",
+            "phone_number",
+            "email_address",
+            "location",
+            "credit_card_number",
+            "banking_information",
+            "us_social_security_number",
+        ],
+        "redact_pii_sub": "hash",
     }
     if keyterms:
         body["keyterms_prompt"] = [k for k in keyterms if k][:50]
@@ -259,8 +274,12 @@ def transcribe(audio: bytes, *, keyterms: list[str]) -> dict[str, Any]:
         if status == "completed":
             words = got.get("words") or []
             confs = [float(w.get("confidence", 0)) for w in words if "confidence" in w]
+            # `text` is redacted by the API; the words still carry the originals,
+            # which is what the consent phrase must be checked against.
+            spoken = " ".join(str(w.get("text", "")) for w in words).strip()
             return {
-                "text": str(got.get("text") or ""),
+                "text": spoken or str(got.get("text") or ""),
+                "redacted": str(got.get("text") or ""),
                 "confidence": min(confs)
                 if confs
                 else float(got.get("confidence") or 0),

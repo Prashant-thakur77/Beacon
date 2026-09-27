@@ -32,7 +32,7 @@ from aws_lambda_powertools.event_handler import (
     Response,
 )
 
-from beacon import aws, observability, store, voice_tools
+from beacon import aai, aws, observability, store, voice_tools
 from beacon.turn_context import TurnContext, turn_context
 
 logger = logging.getLogger(__name__)
@@ -520,7 +520,6 @@ def tools_route(name: str) -> Response[str]:
 
 def _mint_assemblyai_token(api_key: str) -> dict[str, Any]:
     """Exchange the long-lived key for a short-lived browser token."""
-    import urllib.request
 
     # Voice Agent API tokens are single-use and ride the socket URL (?token=).
     req = urllib.request.Request(
@@ -555,61 +554,24 @@ def assemblyai_token() -> Response[str]:
 
 
 _SESSION_RE = re.compile(r"^sess_[0-9a-f]{32}$")
-_ASSEMBLYAI_HOSTS = tuple(
-    h.strip()
-    for h in os.environ.get(
-        "ASSEMBLYAI_SESSION_HOSTS",
-        "agents.eu.assemblyai.com,agents.us.assemblyai.com,agents.assemblyai.com",
-    ).split(",")
-    if h.strip()
-)
 
 
 @app.get("/recordings/<session_id>")
 def recording(session_id: str) -> Response[str]:
     """A short-lived link to the AssemblyAI session recording behind an approval.
 
-    The API key never leaves the Lambda: the browser gets the presigned audio
-    URL the sessions API returns, valid for minutes, and plays it inline.
+    The API key never leaves the Lambda: the browser gets the presigned audio URL
+    the sessions API returns, valid for minutes, and plays it inline.
     """
     if not _passcode_ok(dict(app.current_event.headers)):
         return _json(401, {"error": "passcode required"})
     if not _SESSION_RE.match(session_id):
         return _json(400, {"error": "not an AssemblyAI session id"})
-    param = _env("ASSEMBLYAI_KEY_PARAM")
-    key = _env("ASSEMBLYAI_API_KEY")
-    if not key and param:
-        try:
-            key = aws.client("ssm").get_parameter(Name=param, WithDecryption=True)[
-                "Parameter"
-            ]["Value"]
-        except Exception:
-            logger.exception("assemblyai key unreadable")
-    if not key:
+    if not aai.key():
         return _json(503, {"error": "AssemblyAI is not configured on this deployment"})
-    # Sessions are region-sharded behind geo-DNS: a browser in India lands on the
-    # EU cluster, a Lambda in us-east-1 on the US one, and each answers 404 for
-    # the other's sessions. Ask each regional host until one has it.
-    data: dict[str, Any] | None = None
-    last = ""
-    for host in _ASSEMBLYAI_HOSTS:
-        req = urllib.request.Request(
-            f"https://{host}/v1/sessions/{session_id}",
-            headers={"Authorization": f"Bearer {key}"},
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
-                data = json.loads(resp.read().decode())
-                break
-        except urllib.error.HTTPError as exc:
-            last = f"{host}: {exc.code} {exc.read().decode()[:120]}"
-            if exc.code != 404:
-                logger.warning("session lookup failed: %s", last)
-        except Exception as exc:
-            last = f"{host}: {exc}"
-            logger.warning("session lookup failed: %s", last)
+    data = aai.session(session_id)
     if data is None:
-        return _json(404, {"error": "session not found in any region", "detail": last})
+        return _json(404, {"error": "session not found in any region"})
     audio = next(
         (a for a in data.get("artifacts") or [] if a.get("type") == "audio"), None
     )
@@ -623,6 +585,56 @@ def recording(session_id: str) -> Response[str]:
             "audio_url": audio.get("url") if audio else None,
         },
     )
+
+
+@app.post("/sessions/<session_id>/summary")
+def session_summary(session_id: str) -> Response[str]:
+    """Summarise what was actually said in a voice session, and keep it.
+
+    AssemblyAI transcribes its own recording and summarises it (redacted). The
+    result is cached on the incident, so the postmortem and the morning report can
+    quote the night in the engineer's words rather than the model's.
+    """
+    if not _passcode_ok(dict(app.current_event.headers)):
+        return _json(401, {"error": "passcode required"})
+    if not _SESSION_RE.match(session_id):
+        return _json(400, {"error": "not an AssemblyAI session id"})
+    body = app.current_event.json_body or {}
+    incident_id = str(body.get("incident_id", ""))
+    if not _ID_RE.match(incident_id):
+        return _json(400, {"error": "incident_id is required"})
+    incident = store.get_incident(incident_id, table_name=_incidents_table())
+    if not incident:
+        return _json(404, {"error": f"incident {incident_id} not found"})
+    cached = (incident.get("voice_summary") or {}).get(session_id)
+    if cached and not body.get("refresh"):
+        return _json(200, {"cached": True, **cached})
+    try:
+        out = aai.summarise_session(
+            session_id,
+            keyterms=[
+                str(incident.get("alarm_name") or ""),
+                "approve fix one",
+                "grant contract for seven days",
+                "Beacon",
+            ],
+        )
+    except Exception as exc:
+        logger.warning("session summary failed: %s", exc)
+        return _json(502, {"error": f"could not summarise the session: {exc}"})
+    summaries = dict(incident.get("voice_summary") or {})
+    summaries[session_id] = {
+        "summary": out["summary"],
+        "seconds": out.get("seconds"),
+        "transcript_id": out.get("transcript_id"),
+    }
+    store.update_status(
+        incident_id,
+        str(incident.get("status") or "awaiting_engineer"),
+        table_name=_incidents_table(),
+        extra={"voice_summary": summaries},
+    )
+    return _json(200, {"cached": False, **summaries[session_id]})
 
 
 @app.post("/telegram/webhook")

@@ -19,6 +19,7 @@ class FakeHttp:
     def __init__(self) -> None:
         self.calls: list[tuple[str, Any]] = []
         self.transcript = {"text": "approve fix one", "confidence": 0.97}
+        self.redacted: str | None = None
 
     def __call__(self, req: Any, timeout: float = 0) -> Any:
         url = req.full_url if hasattr(req, "full_url") else str(req)
@@ -59,7 +60,8 @@ class FakeHttp:
                     {
                         "id": "t1",
                         "status": "completed",
-                        "text": self.transcript["text"],
+                        # `text` comes back redacted; `words` keep the originals
+                        "text": self.redacted or self.transcript["text"],
                         "confidence": self.transcript["confidence"],
                         "words": words,
                         "language_code": "en",
@@ -263,3 +265,18 @@ def test_commands_and_route_table(tg: Any) -> None:
     assert telegram.route("what changed?") == ("get_evidence", {"kind": "changes"})
     assert telegram.route("is it fixed") == ("check_recovery", {})
     assert telegram.route("hello there") is None
+
+
+def test_voice_note_transcript_is_redacted_before_it_is_stored(tg: Any) -> None:
+    """Consent is checked on the words as heard; the record keeps the redacted text."""
+    http: FakeHttp = tg["http"]
+    telegram_bot.handle_update(_update("fix it"))
+    http.transcript = {"text": "approve fix one", "confidence": 0.97}
+    http.redacted = "approve fix one, thanks ####"
+    out = telegram_bot.handle_update(_update(voice=True))
+    assert out["tool"] == "approve_fix" and out["ok"]
+    aai = [p for m, p in http.calls if m == "aai.transcript"][-1]
+    assert aai["redact_pii"] is True and "person_name" in aai["redact_pii_policies"]
+    row = _approvals(tg["incident_id"])[0]
+    assert row["transcript_quote"] == "approve fix one, thanks ####"
+    assert row["attestation"]["redacted_quote"] == "approve fix one, thanks ####"

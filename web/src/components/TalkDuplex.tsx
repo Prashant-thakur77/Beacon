@@ -80,6 +80,9 @@ export function TalkDuplex({
   /** fix_id proposed inside the reply now being spoken; interrupting that reply withdraws it. */
   const proposalInReply = useRef<number | null>(null);
   const replySpoke = useRef(false);
+  /** The fix number Beacon last proposed, so the phrase chips say the right one. */
+  const [lastFix, setLastFix] = useState<number | null>(null);
+  const fixPhrase = `approve fix ${lastFix ?? 1}`;
   // Noisy room: a higher VAD threshold and a longer confident-silence window, so a
   // fan or a TV does not open turns and short pauses do not close them.
   const [noisy, setNoisy] = useLocalState("beacon.noisyRoom", "");
@@ -202,7 +205,10 @@ export function TalkDuplex({
             setLatency((prev) => ({ ...prev, tool: ms, toolName: name }));
           }
           const fixId = (result as { fix_id?: number } | null)?.fix_id;
-          if (name === "propose_fix" && typeof fixId === "number") proposalInReply.current = fixId;
+          if (name === "propose_fix" && typeof fixId === "number") {
+            proposalInReply.current = fixId;
+            setLastFix(fixId);
+          }
           else if (name === "approve_fix" || name === "cancel_proposal") proposalInReply.current = null;
           const summary = events[0]?.summary ?? (typeof result === "object" && result && "error" in (result as object) ? String((result as { error: string }).error) : "ok");
           pendingTools.current.push({ name, args, summary, evidence_id: cards[0]?.id ?? null });
@@ -317,7 +323,23 @@ export function TalkDuplex({
             </button>
             <div className="stack" style={{ gap: 4 }}>
               <div className={`state ${state}`}>{stateLabel[state]}</div>
-              <div className="partial">{partial || (heard ? `heard: “${heard.text}”${heard.confidence != null ? ` (${Math.round(heard.confidence * 100)}%)` : ""}` : "full-duplex: just talk")}</div>
+              <div className="partial">
+                {partial ? (
+                  partial
+                ) : heard ? (
+                  <>
+                    heard: “{heard.text}”
+                    {heard.confidence != null ? (
+                      <span className={`conf ${heard.confidence >= 0.85 ? "ok" : "low"}`} title="Speech-to-text confidence. Consent phrases below 85% are refused and you are asked to repeat.">
+                        <i style={{ width: `${Math.round(heard.confidence * 100)}%` }} />
+                        {Math.round(heard.confidence * 100)}%
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  "full-duplex: just talk"
+                )}
+              </div>
               <label className="noisy small" title="Higher speech threshold and a longer pause before Beacon answers — for a fan, a TV, a train.">
                 <input type="checkbox" checked={!!noisy} onChange={(e) => setNoisy(e.target.checked ? "1" : "")} /> noisy room
               </label>
@@ -386,6 +408,32 @@ export function TalkDuplex({
               Send
             </button>
           </form>
+          <div className="phrases" aria-label="Phrases Beacon understands">
+            {[
+              { t: "what happened", k: "ask" },
+              { t: "what changed", k: "ask" },
+              { t: "fix it", k: "ask" },
+              { t: fixPhrase, k: "consent" },
+              { t: "grant contract for seven days", k: "consent" },
+              { t: `undo fix ${lastFix ?? 1}`, k: "consent" },
+              { t: "open the pull request", k: "consent" },
+              { t: "is it fixed", k: "ask" },
+            ].map((p) => (
+              <button
+                key={p.t}
+                className={`phrase ${p.k}`}
+                disabled={!live}
+                title={p.k === "consent" ? "A consent phrase: it only counts if you say it, and it is kept on the record" : "Ask Beacon"}
+                onClick={() => {
+                  setMessages((prev) => [...prev, { role: "user", text: p.t, channel: "typed", at: new Date().toISOString() }]);
+                  lat.current = { turnEnd: performance.now(), firstAudio: null, toolStart: null };
+                  void transport.current?.sendText(p.t);
+                }}
+              >
+                {p.t}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

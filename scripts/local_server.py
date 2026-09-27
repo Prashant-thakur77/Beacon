@@ -150,11 +150,20 @@ class LocalWorld:
         self.mock.stop()
 
     def break_db(self) -> None:
+        """Cut the rule and fire the alarm. Idempotent: breaking an already-broken
+        demo is how the voice suite starts each scenario."""
+        from botocore.exceptions import ClientError
+
         from beacon.remediation import actions_sg
 
-        self.ec2.revoke_security_group_ingress(
-            GroupId=self.rds_sg, IpPermissions=[actions_sg.ip_permission(self.params)]
-        )
+        try:
+            self.ec2.revoke_security_group_ingress(
+                GroupId=self.rds_sg,
+                IpPermissions=[actions_sg.ip_permission(self.params)],
+            )
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] != "InvalidPermission.NotFound":
+                raise
         self.cw.set_alarm_state(
             AlarmName=ALARM, StateValue="ALARM", StateReason="local break"
         )
