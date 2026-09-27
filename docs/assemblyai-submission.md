@@ -36,12 +36,64 @@ It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. Eve
 
 **Why it needed this generation of AI.** Consent is checked against the words Universal-3 Pro actually returned, including half-asleep Hinglish — DTMF cannot express *which* fix on *which* resource, and older ASR could not carry that responsibility. Barge-in has to be observable (`reply.done {interrupted}`) for an interruption to withdraw a pending fix. Nine tools have to be callable mid-turn with results feeding the next sentence. Full reasoning: [docs/business-case.md](business-case.md).
 
+
+## YouTube metadata (for the upload)
+
+**Title**
+`Beacon Night Shift — the on-call agent you can interrupt (AssemblyAI Voice Agent API)`
+
+**Description**
+```
+A voice agent with write access to AWS. At 3 AM it pages you on Telegram, you answer with a voice
+note, and the fix only happens on words you actually said.
+
+Everything in the demo section is a real run on a deployed AWS account — including the moment where
+speaking over the read-back withdraws the proposed fix, and the approval phrase stops working.
+
+Built on AssemblyAI:
+• Voice Agent API (Universal-3 Pro, turn detection, barge-in, TTS) with nine tools on one socket
+• Pre-recorded transcription with word-level confidence for Telegram voice notes
+• Session recordings played back in the audit, behind every approval
+
+And on AWS: Lambda, Step Functions, DynamoDB, EventBridge, CloudTrail, CloudWatch, ECS, RDS, SNS.
+
+Live console (judge passcode in the submission):
+https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/
+Code (MIT): https://github.com/Prashant-thakur77/Beacon/tree/assemblyai
+A pull request Beacon opened by voice: https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2
+
+Chapters
+0:00 03:12 — the page nobody answers
+0:22 The page lands on the phone
+0:40 The Night Board: what changed
+0:49 One socket, full duplex
+1:00 Propose a fix, dry run first
+1:10 Interrupt the read-back — the fix is withdrawn
+1:23 "Approve fix two", and the verify loop
+1:39 A Sleep Contract, in your own words
+1:50 The pull request that ends the incident
+2:02 The recording, played back
+2:13 Who it is for
+2:22 Market
+2:33 Revenue
+2:45 Why this needed this generation of models
+3:17 Built solo, in ten days
+
+Music: "Immersed" by Kevin MacLeod (incompetech.com), CC BY 4.0.
+Narration: Chatterbox TTS. No editor was used — the film is assembled by ffmpeg from
+video/script-assemblyai.md; the pipeline is in the repo.
+```
+
+**Thumbnail** `docs/assets/thumbnail-aai.jpg` · **Visibility** public · **Category** Science & Technology
+
 ## Links
 
 - Live console (passcode in the form): https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/
 - Repository (MIT, branch `assemblyai`): https://github.com/Prashant-thakur77/Beacon/tree/assemblyai
 - The pull request Beacon opened by voice: https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2
-- Film: *(YouTube link, Stage 5)*
+- Film (3:26): *(YouTube link — upload `Beacon-AssemblyAI.mp4` from the release)* · direct download: https://github.com/Prashant-thakur77/Beacon/releases/download/v0.3.0/Beacon-AssemblyAI.mp4
+- Deck (10 slides): https://github.com/Prashant-thakur77/Beacon/releases/download/v0.3.0/Beacon-deck.pdf
+- Release with every artefact: https://github.com/Prashant-thakur77/Beacon/releases/tag/v0.3.0
 - Telegram bot: https://t.me/GoodNightShiftbot (allowlisted to the author; the film shows it)
 
 ## Tags
