@@ -42,11 +42,53 @@ def test_dry_run_passes_for_active_service_and_fails_for_missing(ecs_env: Any) -
     )
 
 
-def test_execute_starts_a_deployment_and_postcondition_holds(ecs_env: Any) -> None:
+def test_postcondition_waits_for_the_new_deployment_to_settle(ecs_env: Any) -> None:
+    """A redeploy is not "done" the moment it is asked for.
+
+    Immediately after `execute` the rollout is in progress and no task is running
+    yet, so the post-condition must say no — otherwise the verify loop would call a
+    still-crashlooping service recovered.
+    """
     ecs, params = ecs_env
     result = actions_ecs.execute(params, ecs_client=ecs)
     assert result.ok is True and result.code == "DeploymentStarted"
-    assert actions_ecs.postcondition(params, ecs_client=ecs) is True
+    assert actions_ecs.postcondition(params, ecs_client=ecs) is False
+
+    class Settled:
+        """What the service looks like once the rollout has finished."""
+
+        def describe_services(self, **_: Any) -> dict[str, Any]:
+            return {
+                "services": [
+                    {
+                        "serviceName": params["service"],
+                        "status": "ACTIVE",
+                        "desiredCount": 1,
+                        "runningCount": 1,
+                        "deployments": [
+                            {
+                                "status": "PRIMARY",
+                                "rolloutState": "COMPLETED",
+                                "runningCount": 1,
+                                "desiredCount": 1,
+                            }
+                        ],
+                    }
+                ]
+            }
+
+    assert actions_ecs.postcondition(params, ecs_client=Settled()) is True
+
+    class StillDraining(Settled):
+        def describe_services(self, **_: Any) -> dict[str, Any]:
+            out = super().describe_services()
+            out["services"][0]["deployments"].append(
+                {"status": "ACTIVE", "rolloutState": "COMPLETED"}
+            )
+            return out
+
+    # old tasks still draining: not settled
+    assert actions_ecs.postcondition(params, ecs_client=StillDraining()) is False
 
 
 def test_precondition_requires_the_service_to_be_configured_as_remediable(

@@ -82,7 +82,28 @@ def execute(params: dict[str, Any], *, ecs_client: Any | None = None) -> ActionR
 
 
 def postcondition(params: dict[str, Any], *, ecs_client: Any | None = None) -> bool:
+    """A redeploy counts only when the new deployment actually settled.
+
+    "The service exists and has a deployment" is true of a service that is still
+    crashlooping, so it is worth nothing as a verification. The primary deployment
+    has to have finished rolling out and be running every task it wants.
+    """
     service = _describe(params, _ecs(ecs_client))
-    if service is None:
+    if service is None or service.get("status") != "ACTIVE":
         return False
-    return service.get("status") == "ACTIVE" and bool(service.get("deployments"))
+    deployments = service.get("deployments") or []
+    primary = next(
+        (d for d in deployments if d.get("status") == "PRIMARY"),
+        deployments[0] if deployments else None,
+    )
+    if primary is None:
+        return False
+    rollout = str(primary.get("rolloutState") or "")
+    if rollout and rollout != "COMPLETED":
+        return False
+    desired = service.get("desiredCount")
+    running = service.get("runningCount")
+    if isinstance(desired, int) and isinstance(running, int) and running < desired:
+        return False
+    # one deployment left means the old tasks are gone, not draining
+    return len([d for d in deployments if d.get("status") != "INACTIVE"]) == 1

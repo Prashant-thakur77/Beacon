@@ -31,6 +31,10 @@ export interface Proposal {
   params: Record<string, unknown>;
   blast_radius: string;
   dry_run: { ok: boolean; code?: string; detail?: string; role?: string };
+  /** Why this action, and how much the deterministic checks actually know. */
+  reason?: string | null;
+  confidence?: "drift" | "ecs_health" | "last_resort" | null;
+  is_last_resort?: boolean;
   expires_at: string;
 }
 

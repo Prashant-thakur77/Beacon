@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import boto3
@@ -119,6 +120,67 @@ def suggested_fix(missing: list[MissingRule]) -> tuple[str, dict[str, Any]] | No
     return None
 
 
+def unhealthy_services(
+    services: list[dict[str, Any]], *, stuck_minutes: int = 10
+) -> list[tuple[dict[str, Any], str]]:
+    """Services that a redeploy would plausibly fix, each with the reason.
+
+    Three shapes, in order of how confident we are about them:
+
+    * tasks are missing — ``running`` is short of ``desired``;
+    * the newest deployment failed outright;
+    * the newest deployment has been rolling out for longer than ``stuck_minutes``.
+
+    A service that looks healthy is not listed here. The wedge fault — where the
+    task keeps running but stops working — is handled by ``run()``'s fallback,
+    because from the outside it is indistinguishable from healthy.
+    """
+    now = datetime.now(tz=UTC)
+    out: list[tuple[dict[str, Any], str]] = []
+    for svc in services:
+        running, desired = svc.get("running"), svc.get("desired")
+        deployments = svc.get("deployments") or []
+        latest = deployments[0] if deployments else {}
+        rollout = str(latest.get("rollout") or "")
+        if isinstance(running, int) and isinstance(desired, int) and running < desired:
+            out.append((svc, f"{running} of {desired} tasks running"))
+            continue
+        if rollout == "FAILED":
+            out.append((svc, "the newest deployment failed"))
+            continue
+        created = latest.get("created")
+        if rollout == "IN_PROGRESS" and created:
+            try:
+                age = (now - _as_datetime(created)).total_seconds() / 60
+            except (TypeError, ValueError):
+                age = 0.0
+            if age > stuck_minutes:
+                out.append(
+                    (svc, f"a deployment has been rolling out for {int(age)} min")
+                )
+    return out
+
+
+def _as_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
+def restartable_service(services: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The one service a restart may be offered for, when nothing else explains it.
+
+    Deliberately narrow: exactly one remediable service must be configured. A
+    restart is the bluntest thing Beacon can propose, so it is only ever offered
+    when there is no security-group drift to explain the alarm, and it is
+    described as a restart rather than as a root cause.
+    """
+    usable = [
+        s for s in services if s.get("status") == "ACTIVE" and s.get("action_params")
+    ]
+    return usable[0] if len(usable) == 1 else None
+
+
 def ecs_health(*, ecs_client: Any | None = None) -> list[dict[str, Any]]:
     """Status of the ECS services Beacon may redeploy (``REMEDIABLE_ECS_SERVICES``).
 
@@ -195,10 +257,33 @@ def run(
     ecs_text = format_ecs(services)
     if ecs_text:
         text = f"{text}\n{ecs_text}"
+
+    # Security-group drift is the specific diagnosis and always wins: it names the
+    # exact rule that vanished. Only when nothing is missing do we look at the
+    # services, and only then may a restart be offered.
+    source, why = ("drift", "") if fix else ("", "")
+    if not fix:
+        sick = unhealthy_services(services)
+        if sick:
+            svc, why = sick[0]
+            fix = ("ecs.force_redeploy", dict(svc["action_params"]))
+            source = "ecs_health"
+            text = f"{text}\nUnhealthy: {svc['cluster']}/{svc['service']} — {why}."
+        elif (candidate := restartable_service(services)) is not None:
+            why = (
+                "no security-group drift and no unhealthy service; a restart of the "
+                "one remediable service is the only allowlisted remedy"
+            )
+            fix = ("ecs.force_redeploy", dict(candidate["action_params"]))
+            source = "last_resort"
+            text = f"{text}\nNo drift found. {why.capitalize()}."
+
     return {
         "missing_rules": [asdict(m) for m in missing],
         "ecs_services": services,
         "suggested_action": fix[0] if fix else None,
         "action_params": fix[1] if fix else None,
+        "action_reason": why or None,
+        "action_confidence": source or None,
         "text": text,
     }

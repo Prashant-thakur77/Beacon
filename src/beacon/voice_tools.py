@@ -275,12 +275,19 @@ def propose_fix() -> dict[str, Any]:
         dry_run=dry_run,
         table_name=_approvals_table(),
     )
+    confidence = beacon_json.get("action_confidence")
     summary = {
         "fix_id": fix_id,
         "action": action,
         "params": params,
         "blast_radius": blast,
         "blast_radius_spoken": spoken_blast_radius(str(action), params),
+        # why this action was chosen, and how much the checks actually know. A
+        # "last_resort" restart is a remedy, not a diagnosis, and must be offered
+        # as one — the engineer is the one deciding on incomplete information.
+        "reason": beacon_json.get("action_reason"),
+        "confidence": confidence,
+        "is_last_resort": confidence == "last_resort",
         "dry_run": dry_run,
         "expires_at": proposal["expires_at"],
     }
@@ -314,8 +321,14 @@ def propose_fix() -> dict[str, Any]:
         "confirmation_phrase": registry.confirmation_phrase(fix_id),
         "evidence": [card],
         "instruction": (
-            f"Read back the blast radius and ask the engineer to say exactly "
-            f"'{registry.confirmation_phrase(fix_id)}' to approve."
+            (
+                "Say plainly that nothing explains the alarm and this is a restart "
+                "rather than a fix, give the reason, then the blast_radius_spoken, "
+                f"then ask for exactly '{registry.confirmation_phrase(fix_id)}'."
+                if confidence == "last_resort"
+                else f"Read back blast_radius_spoken and ask the engineer to say "
+                f"exactly '{registry.confirmation_phrase(fix_id)}' to approve."
+            )
             if dry_run["ok"]
             else "The dry run failed; do not offer to apply this fix."
         ),

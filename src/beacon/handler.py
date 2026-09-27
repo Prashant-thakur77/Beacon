@@ -459,6 +459,9 @@ def _apply_deterministic_action(
         parsed.beacon_json["suggested_action"] = diagnostics["suggested_action"]
         parsed.beacon_json["action_params"] = diagnostics["action_params"]
         parsed.beacon_json["action_source"] = "diagnostics"
+        # why this action, and how sure the checks are — the agent reads it aloud
+        parsed.beacon_json["action_reason"] = diagnostics.get("action_reason")
+        parsed.beacon_json["action_confidence"] = diagnostics.get("action_confidence")
         parsed.beacon_json.setdefault(
             "fingerprint", diagnostics["suggested_action"].replace(".", "-")
         )

@@ -186,6 +186,30 @@ def fallback_analysis(
         status = "High"
         affected = ""
         next_steps = ["Force a new deployment of the service (ecs.force_redeploy)."]
+    elif (diagnostics or {}).get("action_confidence") == "last_resort":
+        # Nothing explains the alarm, but one service is restartable. Say exactly
+        # that: a restart is a remedy, not a diagnosis, and the engineer decides.
+        params = (diagnostics or {}).get("action_params") or {}
+        target = f"{params.get('cluster', '')}/{params.get('service', '')}".strip("/")
+        summary = (
+            f"Alarm {alarm_name or 'unknown'} fired with {len(error_lines)} error "
+            "lines in the window. No security-group drift, and the service reports "
+            f"itself healthy, so nothing here names a cause. The one allowlisted "
+            f"remedy left is a restart of {target}, which clears a wedged process "
+            "but will not fix a bad configuration."
+        )
+        spoken = (
+            "The alarm is real, but nothing in the deterministic checks explains "
+            "it, and the service says it is healthy. The only safe thing I can "
+            "offer is a restart, which often clears a stuck process. It is a "
+            "remedy, not a diagnosis."
+        )
+        status = "Medium"
+        affected = target
+        next_steps = [
+            f"Restart {target} (ecs.force_redeploy) if a wedged process is plausible.",
+            "Otherwise read the error lines below; this needs a human.",
+        ]
     else:
         summary = (
             f"Alarm {alarm_name or 'unknown'} fired; {len(error_lines)} error lines "

@@ -456,3 +456,49 @@ def test_open_fix_pr_needs_the_phrase_an_applied_fix_and_a_repo(
     last = incident["timeline"][-1]
     assert last["event"] == "pr_opened" and last["detail"]["number"] == 41
     assert ctx.evidence[-1]["kind"] == "pull_request"
+
+
+def test_a_last_resort_restart_is_offered_as_a_restart_not_a_diagnosis(
+    env: Any, mocker: Any
+) -> None:
+    """When nothing explains the alarm, the proposal must say so in the read-back."""
+    inc = env["incident_id"]
+    store.update_status(
+        inc,
+        "awaiting_engineer",
+        table_name=INCIDENTS,
+        extra={
+            "rca_json": {
+                **RCA,
+                "beacon_json": {
+                    "suggested_action": "ecs.force_redeploy",
+                    "action_params": {"cluster": "beacon-demo", "service": "web"},
+                    "action_source": "diagnostics",
+                    "action_reason": "no security-group drift and no unhealthy service",
+                    "action_confidence": "last_resort",
+                },
+            }
+        },
+    )
+    env["dryrun"].return_value = {
+        "ok": True,
+        "code": "DryRunOperation",
+        "detail": "",
+        "blast_radius": "1 service restarted",
+        "role": "arn:aws:sts::123:assumed-role/beacon-remediator-test/x",
+        "action": "ecs.force_redeploy",
+        "params": {"cluster": "beacon-demo", "service": "web"},
+    }
+    with turn_context(_ctx(inc, "fix it")):
+        out = voice_tools.propose_fix()
+    assert out["action"] == "ecs.force_redeploy"
+    assert out["is_last_resort"] is True
+    assert "no security-group drift" in out["reason"]
+    assert "restart rather than a fix" in out["instruction"]
+
+
+def test_a_drift_fix_is_not_flagged_as_a_last_resort(env: Any) -> None:
+    with turn_context(_ctx(env["incident_id"], "fix it")):
+        out = voice_tools.propose_fix()
+    assert out["action"] == "sg.restore_ingress" and out["is_last_resort"] is False
+    assert "Read back blast_radius_spoken" in out["instruction"]

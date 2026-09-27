@@ -138,10 +138,42 @@ def test_run_includes_ecs_section_and_keeps_sg_fix_priority(
     assert "Remediable ECS services" in result["text"]
     assert "beacon-demo/beacon-demo-webapp" in result["text"]
     assert result["ecs_services"][0]["service"] == "beacon-demo-webapp"
-    # no drift: no deterministic fix; the model still gets exact ECS ids
-    assert result["suggested_action"] is None
+    # No drift, and moto's service reports no running task: that is a diagnosis of
+    # its own, so a redeploy is proposed and labelled with the reason.
+    assert result["suggested_action"] == "ecs.force_redeploy"
+    assert result["action_confidence"] == "ecs_health"
+    assert "tasks running" in (result["action_reason"] or "")
     env["ec2"].revoke_security_group_ingress(
         GroupId=p["group_id"], IpPermissions=[actions_sg.ip_permission(p)]
     )
     result = diagnose.run(env["golden"], ec2_client=env["ec2"], ecs_client=ecs_env)
+    # drift is the specific diagnosis and outranks any restart
     assert result["suggested_action"] == "sg.restore_ingress"
+    assert result["action_confidence"] == "drift"
+
+
+def test_unhealthy_service_is_proposed_before_any_last_resort_restart() -> None:
+    """Missing tasks are a diagnosis; a healthy-looking service is only a guess."""
+    sick = {
+        "cluster": "c",
+        "service": "web",
+        "status": "ACTIVE",
+        "desired": 3,
+        "running": 1,
+        "deployments": [],
+        "action_params": {"cluster": "c", "service": "web"},
+    }
+    found = diagnose.unhealthy_services([sick])
+    assert found and "1 of 3 tasks running" in found[0][1]
+
+    failed = {**sick, "running": 3, "deployments": [{"rollout": "FAILED"}]}
+    assert "failed" in diagnose.unhealthy_services([failed])[0][1]
+
+    healthy = {**sick, "running": 3, "deployments": [{"rollout": "COMPLETED"}]}
+    assert diagnose.unhealthy_services([healthy]) == []
+    # …and a healthy one is still restartable as a last resort, but only if it is
+    # the only remediable service configured
+    assert diagnose.restartable_service([healthy]) is healthy
+    assert (
+        diagnose.restartable_service([healthy, {**healthy, "service": "other"}]) is None
+    )

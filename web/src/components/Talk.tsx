@@ -116,7 +116,9 @@ export function FixCard({ incident, proposal, series, onPrefill }: { incident: I
       <div className="head">
         Fix {proposal.fix_id}: <code className="mono">{proposal.action}</code>
         <span className={`pill ${proposal.dry_run.ok ? "green" : "red"}`}>dry run {proposal.dry_run.ok ? "PASSED" : "FAILED"}</span>
+        {proposal.is_last_resort ? <span className="pill amber" title="Nothing in the deterministic checks explains this alarm">a restart, not a diagnosis</span> : null}
       </div>
+      {proposal.reason ? <div className="why">{proposal.reason}</div> : null}
       <dl className="kv">
         <dt>blast radius</dt>
         <dd>{proposal.blast_radius}</dd>
