@@ -81,12 +81,12 @@
 
   /* tests that speak */
   .vt { display:flex; flex-direction:column; gap:14px; width:1480px; }
-  .vt .row3 { display:grid; grid-template-columns: 210px 1fr 96px; align-items:center; gap:24px;
+  .vt .row3 { display:grid; grid-template-columns: 210px 1fr 260px; align-items:center; gap:24px;
               border:1px solid var(--line); border-radius:16px; padding:18px 26px; background:rgba(255,255,255,.02); }
   .vt .nm { font-family:"Geist Mono",monospace; font-size:24px; color:var(--lilac); }
   .vt .ds { font-size:25px; color:var(--dim); line-height:1.3; text-align:left; }
   .vt .ds b { color:var(--fg); font-weight:600; }
-  .vt .ok { font-size:22px; font-weight:700; letter-spacing:.1em; color:var(--green); text-align:right; }
+  .vt .ok { font-size:17px; font-family:"Geist Mono",monospace; font-weight:700; letter-spacing:.1em; color:var(--green); text-align:right; }
   .grain { position:absolute; inset:0; pointer-events:none; background:radial-gradient(1200px 700px at 50% 60%, rgba(180,167,255,.06), transparent 70%); }
 
   /* phone */
@@ -384,14 +384,14 @@ ranked: destructive verbs first · Beacon's own writes tagged</pre></div>
     <div class="kicker fade d1">Tests that speak</div>
     <h2 class="display fade d1" style="font-size:52px;margin-bottom:6px">Real audio · the Voice Agent API · the real tools</h2>
     <div class="vt">
-      <div class="row3 fade" style="animation-delay:0.35s"><span class="nm">approve</span><span class="ds">the exact phrase applies the fix and the verify loop starts</span><span class="ok">PASS</span></div>
-      <div class="row3 fade" style="animation-delay:0.63s"><span class="nm">wrong_phrase</span><span class="ds"><b>“yes, do it”</b> changes nothing — agreement is not consent</span><span class="ok">PASS</span></div>
-      <div class="row3 fade" style="animation-delay:0.91s"><span class="nm">barge_in</span><span class="ds">speaking over the read-back <b>withdraws</b> the proposal</span><span class="ok">PASS</span></div>
-      <div class="row3 fade" style="animation-delay:1.19s"><span class="nm">hinglish</span><span class="ds"><b>“isko fix kar do”</b> reaches the same tool as “fix it”</span><span class="ok">PASS</span></div>
-      <div class="row3 fade" style="animation-delay:1.47s"><span class="nm">contract</span><span class="ds">a Sleep Contract needs the read-back <b>and then</b> the phrase</span><span class="ok">PASS</span></div>
-      <div class="row3 fade" style="animation-delay:1.75s"><span class="nm">undo</span><span class="ds">an applied fix can be reversed by phrase</span><span class="ok">PASS</span></div>
+      <div class="row3 fade" style="animation-delay:0.35s"><span class="nm">approve</span><span class="ds">the exact phrase applies the fix and the verify loop starts</span><span class="ok">propose_fix → approve_fix</span></div>
+      <div class="row3 fade" style="animation-delay:0.63s"><span class="nm">wrong_phrase</span><span class="ds"><b>“yes, do it”</b> changes nothing — agreement is not consent</span><span class="ok">propose_fix only</span></div>
+      <div class="row3 fade" style="animation-delay:0.91s"><span class="nm">barge_in</span><span class="ds">speaking over the read-back <b>withdraws</b> the proposal</span><span class="ok">cancel_proposal</span></div>
+      <div class="row3 fade" style="animation-delay:1.19s"><span class="nm">hinglish</span><span class="ds"><b>“isko fix kar do”</b> reaches the same tool as “fix it”</span><span class="ok">propose_fix</span></div>
+      <div class="row3 fade" style="animation-delay:1.47s"><span class="nm">contract</span><span class="ds">a Sleep Contract needs the read-back <b>and then</b> the phrase</span><span class="ok">grant ×2</span></div>
+      <div class="row3 fade" style="animation-delay:1.75s"><span class="nm">undo</span><span class="ds">an applied fix can be reversed by phrase</span><span class="ok">undo_fix</span></div>
     </div>
-    <div class="assume fade" style="animation-delay:2.4s">make voice-test · each scenario speaks, then asserts on what was heard, which tools ran, and how the incident ended</div>
+    <div class="assume fade" style="animation-delay:2.4s">make voice-test · each scenario speaks, then asserts on what was heard, which tools ran and how the incident ended · the right column is what must happen</div>
   </div>
 </section>
 

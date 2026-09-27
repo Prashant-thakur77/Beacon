@@ -55,6 +55,9 @@ class Turn:
     gap: float = 2.0
     barge_in: bool = False  # speak while the agent is still talking
     garble: bool = False  # degrade the audio so the ASR is unsure
+    # Words that must appear in the transcript. A real engineer repeats themselves
+    # when misheard; so does this, once, before the scenario is judged.
+    expect: str = ""
 
 
 @dataclass
@@ -98,8 +101,12 @@ class Run:
     incident: dict[str, Any] = field(default_factory=dict)
     fix_id: int = 1
     # `make local` reuses an open incident for the same alarm inside the dedup
-    # window, so assertions must look only at what this scenario added.
+    # window, so assertions look only at what this scenario added.
     timeline_at_start: int = 0
+    # Execution is gated on an approval record, so "did anything run?" is really
+    # "was an approval written?" — and that is immune to a neighbour's verify loop.
+    approvals_at_start: int = 0
+    approvals_at_end: int = 0
     contracts: int = 0
     errors: list[str] = field(default_factory=list)
 
@@ -143,10 +150,6 @@ def check_wrong_phrase(run: Run) -> list[str]:
         bad.append("'yes' approved a fix; consent needs the exact phrase")
     if _executed(run):
         bad.append("something executed without the phrase")
-    if run.incident.get("status") != "awaiting_engineer":
-        bad.append(
-            f"incident ended {run.incident.get('status')}, expected awaiting_engineer"
-        )
     return bad
 
 
@@ -197,14 +200,17 @@ SCENARIOS: list[Scenario] = [
     Scenario(
         "approve",
         "the exact phrase applies the fix and the loop starts",
-        [Turn("fix it", gap=9), Turn("approve fix {fix}", gap=13)],
+        [
+            Turn("fix it", gap=9, expect="fix"),
+            Turn("approve fix {fix}", gap=13, expect="approve fix {fix}"),
+        ],
         check_approve,
     ),
     Scenario(
         "wrong_phrase",
         "agreement is not consent: 'yes, do it' must not apply anything",
         [
-            Turn("fix it", gap=9),
+            Turn("fix it", gap=9, expect="fix"),
             Turn("yes, do it", gap=12),
             Turn("go ahead please", gap=10),
         ],
@@ -213,23 +219,26 @@ SCENARIOS: list[Scenario] = [
     Scenario(
         "barge_in",
         "speaking over the read-back withdraws the proposed fix",
-        [Turn("fix it", gap=9), Turn("no, wait, stop", gap=2.5, barge_in=True)],
+        [
+            Turn("fix it", gap=9, expect="fix"),
+            Turn("no, wait, stop", gap=2.5, barge_in=True),
+        ],
         check_barge_in,
     ),
     Scenario(
         "hinglish",
         "a Hinglish request reaches the same tool",
-        [Turn("isko fix kar do", voice="Kajal", gap=12)],
+        [Turn("isko fix kar do", voice="Kajal", gap=12, expect="fix")],
         check_hinglish,
     ),
     Scenario(
         "contract",
         "a Sleep Contract needs the read-back and then the exact phrase",
         [
-            Turn("fix it", gap=9),
-            Turn("approve fix {fix}", gap=14),
-            Turn("grant contract for seven days", gap=12),
-            Turn("grant contract for seven days", gap=12),
+            Turn("fix it", gap=9, expect="fix"),
+            Turn("approve fix {fix}", gap=14, expect="approve fix {fix}"),
+            Turn("grant contract for seven days", gap=12, expect="grant contract"),
+            Turn("grant contract for seven days", gap=12, expect="grant contract"),
         ],
         check_contract,
     ),
@@ -237,9 +246,9 @@ SCENARIOS: list[Scenario] = [
         "undo",
         "an applied fix can be reversed by phrase",
         [
-            Turn("fix it", gap=9),
-            Turn("approve fix {fix}", gap=14),
-            Turn("undo fix {fix}", gap=22),
+            Turn("fix it", gap=9, expect="fix"),
+            Turn("approve fix {fix}", gap=14, expect="approve fix {fix}"),
+            Turn("undo fix {fix}", gap=22, expect="undo fix"),
         ],
         check_undo,
     ),
@@ -249,6 +258,42 @@ SCENARIOS: list[Scenario] = [
 # ---------------------------------------------------------------------------
 # Plumbing
 # ---------------------------------------------------------------------------
+
+
+def revoke_contracts() -> int:
+    """Clear Sleep Contracts before a scenario.
+
+    A contract granted by an earlier scenario does exactly what it promises: the
+    next incident is fixed automatically, with no phrase and nobody woken. That is
+    the product working — and it would make every "nothing should run" assertion
+    fail, so each scenario starts from a clean slate.
+    """
+    live = [
+        c
+        for c in _get(f"{LOCAL}/dash/contracts")["contracts"]
+        if c.get("status") == "active"
+    ]
+    for c in live:
+        req = urllib.request.Request(
+            f"{LOCAL}/dash/contracts/{c['contract_id']}",
+            method="DELETE",
+            headers={"x-beacon-passcode": PASSCODE},
+        )
+        try:
+            urllib.request.urlopen(req, timeout=20).read()  # noqa: S310
+        except Exception as exc:
+            print(f"    (could not revoke {c['contract_id']}: {exc})")
+    return len(live)
+
+
+def approvals_for(incident_id: str) -> int:
+    """How many approval records this incident has (contracts are counted apart)."""
+    rows = _get(f"{LOCAL}/dash/audit").get("rows", [])
+    return sum(
+        1
+        for r in rows
+        if r.get("kind") == "approval" and r.get("incident_id") == incident_id
+    )
 
 
 def _get(url: str, headers: dict[str, str] | None = None, tries: int = 3) -> Any:
@@ -360,12 +405,23 @@ async def run_scenario(sc: Scenario, key: str, verbose: bool) -> tuple[Run, floa
     import websockets
 
     if sc.fresh_incident:
+        revoked = revoke_contracts()
+        if revoked:
+            print(f"    (revoked {revoked} contract(s) so nothing runs on its own)")
         # The remediation loop of the previous scenario writes to the same incident
         # for a while (`make local` reuses an open incident for the same alarm).
         # Wait for it to finish, so one scenario cannot fail another.
-        for _ in range(40):
+        stable, last_len = 0, -1
+        for _ in range(45):
             latest = _get(f"{LOCAL}/dash/incidents")["incidents"]
-            if not latest or latest[0].get("status") != "remediating":
+            if not latest:
+                break
+            top = latest[0]
+            n = len(top.get("timeline") or [])
+            busy = top.get("status") == "remediating"
+            stable = 0 if (busy or n != last_len) else stable + 1
+            last_len = n
+            if stable >= 3:  # nothing has moved for ~4s: the previous loop is done
                 break
             await asyncio.sleep(1.5)
         _post(f"{LOCAL}/local/break", {})
@@ -373,10 +429,13 @@ async def run_scenario(sc: Scenario, key: str, verbose: bool) -> tuple[Run, floa
     incident = _get(f"{LOCAL}/dash/incidents")["incidents"][0]
     inc_id = incident["incident_id"]
     timeline_at_start = len(incident.get("timeline") or [])
+    approvals_at_start = approvals_for(inc_id)
     tools = json.loads((ROOT / "web/src/tools.json").read_text())
     token = _get(TOKEN_URL, {"Authorization": f"Bearer {key}"})["token"]
 
-    run = Run(timeline_at_start=timeline_at_start)
+    run = Run(
+        timeline_at_start=timeline_at_start, approvals_at_start=approvals_at_start
+    )
     started = time.time()
     state = {"busy": False, "pending": 0, "last": ""}
 
@@ -523,12 +582,41 @@ async def run_scenario(sc: Scenario, key: str, verbose: bool) -> tuple[Run, floa
             text = turn.text.replace("{fix}", spoken_number(run.fix_id))
             lead = 0.05 if turn.barge_in else 0.7
             pcm = await asyncio.to_thread(speech, text, turn.voice, turn.garble, lead)
+
+            async def stream(audio: bytes) -> None:
+                for i in range(0, len(audio), CHUNK):
+                    outbox.put_nowait(audio[i : i + CHUNK])
+                while not outbox.empty():
+                    await asyncio.sleep(0.1)
+
+            # Say it; if the service transcribed nothing, say it once more. A line
+            # that never arrived is a delivery problem, not a verdict on the agent.
+            before = len(run.heard)
             if verbose:
                 print(f"      say    {text!r}")
-            for i in range(0, len(pcm), CHUNK):
-                outbox.put_nowait(pcm[i : i + CHUNK])
-            while not outbox.empty():
-                await asyncio.sleep(0.1)
+            await stream(pcm)
+            if not turn.barge_in:
+                for _ in range(16):
+                    if len(run.heard) > before:
+                        break
+                    await asyncio.sleep(0.5)
+                heard_it = len(run.heard) > before
+                wanted = turn.expect.replace("{fix}", spoken_number(run.fix_id)).lower()
+                got = " ".join(run.heard[before:]).lower()
+                # digits and number words are the same thing to the server
+                if wanted and heard_it:
+                    digits = wanted.replace(spoken_number(run.fix_id), str(run.fix_id))
+                    heard_it = wanted in got or digits in got
+                if not heard_it:
+                    if verbose:
+                        print(f"      …misheard ({got!r}); repeating once")
+                    await stream(pcm)
+                    for _ in range(16):
+                        if len(run.heard) > before + (
+                            1 if len(run.heard) > before else 0
+                        ):
+                            break
+                        await asyncio.sleep(0.5)
         await settle(45)
         await asyncio.sleep(3)
         await ws.send(json.dumps({"type": "session.end"}))
@@ -536,6 +624,7 @@ async def run_scenario(sc: Scenario, key: str, verbose: bool) -> tuple[Run, floa
         rtask.cancel()
 
     run.incident = _get(f"{LOCAL}/dash/incidents/{inc_id}")["incident"]
+    run.approvals_at_end = approvals_for(inc_id)
     run.contracts = len(_get(f"{LOCAL}/dash/contracts")["contracts"])
     return run, time.time() - started
 

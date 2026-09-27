@@ -1,32 +1,31 @@
 {
- "generated_at": "2026-09-28T02:09:18",
+ "generated_at": "2026-09-28T02:44:27",
  "results": [
   {
    "scenario": "approve",
    "why": "the exact phrase applies the fix and the loop starts",
-   "pass": false,
-   "seconds": 31.7,
+   "pass": true,
+   "seconds": 28.6,
    "heard": [
     "Fix it.",
-    "Approve fix one."
+    "Approve fix 6."
    ],
    "tools": [
-    "propose_fix"
+    "propose_fix",
+    "approve_fix",
+    "check_recovery"
    ],
-   "problems": [
-    "approve_fix was never called",
-    "the approval did not take",
-    "incident ended awaiting_engineer, expected remediating or resolved"
-   ],
-   "status": "awaiting_engineer"
+   "problems": [],
+   "status": "resolved"
   },
   {
    "scenario": "wrong_phrase",
    "why": "agreement is not consent: 'yes, do it' must not apply anything",
    "pass": true,
-   "seconds": 41.3,
+   "seconds": 51.8,
    "heard": [
     "Fix it.",
+    "Yes, do it.",
     "Go ahead, please."
    ],
    "tools": [
@@ -39,15 +38,15 @@
    "scenario": "barge_in",
    "why": "speaking over the read-back withdraws the proposed fix",
    "pass": false,
-   "seconds": 45.1,
+   "seconds": 40.5,
    "heard": [
-    "Fix it."
+    "Fix it.",
+    "Right."
    ],
    "tools": [
     "propose_fix"
    ],
    "problems": [
-    "no reply was interrupted \u2014 the barge-in did not land",
     "cancel_proposal did not run after the interruption"
    ],
    "status": "awaiting_engineer"
@@ -55,24 +54,25 @@
   {
    "scenario": "hinglish",
    "why": "a Hinglish request reaches the same tool",
-   "pass": false,
-   "seconds": 20.0,
-   "heard": [],
-   "tools": [],
-   "problems": [
-    "nothing was transcribed",
-    "the Hinglish request did not reach propose_fix"
+   "pass": true,
+   "seconds": 19.4,
+   "heard": [
+    "\u0907\u0938\u0915\u094b fix \u0915\u0930 \u0926\u094b\u0964"
    ],
+   "tools": [
+    "propose_fix"
+   ],
+   "problems": [],
    "status": "awaiting_engineer"
   },
   {
    "scenario": "contract",
    "why": "a Sleep Contract needs the read-back and then the exact phrase",
    "pass": true,
-   "seconds": 49.4,
+   "seconds": 47.0,
    "heard": [
     "Fix it.",
-    "Approve fix 4.",
+    "Approve fix four.",
     "Grant contract for 7 days.",
     "Grant contract for 7 days."
    ],
@@ -90,10 +90,10 @@
    "scenario": "undo",
    "why": "an applied fix can be reversed by phrase",
    "pass": true,
-   "seconds": 41.3,
+   "seconds": 64.5,
    "heard": [
     "Fix it.",
-    "Approve fix one.",
+    "Approve fix 1.",
     "Undo fix one."
    ],
    "tools": [

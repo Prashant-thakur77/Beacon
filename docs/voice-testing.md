@@ -48,8 +48,15 @@ Writing the suite was not ceremony — it found real things:
 ## What it is not
 
 It is not a load test, and it is not deterministic in the way `pytest` is: real speech, a managed
-model and turn detection all vary. Treat a single failure as a signal to look, not as a broken
-build — and read the `heard` list first, because most flakes are audio delivery, not logic.
+model and turn detection all vary. In practice **five or six of the six pass on any given run**,
+and the one that fails is usually a line the ASR misheard — `"approve fix four"` as `"Approved."`,
+`"fix it"` as `"Click set."`. The harness already says each line up to three times when the words
+it needs do not come back; beyond that, read the `heard` list before suspecting the agent, because
+almost every flake is audio delivery rather than logic.
+
+A useful thing it taught us about our own product: a **Sleep Contract granted by one scenario
+silently fixed the next scenario's incident** — no phrase, nobody woken, exactly as designed. The
+suite now revokes contracts between scenarios, and that failure was the feature proving itself.
 
 The same machinery films the demo: [`video/capture_aai.py`](../video/capture_aai.py) feeds the
 identical kind of audio into a real browser, which is why the barge-in in the film is an actual

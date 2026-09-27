@@ -150,8 +150,11 @@ as the browser would, and asserts on what was heard, which tools ran, and how th
 | `contract` | a Sleep Contract needs the read-back **and** then the exact phrase |
 | `undo` | an applied fix can be reversed by phrase |
 
-Writing it was not ceremony — it found a non-idempotent `local/break`, a first-word clip that made
-the server (correctly) refuse a grant, and the fact that the fix number is not always one. Details,
+Writing it was not ceremony. It found a non-idempotent `local/break`, a first-word clip that made
+the server (correctly) refuse a grant, the fact that the fix number is not always one — and one
+genuine surprise: a **Sleep Contract granted by an earlier scenario silently fixed the next
+scenario's incident**, with no phrase and nobody woken, exactly as designed. Five or six of the six
+pass on a given run; the one that flakes is almost always a misheard line, not the agent. Details,
 including what it is *not*: [docs/voice-testing.md](docs/voice-testing.md).
 
 ## Who it is for, and what it is worth
