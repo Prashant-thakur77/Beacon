@@ -124,7 +124,9 @@ def summarise(url: str, *, keyterms: list[str] | None = None) -> dict[str, Any]:
     body: dict[str, Any] = {
         "audio_url": url,
         "summarization": True,
-        "summary_model": "conversational",
+        # `informative` reads like a postmortem; `conversational` needs speaker
+        # labels and, on a single mixed channel, invents a cast of speakers.
+        "summary_model": "informative",
         "summary_type": "bullets",
         "redact_pii": True,
         "redact_pii_policies": [
