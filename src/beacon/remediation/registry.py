@@ -37,6 +37,12 @@ class ActionSpec:
     postcondition: Callable[..., bool]
     # The action that undoes this one with the same params ("undo fix <n>"), if any.
     inverse: str | None = None
+    # How long recovery is allowed to take. Restoring a rule works the moment it
+    # lands, so the alarm clears in a minute; replacing a task means waiting for it
+    # to start, warm up and then for CloudWatch to see clean periods. Escalating a
+    # fix that actually worked is its own kind of wrong, so this is per action.
+    verify_wait_seconds: int = 30
+    verify_max_attempts: int = 6
 
 
 REGISTRY: dict[str, ActionSpec] = {
@@ -89,8 +95,18 @@ REGISTRY: dict[str, ActionSpec] = {
         dry_run=actions_ecs.dry_run,
         execute=actions_ecs.execute,
         postcondition=actions_ecs.postcondition,
+        # a new task has to start, warm up, and then produce clean CloudWatch
+        # periods: about eight minutes of patience rather than three
+        verify_wait_seconds=45,
+        verify_max_attempts=11,
     ),
 }
+
+
+def verify_budget(action: str) -> tuple[int, int]:
+    """(seconds between attempts, attempts) for this action's verification."""
+    spec = REGISTRY.get(action)
+    return (spec.verify_wait_seconds, spec.verify_max_attempts) if spec else (30, 6)
 
 
 def get_action(action_id: str) -> ActionSpec | None:

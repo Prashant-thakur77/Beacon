@@ -117,18 +117,26 @@ def run_machine(
                 else state["Result"]
             )
         elif kind == "Wait":
-            pass
+            # a per-action budget: the wait comes from the verify payload
+            assert "Seconds" in state or "SecondsPath" in state
+            if "SecondsPath" in state:
+                assert isinstance(_path(data, state["SecondsPath"]), int)
         elif kind == "Choice":
             nxt = None
             for choice in state["Choices"]:
                 value = _path(data, choice["Variable"])
+                limit = (
+                    _path(data, choice["NumericLessThanPath"])
+                    if "NumericLessThanPath" in choice
+                    else choice.get("NumericLessThan")
+                )
                 if (
                     "BooleanEquals" in choice
                     and value == choice["BooleanEquals"]
                     or (
-                        "NumericLessThan" in choice
+                        limit is not None
                         and isinstance(value, int | float)
-                        and value < choice["NumericLessThan"]
+                        and value < limit
                     )
                 ):
                     nxt = choice["Next"]
@@ -261,7 +269,7 @@ def test_happy_path_reaches_resolve_with_real_payload_shapes(env: Any) -> None:
         "ApprovalOk",
         "Execute",
     ]
-    assert "Verify" in visited and visited.count("Wait30") >= 1
+    assert "Verify" in visited and visited.count("WaitBeforeVerify") >= 1
     assert (
         data["execute"]["Payload"]["ok"] is True
         and data["execute"]["Payload"]["executed_at"]

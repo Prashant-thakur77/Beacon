@@ -49,7 +49,7 @@ def test_definition_is_valid_json_with_expected_states() -> None:
         "Execute",
         "ExecuteOk",
         "InitVerify",
-        "Wait30",
+        "WaitBeforeVerify",
         "Verify",
         "Verified",
         "Resolve",
@@ -77,8 +77,13 @@ def test_verify_loop_is_bounded_and_every_failure_escalates() -> None:
     asl = _definition()
     verified = asl["States"]["Verified"]
     assert verified["Default"] == "Escalate"
-    bound = [c for c in verified["Choices"] if "NumericLessThan" in c][0]
-    assert bound["NumericLessThan"] == 6 and bound["Next"] == "Wait30"
+    # the loop is bounded, but by the action's own budget rather than a constant:
+    # restoring a rule proves itself in a minute, replacing a task does not
+    bound = [c for c in verified["Choices"] if "NumericLessThanPath" in c][0]
+    assert bound["NumericLessThanPath"] == "$.verify.Payload.max_attempts"
+    assert bound["Next"] == "WaitBeforeVerify"
+    wait = asl["States"]["WaitBeforeVerify"]
+    assert wait["SecondsPath"] == "$.verify.Payload.wait_seconds"
     for gate in ("DryRunOk", "ApprovalOk", "ExecuteOk"):
         assert asl["States"][gate]["Default"] == "Escalate"
 

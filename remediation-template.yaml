@@ -505,11 +505,11 @@ Resources:
               },
               "InitVerify": {
                 "Type": "Pass",
-                "Result": { "Payload": { "ok": false, "attempts": 0 } },
+                "Result": { "Payload": { "ok": false, "attempts": 0, "wait_seconds": 30, "max_attempts": 6 } },
                 "ResultPath": "$.verify",
-                "Next": "Wait30"
+                "Next": "WaitBeforeVerify"
               },
-              "Wait30": { "Type": "Wait", "Seconds": 30, "Next": "Verify" },
+              "WaitBeforeVerify": { "Type": "Wait", "SecondsPath": "$.verify.Payload.wait_seconds", "Next": "Verify" },
               "Verify": {
                 "Type": "Task",
                 "Resource": "arn:aws:states:::lambda:invoke",
@@ -533,7 +533,7 @@ Resources:
                 "Type": "Choice",
                 "Choices": [
                   { "Variable": "$.verify.Payload.ok", "BooleanEquals": true, "Next": "Resolve" },
-                  { "Variable": "$.verify.Payload.attempts", "NumericLessThan": 6, "Next": "Wait30" }
+                  { "Variable": "$.verify.Payload.attempts", "NumericLessThanPath": "$.verify.Payload.max_attempts", "Next": "WaitBeforeVerify" }
                 ],
                 "Default": "Escalate"
               },

@@ -99,3 +99,18 @@ def test_precondition_requires_the_service_to_be_configured_as_remediable(
     assert "not configured" in str(actions_ecs.precondition(params, ecs_client=ecs))
     monkeypatch.setenv("REMEDIABLE_ECS_SERVICES", "beacon-demo/beacon-demo-webapp")
     assert actions_ecs.precondition(params, ecs_client=ecs) is None
+
+
+def test_each_action_gets_its_own_verification_budget() -> None:
+    """Escalating a fix that worked is its own kind of wrong.
+
+    A restored rule works the instant it lands; a replaced task has to start, warm
+    up and then produce clean CloudWatch periods. A single global window either
+    escalates good restarts or waits far too long on a rule that will never come back.
+    """
+    from beacon.remediation import registry
+
+    sg_wait, sg_attempts = registry.verify_budget("sg.restore_ingress")
+    ecs_wait, ecs_attempts = registry.verify_budget("ecs.force_redeploy")
+    assert ecs_wait * ecs_attempts > sg_wait * sg_attempts * 2
+    assert registry.verify_budget("nonexistent") == (30, 6)

@@ -243,10 +243,17 @@ def execute(event: dict[str, Any]) -> dict[str, Any]:
 def verify(event: dict[str, Any]) -> dict[str, Any]:
     """One verification attempt: alarm OK after the fix, metric zero, post-condition."""
     attempts = int(event.get("attempts") or 0) + 1
+    wait_seconds, max_attempts = registry.verify_budget(str(event.get("action", "")))
     try:
         spec, params = _validated(event)
     except ParamError as exc:
-        return {**_error(event, str(exc)), "attempts": attempts, "checks": []}
+        return {
+            **_error(event, str(exc)),
+            "attempts": attempts,
+            "checks": [],
+            "wait_seconds": wait_seconds,
+            "max_attempts": max_attempts,
+        }
     incident_id = str(event.get("incident_id", ""))
     executed_at = datetime.fromisoformat(str(event.get("executed_at") or _now_iso()))
 
@@ -260,6 +267,8 @@ def verify(event: dict[str, Any]) -> dict[str, Any]:
             "attempts": attempts,
             "checks": [],
             "error": "incident has no alarm to verify",
+            "wait_seconds": wait_seconds,
+            "max_attempts": max_attempts,
         }
 
     result = verify_all(
@@ -275,6 +284,8 @@ def verify(event: dict[str, Any]) -> dict[str, Any]:
         "ok": result.ok,
         "attempts": attempts,
         "checks": checks,
+        "wait_seconds": wait_seconds,
+        "max_attempts": max_attempts,
         "alarm_name": alarm_name,
     }
 
@@ -387,8 +398,11 @@ def escalate(event: dict[str, Any]) -> dict[str, Any]:
 
 def run_all(event: dict[str, Any]) -> dict[str, Any]:
     """Inline loop: the same steps Step Functions would drive, in one invocation."""
-    wait = float(_env("VERIFY_WAIT_SECONDS", "30"))
-    max_attempts = int(_env("VERIFY_MAX_ATTEMPTS", "6"))
+    # Per action, so a restart is not escalated while it is still coming up; the
+    # environment still wins when it is set (the local runner keeps it short).
+    budget_wait, budget_attempts = registry.verify_budget(str(event.get("action", "")))
+    wait = float(_env("VERIFY_WAIT_SECONDS", str(budget_wait)))
+    max_attempts = int(_env("VERIFY_MAX_ATTEMPTS", str(budget_attempts)))
     state: dict[str, Any] = dict(event)
 
     for stage, fn in (
