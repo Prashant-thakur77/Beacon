@@ -147,3 +147,63 @@ which is what Twilio's `clear` does.
 It does not model packet loss, jitter, echo or a GSM codec on top of G.711. A real
 call is worse than this, which is why the phone brief tells the agent to say the
 approval phrase twice and slowly the first time.
+
+## Putting a real number on it
+
+Four steps, none of which the repo can do for you (they need an account and a
+regulatory identity):
+
+1. **Sign up** at twilio.com/try-twilio. The trial credit covers a demo call many
+   times over.
+2. **Verify the phone you will answer** — Console → Phone Numbers → Manage →
+   Verified Caller IDs. A trial account can only call verified numbers, so this is
+   not optional.
+3. **Get a Twilio number.** Buy a **US** number: it is instant. Do *not* try to buy
+   an Indian number for this — Indian numbers need a regulatory bundle with address
+   proof and take days to approve, and you do not need one. A US number can call an
+   Indian mobile perfectly well.
+4. **Enable India for outbound voice** — Console → Voice → Settings → Geographic
+   Permissions. Calls to India are **off by default** on new accounts, and this is
+   the step everybody misses; the call fails with error 13227 until it is on.
+
+Then:
+
+```bash
+export TWILIO_ACCOUNT_SID=AC…  TWILIO_AUTH_TOKEN=…  TWILIO_FROM_NUMBER=+1…
+
+# a public https URL for the webhook and a wss:// for the media
+cloudflared tunnel --url http://localhost:8080
+
+python -m beacon.phone serve --base-url "$VOICE_URL" --passcode "$PASSCODE" \
+    --public-url https://<the-tunnel-host> --incident <id> --recordings ~/calls
+
+python -m beacon.phone dial --to +91XXXXXXXXXX \
+    --twiml-url https://<the-tunnel-host>/twiml
+```
+
+Inbound works with no extra code: point the number's voice webhook at the same
+`/twiml` URL and call Beacon back.
+
+**One thing to know before filming.** A trial account plays *"You have a trial
+account…"* before connecting every call. Upgrading with any payment removes it;
+until then the recording opens with Twilio's voice rather than Beacon's.
+
+### Proving the carrier side without a carrier
+
+`scripts/twilio_probe.py` is a client that speaks Twilio's Media Streams protocol
+at our own server: it fetches the TwiML, opens the media socket, streams mu-law
+frames in, plays what comes back, and sends a keypress. It exercises the TwiML
+endpoint, `TwilioLeg` and `PhoneService` — everything a real call touches except
+the carrier.
+
+```bash
+python -m beacon.phone serve --base-url http://localhost:8000/voice \
+    --passcode local --public-url http://localhost:8080 --incident <id>
+.venv/bin/python scripts/twilio_probe.py --incident <id> --out call.wav
+```
+
+It models the carrier's jitter buffer, because Twilio buffers what we send and
+plays it at speaking speed. The first version did not, spoke 0.9 s into a 1.4 s
+sentence, and the bridge correctly read that as barge-in — the probe was wrong, not
+the bridge. It also waits for a reply to *begin* before speaking again, for the same
+reason the replay leg does.
