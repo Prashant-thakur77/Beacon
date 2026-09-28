@@ -20,7 +20,10 @@ import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 import boto3
 from fastapi import FastAPI, Request, Response
@@ -210,8 +213,21 @@ class LocalWorld:
 # ---------------------------------------------------------------------------
 
 
-def _patch_remote_calls(world: LocalWorld) -> None:
-    """Route cross-Lambda calls in-process and replace Bedrock with a script."""
+def _patch_remote_calls(world: LocalWorld) -> Callable[[], None]:
+    """Route cross-Lambda calls in-process and replace Bedrock with a script.
+
+    Returns the undo. Restoring matters because the test suite imports create_app
+    in-process: a permanent swap left every later test seeing the local shim instead
+    of the real function, which is how a genuine bug in _invoke_remediate's timeouts
+    stayed invisible until a test finally called it.
+    """
+    undo: list[Callable[[], None]] = []
+
+    def _swap(module: Any, attr: str, replacement: Any) -> None:
+        original = getattr(module, attr)
+        undo.append(lambda: setattr(module, attr, original))
+        setattr(module, attr, replacement)
+
     from beacon import handler as triage_handler
     from beacon import remediate, voice_tools, voice_turn
 
@@ -250,22 +266,22 @@ def _patch_remote_calls(world: LocalWorld) -> None:
             remediate.verify_all = real_verify_alarm  # type: ignore[assignment]
         return f"arn:aws:states:{REGION}:123456789012:execution:beacon-remediate-local:{int(time.time())}"
 
-    voice_tools._invoke_remediate = invoke_remediate  # type: ignore[assignment]
-    voice_tools._start_execution = start_execution  # type: ignore[assignment]
-    triage_handler._start_execution = start_execution  # type: ignore[assignment]
+    _swap(voice_tools, "_invoke_remediate", invoke_remediate)
+    _swap(voice_tools, "_start_execution", start_execution)
+    _swap(triage_handler, "_start_execution", start_execution)
 
     def synthesize(_text: str) -> dict[str, Any]:
         raise RuntimeError("local mode: browser voice")
 
-    voice_turn._synthesize = synthesize  # type: ignore[assignment]
+    _swap(voice_turn, "_synthesize", synthesize)
 
     def build_agent(*, history: list[dict[str, Any]]) -> Any:
         return ScriptedAgent(history)
 
-    voice_turn._build_agent = build_agent  # type: ignore[assignment]
+    _swap(voice_turn, "_build_agent", build_agent)
 
     # triage: no CloudWatch Logs, no Bedrock; feed the fixture RCA through the real pipeline
-    triage_handler.resolve_log_groups = lambda patterns: ["/ecs/beacon-demo"]  # type: ignore[assignment]
+    _swap(triage_handler, "resolve_log_groups", lambda patterns: ["/ecs/beacon-demo"])
     triage_handler.fetch_logs = lambda group, lookback: (
         "ERROR CRITICAL: Database unreachable. Host=beacon-demo-db:5432\n" * 8
     )  # type: ignore[assignment]
@@ -276,11 +292,17 @@ def _patch_remote_calls(world: LocalWorld) -> None:
         triage_module.last_usage.update({"input_tokens": 14200, "output_tokens": 620})
         return TRIAGE_TEXT
 
-    triage_handler.triage = scripted_triage  # type: ignore[assignment]
-    triage_handler.compute_available_tokens = lambda config, sp, tc: 100_000  # type: ignore[assignment]
+    _swap(triage_handler, "triage", scripted_triage)
+    _swap(triage_handler, "compute_available_tokens", lambda config, sp, tc: 100_000)
     import beacon.prefetch as prefetch
 
-    prefetch.run = lambda *a, **k: None  # type: ignore[assignment]
+    _swap(prefetch, "run", lambda *a, **k: None)
+
+    def restore() -> None:
+        for step in reversed(undo):
+            step()
+
+    return restore
 
 
 class ScriptedAgent:
@@ -469,13 +491,14 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> Any:
         world = LocalWorld()
-        _patch_remote_calls(world)
+        restore = _patch_remote_calls(world)
         world.break_db()
         triage_handler.handler(world.alarm_event(), None)
         state["world"] = world
         try:
             yield
         finally:
+            restore()
             world.close()
             state.clear()
 

@@ -557,6 +557,11 @@ deploy-console: web-build
 	echo "==> Uploading web/dist to s3://$$BUCKET ..." && \
 	aws s3 sync web/dist "s3://$$BUCKET" --delete --exclude config.json --region $(REGION)
 	@ARCHIVED_INCIDENT_ID=$(ARCHIVED_INCIDENT_ID) bash scripts/console_config.sh $(CONSOLE_STACK) $(REGION) $(STT_LANGUAGE) $(VOICE_BACKEND)
+	@echo "==> Warming the Lambdas the first voice turn touches..."
+	@for FN in beacon-voice-turn-$(STACK_NAME) beacon-dashboard-$(STACK_NAME) beacon-remediate-$(STACK_NAME); do \
+	  aws lambda invoke --function-name $$FN --payload '{}' /dev/null --region $(REGION) > /dev/null 2>&1 || true; \
+	done
+	@echo "    warm (a cold dry run cost a live call 25 s and a failed propose_fix)"
 	@CONSOLE_URL=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
 		--query 'Stacks[0].Outputs[?OutputKey==`ConsoleUrl`].OutputValue' --output text) && \
 	touch .beacon.env && grep -v '^DASHBOARD_URL=' .beacon.env > .beacon.env.tmp || true; \

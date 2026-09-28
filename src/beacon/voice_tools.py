@@ -162,7 +162,19 @@ def _invoke_remediate(payload: dict[str, Any]) -> dict[str, Any]:
     arn = os.environ.get("REMEDIATE_FUNCTION_ARN", "")
     if not arn:
         return {"ok": False, "error": "REMEDIATE_FUNCTION_ARN not set"}
-    resp = aws.client("lambda", read_timeout=12).invoke(
+    # A dry run changes nothing, so it gets one generous attempt rather than two
+    # short ones. Two 12 s attempts against a cold container-image Lambda spent 25
+    # seconds on a live call and then failed -- the second attempt starts its own
+    # clock while the first invocation is still warming the very thing it is waiting
+    # for. An execute keeps the bounded default: it is not safe to sit on a request
+    # that may already have applied a change.
+    cold = str(payload.get("step")) == "dryrun"
+    lam = (
+        aws.client("lambda", read_timeout=25, retries={"max_attempts": 1})
+        if cold
+        else aws.client("lambda", read_timeout=12)
+    )
+    resp = lam.invoke(
         FunctionName=arn,
         InvocationType="RequestResponse",
         Payload=json.dumps(payload).encode(),

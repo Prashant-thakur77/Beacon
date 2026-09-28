@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 from typing import Any
 
@@ -541,3 +542,37 @@ def test_devanagari_agreement_is_still_not_consent(env: Any) -> None:
             refused = voice_tools.approve_fix(2, "approve fix 2")
         assert refused["approved"] is False, f"{line!r} approved a change"
     env["sfn"].assert_not_called()
+
+
+def test_a_dry_run_gets_one_long_attempt_and_an_execute_does_not(
+    monkeypatch: Any,
+) -> None:
+    """Two 12 s attempts against a cold Lambda spent 25 s on a live call, then failed.
+
+    propose_fix told the caller it could not reach the system while the dry run's
+    second attempt was timing out against a function the first attempt had already
+    started warming. A dry run changes nothing, so waiting once is free; an execute
+    may already have applied something, so it keeps the bounded default.
+    """
+    from beacon import aws, voice_tools
+
+    seen: list[dict[str, Any]] = []
+
+    class _Lambda:
+        def invoke(self, **_kw: Any) -> Any:
+            return {"Payload": io.BytesIO(b'{"ok": true}')}
+
+    def fake_client(service: str, **overrides: Any) -> Any:
+        seen.append(overrides)
+        return _Lambda()
+
+    monkeypatch.setenv("REMEDIATE_FUNCTION_ARN", "arn:aws:lambda:::function:remediate")
+    monkeypatch.setattr(aws, "client", fake_client)
+
+    voice_tools._invoke_remediate({"step": "dryrun", "action": "sg.restore_ingress"})
+    assert seen[-1] == {"read_timeout": 25, "retries": {"max_attempts": 1}}
+
+    voice_tools._invoke_remediate({"step": "execute", "approval_id": "a-1"})
+    assert seen[-1] == {"read_timeout": 12}, (
+        "an execute must not be retried or sat on; it may already have applied"
+    )
