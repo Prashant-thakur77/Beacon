@@ -1,7 +1,9 @@
 """``python -m beacon.phone`` -- run the phone channel, or prove it works.
 
-    # a real number, once a carrier is configured (see docs/phone.md)
-    python -m beacon.phone serve --base-url $VOICE_URL --public-url https://beacon.example
+    # a real number, once a carrier is configured (see docs/phone.md). Given a
+    # --dashboard-url and no --incident, an inbound call reaches whatever is open.
+    python -m beacon.phone serve --base-url $VOICE_URL \\
+        --public-url https://beacon.example --dashboard-url $DASHBOARD_URL
 
     # wake somebody
     python -m beacon.phone dial --to +911234567890 --twiml-url https://beacon.example/twiml
@@ -272,6 +274,7 @@ async def cmd_serve(args: argparse.Namespace) -> int:
         passcode=args.passcode,
         public_url=args.public_url,
         default_incident=args.incident or "",
+        dashboard_url=args.dashboard_url,
         recordings_dir=args.recordings,
     )
     await server.serve(service, host=args.host, port=args.port)
@@ -314,7 +317,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     s.add_argument("--host", default="0.0.0.0")
     s.add_argument("--port", type=int, default=8080)
-    s.add_argument("--incident", default="", help="incident for calls that name none")
+    s.add_argument(
+        "--incident",
+        default="",
+        help="pin every call to this incident; omit to answer about whatever is open",
+    )
+    s.add_argument(
+        "--dashboard-url",
+        default=os.environ.get("BEACON_DASHBOARD_URL", ""),
+        help="where to look up the live incident when a call names none (inbound)",
+    )
     s.add_argument(
         "--recordings", default="", help="directory to keep call recordings in"
     )

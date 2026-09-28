@@ -18,6 +18,7 @@ import asyncio
 import json
 import logging
 import os
+import urllib.request
 from typing import Any
 
 from beacon.phone import attest, tools
@@ -37,16 +38,49 @@ class PhoneService:
         passcode: str,
         public_url: str,
         default_incident: str = "",
+        dashboard_url: str = "",
         recordings_dir: str = "",
     ) -> None:
         self.base_url = base_url
         self.passcode = passcode
         self.public_url = public_url.rstrip("/")
         self.default_incident = default_incident
+        self.dashboard_url = dashboard_url.rstrip("/")
         self.recordings_dir = recordings_dir
         self.calls: list[dict[str, Any]] = []
 
     # -- the webhook -------------------------------------------------------
+
+    def live_incident(self) -> str:
+        """The incident an inbound caller means, decided when they call.
+
+        Outbound calls carry their incident: Beacon rang about a particular thing.
+        An inbound call carries nothing, and pinning it to whatever was burning when
+        the process started is wrong in the one case that matters — the engineer
+        who was paged, went back to sleep, and calls back an hour later into a
+        different fault. So the number answers about whatever needs a human *now*,
+        looked up at the moment the webhook fires.
+        """
+        if self.default_incident or not self.dashboard_url:
+            return self.default_incident
+        try:
+            req = urllib.request.Request(
+                f"{self.dashboard_url}/incidents",
+                headers={"x-beacon-passcode": self.passcode},
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:  # noqa: S310
+                incidents = json.loads(resp.read().decode()).get("incidents") or []
+        except Exception as exc:
+            logger.warning("could not look up an incident for the call: %s", exc)
+            return ""
+        open_first = [i for i in incidents if i.get("status") != "resolved"]
+        chosen = (open_first or incidents or [{}])[0]
+        incident_id = str(chosen.get("incident_id") or "")
+        if incident_id:
+            logger.info(
+                "inbound call → incident %s (%s)", incident_id, chosen.get("status")
+            )
+        return incident_id
 
     def process_request(self, connection: Any, request: Any) -> Any:
         """Answer plain HTTP on the same port; let the media path upgrade."""
@@ -57,8 +91,17 @@ class PhoneService:
             stream = self.public_url.replace("https://", "wss://").replace(
                 "http://", "ws://"
             )
+            incident_id = self.live_incident()
+            if not incident_id:
+                # Better a spoken sentence than a silent line the caller blames on us.
+                return connection.respond(
+                    200,
+                    '<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n'
+                    "  <Say>Beacon has no open incident to discuss. Goodbye.</Say>\n"
+                    "</Response>\n",
+                )
             body = twilio.twiml(
-                f"{stream}{twilio.MEDIA_PATH}", incident_id=self.default_incident
+                f"{stream}{twilio.MEDIA_PATH}", incident_id=incident_id
             ).encode()
             return connection.respond(200, body.decode())
         if path == "/health":
@@ -80,7 +123,7 @@ class PhoneService:
             return
         finally:
             pump.cancel()
-        incident_id = leg.params.get("incident_id") or self.default_incident
+        incident_id = leg.params.get("incident_id") or self.live_incident()
         if not incident_id:
             logger.error("no incident for call %s; hanging up", leg.call_sid)
             await leg.hangup()
