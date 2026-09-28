@@ -33,6 +33,7 @@ from aws_lambda_powertools.event_handler import (
 )
 
 from beacon import aai, aws, observability, store, voice_brief, voice_tools
+from beacon.phone import attest
 from beacon.turn_context import TurnContext, turn_context
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,14 @@ _CITATION_RE = re.compile(r"\s*\[(E\d+)\]")
 _MAX_HISTORY = 20
 _CONSENT_TOOLS = ("approve_fix", "grant_sleep_contract", "undo_fix", "open_fix_pr")
 _MIN_CONSENT_CONFIDENCE = 0.85
+# Phrases the re-transcription must not mishear; they are what unlocks a change.
+_CONSENT_KEYTERMS = (
+    "approve fix one",
+    "approve fix two",
+    "grant contract for seven days",
+    "open the pull request",
+    "undo fix one",
+)
 
 # CORS lives on the Function URL (console-template.yaml), scoped to the console
 # origin; setting it here too would duplicate the headers in every response.
@@ -660,6 +669,73 @@ def session_summary(session_id: str) -> Response[str]:
         extra={"voice_summary": summaries},
     )
     return _json(200, {"cached": False, **summaries[session_id]})
+
+
+@app.post("/sessions/<session_id>/attest")
+def session_attest(session_id: str) -> Response[str]:
+    """How clearly the words that authorised this session's changes were heard.
+
+    The Voice Agent API reports no confidence on a live turn, so an approval spoken
+    in the browser or down a phone is acted on without one -- while the same words
+    sent as a Telegram voice note must clear 85%. That gap is real, and this closes
+    it after the fact: AssemblyAI re-transcribes its own recording of the session
+    with the pre-recorded model, which does return per-word confidence, and each
+    phrase that unlocked a change is scored by its **weakest** word.
+
+    Nothing is undone by a poor score; by the time a transcript exists the fix has
+    been applied and verified. It is recorded on the incident and flagged in the
+    audit, which is what an audit is for. Waiting a minute for a transcript before
+    touching production would be the wrong trade at 3 AM.
+    """
+    if not _passcode_ok(dict(app.current_event.headers)):
+        return _json(401, {"error": "passcode required"})
+    if not _SESSION_RE.match(session_id):
+        return _json(400, {"error": "not an AssemblyAI session id"})
+    body = app.current_event.json_body or {}
+    incident_id = str(body.get("incident_id", ""))
+    if not _ID_RE.match(incident_id):
+        return _json(400, {"error": "incident_id is required"})
+    incident = store.get_incident(incident_id, table_name=_incidents_table())
+    if not incident:
+        return _json(404, {"error": f"incident {incident_id} not found"})
+
+    phrases = [
+        {"quote": str(entry.get("detail", {}).get("quote") or "")}
+        for entry in incident.get("timeline") or []
+        if entry.get("event") in ("approved", "contract_granted", "undone")
+        and (entry.get("detail") or {}).get("quote")
+    ]
+    if not phrases:
+        return _json(
+            200,
+            {
+                "ok": True,
+                "checks": [],
+                "problems": [],
+                "note": "no consent phrase was recorded for this incident",
+            },
+        )
+    try:
+        heard = aai.audit_session(
+            session_id,
+            keyterms=[str(incident.get("alarm_name") or ""), *_CONSENT_KEYTERMS],
+        )
+    except Exception as exc:
+        logger.warning("session attestation failed: %s", exc)
+        return _json(502, {"error": f"could not re-transcribe the session: {exc}"})
+
+    verdict = attest.verify_confidence(heard["words"], phrases)
+    verdict["transcript_id"] = heard.get("transcript_id")
+    verdict["session_id"] = session_id
+    attestations = dict(incident.get("voice_attestation") or {})
+    attestations[session_id] = verdict
+    store.update_status(
+        incident_id,
+        str(incident.get("status") or "awaiting_engineer"),
+        table_name=_incidents_table(),
+        extra={"voice_attestation": attestations},
+    )
+    return _json(200, verdict)
 
 
 @app.post("/telegram/webhook")

@@ -218,6 +218,63 @@ def transcribe_call(
     raise TimeoutError("the call transcript did not finish in time")
 
 
+def audit_session(
+    session_id: str, *, keyterms: list[str] | None = None
+) -> dict[str, Any]:
+    """Re-transcribe a live session's own recording, with word-level confidence.
+
+    The Voice Agent API does not report confidence on a live turn -- there is no
+    number on ``transcript.user`` -- so an approval spoken in the browser or down a
+    phone is acted on without one, while the same words sent as a Telegram voice
+    note are held to 85%. That is a real gap, and this closes it after the fact:
+    AssemblyAI transcribes its own recording of the session with the pre-recorded
+    model, which does return ``words[].confidence``, and the phrase that authorised
+    the change can be checked against the bar it should have cleared.
+
+    It is deliberately a second opinion rather than a gate on the turn: waiting a
+    minute for a transcript before applying a fix would be the wrong trade at 3 AM.
+    A change whose approval turns out to have been heard poorly is *flagged*, which
+    is what the audit is for.
+
+    Returns ``{"text", "words": [{"text", "confidence", "start"}], "transcript_id",
+    "seconds"}``.
+    """
+    url = audio_url(session_id)
+    if not url:
+        raise LookupError(f"no recording for session {session_id}")
+    body: dict[str, Any] = {
+        "audio_url": url,
+        "punctuate": True,
+        "format_text": True,
+        "language_code": "en",
+    }
+    if keyterms:
+        body["keyterms_prompt"] = [k for k in keyterms if k][:50]
+    job = _json("POST", f"{API}/transcript", body)
+    deadline = time.time() + _SUMMARY_WAIT_SECONDS
+    while time.time() < deadline:
+        got = _json("GET", f"{API}/transcript/{job['id']}")
+        if got.get("status") == "completed":
+            return {
+                "text": str(got.get("text") or "").strip(),
+                "words": [
+                    {
+                        "text": str(w.get("text") or ""),
+                        "confidence": w.get("confidence"),
+                        "start": w.get("start"),
+                    }
+                    for w in got.get("words") or []
+                ],
+                "transcript_id": got.get("id"),
+                "seconds": got.get("audio_duration"),
+                "session_id": session_id,
+            }
+        if got.get("status") == "error":
+            raise RuntimeError(str(got.get("error")))
+        time.sleep(1.5)
+    raise TimeoutError("the session transcript did not finish in time")
+
+
 def summarise_session(
     session_id: str, *, keyterms: list[str] | None = None
 ) -> dict[str, Any]:

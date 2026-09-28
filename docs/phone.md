@@ -57,6 +57,39 @@ ever sent to `input.audio`, so the transcript the Lambda checks cannot contain t
 agent reading a phrase back to itself. See below for the artifact that proves it
 after the fact.
 
+## How clearly the words were heard
+
+There is a gap the Voice Agent API creates and cannot close: **a live turn carries
+no confidence**. `transcript.user` has text and no number. So an approval spoken in
+the browser or down a phone was acted on with no measure of how well it was heard,
+while the same words sent as a Telegram voice note had to clear 85% — because the
+pre-recorded API *does* return `words[].confidence`.
+
+That is not a hypothetical. On a real Telegram run on 28 Sep 2026 the gate earned
+its place on camera:
+
+```
+Heard: "Okay, then approve fix one." (75%)   → refused
+Heard: "Approve fix one."           (74%)   → refused
+                                             → the engineer typed it instead
+```
+
+Nothing reached production until the words were certain. The same phrase, spoken in
+the browser, would have applied the fix without anybody knowing how well it was
+heard.
+
+`POST /sessions/<id>/attest` closes that. AssemblyAI re-transcribes **its own
+recording of the session** with the pre-recorded model, and every phrase that
+unlocked a change is scored by its **weakest word** — "approve fix one" heard as
+"approve fix" plus a guess is not 90% correct, it is wrong in the one place that
+decides which fix runs. The verdict is stored on the incident and shown in the audit.
+
+It is deliberately a second opinion rather than a gate on the turn. By the time a
+transcript exists the fix has been applied and verified; waiting a minute for one
+before touching production would be the wrong trade at 3 AM. A change whose approval
+turns out to have been heard poorly is **flagged**, which is what an audit is for.
+A phrase that is not in the recording at all is a louder finding than a low score.
+
 ## Two channels, so the approval is attributable
 
 The agent reads the approval phrase back — *"say exactly: approve fix one"* — so the

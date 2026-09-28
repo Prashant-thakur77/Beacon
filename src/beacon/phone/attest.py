@@ -35,8 +35,59 @@ CONSENT_PATTERNS = {
 }
 
 
+# The bar a spoken approval has to clear. The same number the Telegram voice-note
+# gate uses, so a phrase is held to one standard whichever channel carried it.
+MIN_CONFIDENCE = 0.85
+
+
 def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _words_of(phrase: str) -> list[str]:
+    return [w for w in re.sub(r"[^\w\s]", " ", phrase.lower()).split() if w]
+
+
+def phrase_confidence(
+    words: list[dict[str, Any]], phrase: str
+) -> dict[str, Any] | None:
+    """How clearly the words that authorised a change were actually heard.
+
+    Takes the word list from ``aai.audit_session`` and finds the run of words
+    matching *phrase*. The score is the **lowest** word in that run, not the mean:
+    "approve fix one" heard as "approve fix" plus a guess is not 90% correct, it is
+    wrong in the one place that decides which fix gets applied.
+
+    ``None`` when the phrase is not in the recording at all, which is a louder
+    finding than a low score.
+    """
+    want = _words_of(phrase)
+    if not want or not words:
+        return None
+    spoken = [_words_of(str(w.get("text") or "")) for w in words]
+    flat = [(w[0] if w else "", i) for i, w in enumerate(spoken)]
+    best: dict[str, Any] | None = None
+    for start in range(len(flat) - len(want) + 1):
+        if [t for t, _ in flat[start : start + len(want)]] != want:
+            continue
+        run = [words[i] for _, i in flat[start : start + len(want)]]
+        scores = [
+            float(w["confidence"])
+            for w in run
+            if isinstance(w.get("confidence"), int | float)
+        ]
+        if not scores:
+            continue
+        found = {
+            "phrase": phrase,
+            "confidence": round(min(scores), 4),
+            "mean": round(sum(scores) / len(scores), 4),
+            "weakest_word": run[scores.index(min(scores))].get("text"),
+            "start_ms": run[0].get("start"),
+        }
+        if best is None or found["confidence"] > best["confidence"]:
+            best = found
+    return best
 
 
 def attribute(utterances: list[dict[str, Any]]) -> dict[str, Any]:
@@ -74,6 +125,48 @@ def attribute(utterances: list[dict[str, Any]]) -> dict[str, Any]:
         ],
         "phrases": found,
     }
+
+
+def verify_confidence(
+    words: list[dict[str, Any]], approvals: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Check each applied change against how clearly its phrase was heard.
+
+    The live socket reports no confidence, so an approval spoken in the browser or
+    on the phone is acted on without one while the same words in a Telegram voice
+    note must clear 85%. This is the second opinion that closes that gap: after the
+    fact, from AssemblyAI's own recording of the session.
+
+    Nothing is undone by a poor score -- the fix has been applied and verified by
+    then. It is *flagged*, which is what an audit is for.
+    """
+    checks: list[dict[str, Any]] = []
+    problems: list[str] = []
+    for approval in approvals:
+        phrase = str(approval.get("quote") or approval.get("phrase") or "").strip()
+        if not phrase:
+            continue
+        found = phrase_confidence(words, phrase)
+        if found is None:
+            checks.append(
+                {
+                    "phrase": phrase,
+                    "ok": False,
+                    "confidence": None,
+                    "why": "not found in the session recording",
+                }
+            )
+            problems.append(f"{phrase!r} is not in the recording of the session")
+            continue
+        ok = found["confidence"] >= MIN_CONFIDENCE
+        checks.append({**found, "ok": ok})
+        if not ok:
+            problems.append(
+                f"{phrase!r} was heard at {found['confidence']:.0%} "
+                f"(weakest word {found['weakest_word']!r}), "
+                f"below {MIN_CONFIDENCE:.0%}"
+            )
+    return {"ok": not problems, "checks": checks, "problems": problems}
 
 
 def verify(
