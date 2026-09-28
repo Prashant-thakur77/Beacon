@@ -147,7 +147,15 @@ def test_the_attest_route_flags_an_approval_that_was_heard_poorly(
         "status": "resolved",
         "alarm_name": "payments-errors",
         "timeline": [
-            {"event": "approved", "detail": {"quote": "approve fix one"}},
+            {
+                "event": "approved",
+                "detail": {
+                    "fix_id": 1,
+                    "channel": "assemblyai",
+                    "transcript_quote": "approve fix one",
+                    "approval_id": "a-1",
+                },
+            },
         ],
     }
     monkeypatch.setattr(store, "get_incident", lambda *_a, **_k: dict(incident))
@@ -180,3 +188,60 @@ def test_the_attest_route_flags_an_approval_that_was_heard_poorly(
     assert "61%" in body["problems"][0]
     # and it is kept on the incident, not just returned
     assert saved["voice_attestation"]["sess_" + "b" * 32]["checks"][0]["ok"] is False
+
+
+def test_every_consent_tool_puts_its_phrase_where_attestation_looks_for_it() -> None:
+    """The route read ``detail.quote``; three of the four writers use another key.
+
+    That mismatch is invisible in a hand-written fixture, so this test reads the
+    event name and the key out of each consent tool itself. On the live account the
+    bug meant the attest button answered "no consent phrase was recorded" for every
+    voice approval ever made -- while the audit row beside it quoted the words.
+    """
+    import ast
+    from pathlib import Path
+
+    from beacon.voice_turn import _CONSENT_TOOLS, consent_phrases
+
+    tree = ast.parse(Path("src/beacon/voice_tools.py").read_text(encoding="utf-8"))
+    wrote: dict[str, tuple[str, str]] = {}
+    for fn in ast.walk(tree):
+        if not isinstance(fn, ast.FunctionDef) or fn.name not in _CONSENT_TOOLS:
+            continue
+        for call in ast.walk(fn):
+            if not (
+                isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Attribute)
+                and call.func.attr == "append_timeline"
+            ):
+                continue
+            names = [
+                n.value
+                for n in ast.walk(call.args[1])
+                if isinstance(n, ast.Constant) and isinstance(n.value, str)
+            ]
+            detail = next((k for k in call.keywords if k.arg == "detail"), None)
+            keys = (
+                [
+                    k.value
+                    for k in detail.value.keys  # type: ignore[union-attr]
+                    if isinstance(k, ast.Constant)
+                ]
+                if detail
+                else []
+            )
+            key = next((k for k in ("transcript_quote", "quote") if k in keys), "")
+            if names and key:
+                wrote[fn.name] = (names[0], key)
+
+    missing = set(_CONSENT_TOOLS) - set(wrote)
+    assert not missing, f"no timeline phrase found for {sorted(missing)}"
+
+    for tool, (event, key) in sorted(wrote.items()):
+        phrases = consent_phrases(
+            {"timeline": [{"event": event, "detail": {key: "approve fix one"}}]}
+        )
+        assert phrases == [{"quote": "approve fix one", "event": event}], (
+            f"{tool} records its phrase as {event}.detail.{key} "
+            "and attestation cannot see it"
+        )

@@ -45,6 +45,8 @@ _MAX_TEXT = 2000
 _CITATION_RE = re.compile(r"\s*\[(E\d+)\]")
 _MAX_HISTORY = 20
 _CONSENT_TOOLS = ("approve_fix", "grant_sleep_contract", "undo_fix", "open_fix_pr")
+# The same four, as the timeline names them once they have run.
+_CONSENT_EVENTS = ("approved", "contract_granted", "undone", "pr_opened")
 _MIN_CONSENT_CONFIDENCE = 0.85
 # Phrases the re-transcription must not mishear; they are what unlocks a change.
 _CONSENT_KEYTERMS = (
@@ -671,6 +673,27 @@ def session_summary(session_id: str) -> Response[str]:
     return _json(200, {"cached": False, **summaries[session_id]})
 
 
+def consent_phrases(incident: dict[str, Any]) -> list[dict[str, Any]]:
+    """The spoken phrases that authorised a change on this incident, in order.
+
+    The four tools that change something each leave a timeline entry, but they do
+    not all name the phrase the same way: three write ``transcript_quote`` and
+    open_fix_pr writes ``quote``. Reading one key and listing three events is how
+    this route came to answer "no consent phrase was recorded" for every live
+    approval it exists to re-check -- on an incident whose audit row showed the
+    phrase plainly.
+    """
+    phrases: list[dict[str, Any]] = []
+    for entry in incident.get("timeline") or []:
+        if entry.get("event") not in _CONSENT_EVENTS:
+            continue
+        detail = entry.get("detail") or {}
+        quote = str(detail.get("transcript_quote") or detail.get("quote") or "").strip()
+        if quote:
+            phrases.append({"quote": quote, "event": str(entry.get("event"))})
+    return phrases
+
+
 @app.post("/sessions/<session_id>/attest")
 def session_attest(session_id: str) -> Response[str]:
     """How clearly the words that authorised this session's changes were heard.
@@ -699,12 +722,7 @@ def session_attest(session_id: str) -> Response[str]:
     if not incident:
         return _json(404, {"error": f"incident {incident_id} not found"})
 
-    phrases = [
-        {"quote": str(entry.get("detail", {}).get("quote") or "")}
-        for entry in incident.get("timeline") or []
-        if entry.get("event") in ("approved", "contract_granted", "undone")
-        and (entry.get("detail") or {}).get("quote")
-    ]
+    phrases = consent_phrases(incident)
     if not phrases:
         return _json(
             200,
