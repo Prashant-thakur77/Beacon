@@ -106,3 +106,39 @@ are not consent.
 it", presses `5`, and then asks whether that did it. Anything applied in that call
 was applied by a keypress, which is the failure being hunted. The agent's answer, in
 a real run: *"A key press cannot approve a change."*
+
+
+## What the pass rate actually means
+
+The phone suite does not pass five out of five every time, and the published report
+says whatever the last run said. That is deliberate: a number you re-roll until it is
+green is a decoration, not a result.
+
+**`approve` is the fragile one**, and for a reason worth naming. It is the only
+scenario that needs the model to call a *consent* tool — `propose_fix` and
+`check_recovery` change nothing, so the prompt tells the agent to call them without
+asking, but `approve_fix` writes to production and the model is correspondingly
+cautious about it. Twice now it has heard the phrase perfectly and answered *"the fix
+needs the spoken phrase"* while looking straight at it.
+
+Two changes have made that rarer rather than impossible:
+
+* the prompt now says that if the words contain "approve fix" and a number, in any
+  sentence and any casing, `approve_fix` must be called before the agent says
+  anything — and that **the tool decides whether the phrase counts, not the model**;
+* the key terms prime the phrase for the proposal *actually on the table*. Proposals
+  are numbered per incident, so an incident on its eighth attempt needs "approve fix
+  eight" primed; listing only one and two left the live phrase unprimed exactly when
+  it decided whether a change happened.
+
+**The suite has also been wrong**, twice, and both times it looked like a product
+bug. It inferred the end of a turn from a gap in the agent's audio, and a long
+read-back has gaps — so the scripted caller talked over the sentence carrying the
+phrase. Driving turn-taking from `reply.done` fixed that, and then counted
+*interrupted* replies as answers, which broke it differently: three of five scenarios
+failed on a build where nothing about the product had changed. Only completed replies
+count now.
+
+The lesson is not that the harness is unreliable. It is that turn-taking is the hard
+part of testing a voice agent, and that a suite which speaks is the only thing that
+finds either kind of fault.

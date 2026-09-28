@@ -128,3 +128,23 @@ def test_the_console_copy_and_the_served_prompt_are_the_same() -> None:
         json.loads(f'"{part}"') for part in re.findall(r'"((?:[^"\\]|\\.)*)"', block)
     )
     assert re.sub(r"\s+", " ", in_console).strip() == voice_brief.system_prompt()
+
+
+def test_the_phrase_for_the_proposal_on_the_table_is_primed() -> None:
+    """Proposals are numbered per incident, so it is not always 'approve fix one'.
+
+    An incident on its eighth attempt needs "approve fix eight" in the key terms —
+    priming only one and two leaves the live phrase unprimed exactly when it decides
+    whether a change happens.
+    """
+    eighth = {**DRIFT, "proposals": [{"fix_id": 7}, {"fix_id": 8}]}
+    terms = voice_brief.keyterms_for(eighth)
+    assert "approve fix eight" in terms
+    assert "approve fix 8" in terms, "people say the digit, and so does the transcript"
+    # the newest proposal comes first, so the cap can never drop it
+    assert terms.index("approve fix eight") < terms.index("approve fix one")
+
+
+def test_an_incident_with_no_proposal_yet_still_primes_the_common_phrases() -> None:
+    terms = voice_brief.keyterms_for({"incident_id": "i", "alarm_name": "a"})
+    assert "approve fix one" in terms and "grant contract for seven days" in terms

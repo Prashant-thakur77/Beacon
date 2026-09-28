@@ -138,11 +138,30 @@ def greeting_for(incident: dict[str, Any], *, channel: str = "browser") -> str:
     return f"{opening}{cause} Say fix it, and I will propose the fix."
 
 
+_SPOKEN = {
+    1: "one",
+    2: "two",
+    3: "three",
+    4: "four",
+    5: "five",
+    6: "six",
+    7: "seven",
+    8: "eight",
+    9: "nine",
+    10: "ten",
+}
+
+
 def keyterms_for(incident: dict[str, Any]) -> list[str]:
     """Words the transcriber must not guess at: the consent phrases and the ids.
 
     Every phrase that unlocks a change is in here, because a phrase heard as
     "approve fix to" is a refused approval and a second wasted minute at 3 AM.
+
+    The phrase that matters most is the one for the proposal actually on the table,
+    and it is not always "approve fix one": proposals are numbered per incident, so
+    an incident on its eighth attempt needs "approve fix eight" primed. Listing only
+    one and two left the live phrase unprimed exactly when it mattered.
     """
     rules = (incident.get("diagnostics") or {}).get("missing_rules") or []
     ids = [
@@ -151,8 +170,20 @@ def keyterms_for(incident: dict[str, Any]) -> list[str]:
         if isinstance(rule, dict)
         for field in ("group_id", "source_group_id")
     ]
+    # newest first, so the live proposal's phrase survives the 50-term cap
+    proposed = [
+        p.get("fix_id")
+        for p in reversed(incident.get("proposals") or [])
+        if isinstance(p.get("fix_id"), int)
+    ]
+    live = [
+        phrase
+        for n in dict.fromkeys(proposed)
+        for phrase in (f"approve fix {_SPOKEN.get(int(n), n)}", f"approve fix {n}")
+    ]
     terms = [
         str(incident.get("alarm_name") or ""),
+        *live,
         *ids,
         "approve fix one",
         "approve fix two",
