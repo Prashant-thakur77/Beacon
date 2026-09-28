@@ -207,3 +207,11 @@ plays it at speaking speed. The first version did not, spoke 0.9 s into a 1.4 s
 sentence, and the bridge correctly read that as barge-in — the probe was wrong, not
 the bridge. It also waits for a reply to *begin* before speaking again, for the same
 reason the replay leg does.
+
+**Over the public internet, too.** Run the bridge with `--public-url` set to a
+Cloudflare quick tunnel and point the probe at that host, and the whole path Twilio
+will use is exercised: the TwiML fetched over HTTPS, the media socket upgraded to
+`wss://` through Cloudflare, mu-law frames both ways. A run on 28 Sep 2026 went
+`propose_fix → approve_fix → check_recovery` and left the incident **resolved,
+handled_by voice**, in 133 s. What remains unproven after that is one thing: whether
+Twilio dials.
