@@ -137,11 +137,22 @@ def check_barge_in(run: Run) -> list[str]:
 
 
 def check_hinglish(run: Run) -> list[str]:
+    """Hinglish all the way to the change, not just to the proposal.
+
+    This check used to stop at propose_fix. A live call then had its approval
+    transcribed as "अप्रूव फिक्स टू" and refused, because the phrase check stripped
+    every non-ASCII character before looking for the words -- a whole supported
+    language could not approve anything, and nothing here would have said so.
+    """
     bad = []
     if not run.heard:
         bad.append("nothing was transcribed")
     if not run.ran("propose_fix"):
         bad.append("'isko fix kar do' did not reach propose_fix")
+    if not run.ran("approve_fix"):
+        bad.append("the Hinglish approval never reached approve_fix")
+    elif not run.approvals:
+        bad.append("the Hinglish phrase was refused; nothing was applied")
     return bad
 
 

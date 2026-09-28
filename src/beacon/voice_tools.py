@@ -82,8 +82,64 @@ def _apply_enabled() -> bool:
     return os.environ.get("APPLY_ENABLED", "true").lower() != "false"
 
 
+# AssemblyAI transcribes a narrowband phone line multilingually, and an English
+# consent phrase spoken in an Indian accent can come back in Devanagari. A live call
+# to the deployed stack returned "अप्रूव फिक्स टू" for "approve fix two"; _normalise
+# stripped every non-ASCII character, leaving an empty string, and the phrase check
+# refused a correct approval. The engineer said the right words -- only the script
+# differed -- and Hinglish is a channel this agent claims to support.
+#
+# This maps the consent vocabulary alone: the words that can appear in a
+# confirmation phrase. The exact phrase must still be present after mapping, so an
+# unmapped spelling refuses exactly as it does today. It can turn a wrong refusal
+# into a correct acceptance; it cannot accept anything that is not the phrase.
+#
+# Hindi cardinals are deliberately absent. "दो" is both "two" and the imperative
+# "give" -- "इसको फिक्स कर दो" is *please fix this*, not an approval of fix 2 --
+# so only the English numerals as Devanagari renders them are mapped.
+_DEVANAGARI = {
+    "अप्रूव": "approve",
+    "एप्रूव": "approve",
+    "अप्प्रूव": "approve",
+    "फिक्स": "fix",
+    "फ़िक्स": "fix",
+    "वन": "one",
+    "टू": "two",
+    "थ्री": "three",
+    "फोर": "four",
+    "फ़ोर": "four",
+    "फाइव": "five",
+    "सिक्स": "six",
+    "सेवन": "seven",
+    "एट": "eight",
+    "नाइन": "nine",
+    "टेन": "ten",
+    "ग्रांट": "grant",
+    "ग्रान्ट": "grant",
+    "कॉन्ट्रैक्ट": "contract",
+    "कान्ट्रैक्ट": "contract",
+    "कॉन्ट्रेक्ट": "contract",
+    "फॉर": "for",
+    "डेज": "days",
+    "डेज़": "days",
+    "ओपन": "open",
+    "द": "the",
+    "पुल": "pull",
+    "रिक्वेस्ट": "request",
+    "अंडू": "undo",
+    "अन्डू": "undo",
+}
+_DEV_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
+# Devanagari full stop and the usual sentence punctuation, so "टू।" still matches.
+_EDGE = "।॥.,!?;:\"'()-—… "
+
+
 def _normalise(text: str) -> str:
-    words = re.sub(r"[^a-z0-9\s]", " ", text.lower()).split()
+    latin = " ".join(
+        _DEVANAGARI.get(word.strip(_EDGE), word)
+        for word in text.translate(_DEV_DIGITS).split()
+    )
+    words = re.sub(r"[^a-z0-9\s]", " ", latin.lower()).split()
     return " ".join(_NUMBER_WORDS.get(w, w) for w in words)
 
 

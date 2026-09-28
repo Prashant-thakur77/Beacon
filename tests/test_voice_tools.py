@@ -502,3 +502,42 @@ def test_a_drift_fix_is_not_flagged_as_a_last_resort(env: Any) -> None:
         out = voice_tools.propose_fix()
     assert out["action"] == "sg.restore_ingress" and out["is_last_resort"] is False
     assert "Read back blast_radius_spoken" in out["instruction"]
+
+
+def test_a_phrase_transcribed_in_devanagari_still_approves(env: Any) -> None:
+    """A live call to the deployed stack heard "approve fix two" as Devanagari.
+
+    AssemblyAI transcribes a narrowband line multilingually, and the phrase came
+    back as "अप्रूव फिक्स टू" with fix_id 2. _normalise stripped every non-ASCII
+    character to an empty string, so the check refused an approval the engineer had
+    correctly spoken -- on a channel whose Hinglish support is a documented feature.
+    """
+    with turn_context(_ctx(env["incident_id"], "can you fix it")):
+        voice_tools.propose_fix()
+    with turn_context(_ctx(env["incident_id"], "अप्रूव फिक्स वन")):
+        ok = voice_tools.approve_fix(1, "अप्रूव फिक्स वन")
+    assert ok["approved"] is True, "the engineer said the phrase; the script differed"
+    env["sfn"].assert_called_once()
+    record = approvals.get(
+        env["sfn"].call_args.args[0]["approval_id"], table_name=APPROVALS
+    )
+    assert record is not None
+    assert record["transcript_quote"] == "अप्रूव फिक्स वन", (
+        "the quote is what was said, not a normalised rewrite of it"
+    )
+
+
+def test_devanagari_agreement_is_still_not_consent(env: Any) -> None:
+    """The mapping covers the consent vocabulary; it must not turn Hindi into a yes.
+
+    "इसको फिक्स कर दो" is *please fix this*. Mapping Hindi cardinals would have read
+    its trailing "दो" as the number two, so only the English numerals as Devanagari
+    renders them are mapped.
+    """
+    with turn_context(_ctx(env["incident_id"], "can you fix it")):
+        voice_tools.propose_fix()
+    for line in ("इसको फिक्स कर दो।", "हाँ, कर दो", "ठीक है"):
+        with turn_context(_ctx(env["incident_id"], line)):
+            refused = voice_tools.approve_fix(2, "approve fix 2")
+        assert refused["approved"] is False, f"{line!r} approved a change"
+    env["sfn"].assert_not_called()

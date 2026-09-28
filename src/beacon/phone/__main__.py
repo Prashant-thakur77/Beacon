@@ -119,10 +119,14 @@ SCENARIOS: dict[str, list[dict[str, Any]]] = {
         {"text": "No, wait, stop.", "interrupt": True},
         {"text": "Approve fix {fix}."},
     ],
-    # The channel a phone actually gets used in.
+    # The channel a phone actually gets used in -- through to the approval, because
+    # stopping at propose_fix is how a live call came to have its Devanagari
+    # "अप्रूव फिक्स टू" refused with nothing in the suite to catch it.
     "hinglish": [
         {"text": "Kya hua hai?", "voice": HINGLISH_VOICE},
         {"text": "Isko fix kar do.", "voice": HINGLISH_VOICE},
+        {"text": "Approve fix {fix}.", "voice": HINGLISH_VOICE},
+        {"text": "Theek ho gaya?", "voice": HINGLISH_VOICE},
     ],
     # The take for the film: a person on a phone at 3 AM, not a test harness. Same
     # socket, same tools, same consent rules as every other scenario here — the
