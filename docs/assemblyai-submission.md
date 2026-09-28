@@ -24,6 +24,8 @@ It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. Eve
 
 **Four AssemblyAI products, four jobs.** The Voice Agent API is the live conversation. Pre-recorded transcription reads Telegram voice notes — with word-level confidence for the 85 % consent gate, and PII redaction, so what gets *written* to the approval row is redacted while consent is checked on the words as heard. Summarization closes the loop: the audit can summarise the session recording behind an approval, and that summary is printed in the postmortem as *the night in the engineer's words*. Dual-channel transcription makes the phone call's approval attributable to the human who gave it.
 
+**The gate refusing, on camera.** The strongest thirty seconds of the film were not planned. Asked to approve, the engineer's voice note was transcribed at 75% and refused; said again it came back at 74% and was refused again; they typed the phrase instead. Nothing reached production until the words were certain. That is the safety argument demonstrating itself on a live AWS account, and it is the reason the confidence number matters more here than the model does.
+
 **Tests that speak — including down a phone line.** `make phone-test` places five scripted calls on a fresh incident each, through the real Voice Agent API and the real tools, with the caller's lines degraded to telephone quality first. The caller says the fix number the agent actually proposed (a script hard-coding "one" is a refused approval, which looks exactly like a real bug), every call is checked against its own two-channel recording, and the keypad scenario never speaks the phrase at all — so anything applied in it was applied by a keypress. `make voice-test` runs six spoken scenarios through the Voice Agent API against the real tools — the exact phrase applies a fix, *"yes, do it"* does not, interrupting the read-back withdraws the proposal, Hinglish reaches the same tool, a contract needs the read-back and then the phrase, and an applied fix can be undone by phrase. Writing it found three real bugs.
 
 **Three behaviours the socket makes possible.** Speaking over a read-back withdraws the fix it was reading (barge-in with a safety meaning). If the socket drops after you said *approve*, nothing executes — execution is a Lambda call, never socket state (tested by aborting the socket mid-turn). And the night ends with a pull request produced by code from the parameters that passed the dry run.
@@ -99,7 +101,7 @@ video/script-assemblyai.md; the pipeline is in the repo.
 - Live console (passcode in the form): https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/
 - Repository (MIT, branch `assemblyai`): https://github.com/Prashant-thakur77/Beacon/tree/assemblyai
 - The pull request Beacon opened by voice: https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2
-- Film (4:21): *(YouTube link — upload `Beacon-AssemblyAI.mp4` from the release)* · direct download: https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4
+- Film (4:44): *(YouTube link — upload `Beacon-AssemblyAI.mp4` from the release)* · direct download: https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4
 - Deck (11 slides): https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-deck.pdf
 - Release with every artefact: https://github.com/Prashant-thakur77/Beacon/releases/tag/v0.6.0
 - Telegram bot: https://t.me/GoodNightShiftbot (allowlisted to the author; the film shows it)
@@ -113,10 +115,12 @@ Voice Agent API · Universal-3 Pro · pre-recorded transcription · dual-channel
 | Time | Content |
 |---|---|
 | 0:00–0:30 | The problem: 03:12, one-person rotation, the numbers |
-| 0:30–1:00 | Where the words go: three channels on one socket, and the phone call — two channels, the approval attributable to the human |
-| 1:00–2:45 | Live demo: page → Telegram voice note → read-back → barge-in withdraws the fix → *approve fix one* → verified → contract → *open the pull request* → the recording in the audit |
-| 2:45–4:00 | Business case: who it is for, market, revenue model, why it needed this generation of AI |
-| 4:00–4:21 | Built solo in ten days; what is next; the live URL and passcode |
+| 0:30–1:05 | Where the words go: three channels on one socket, and the phone call — two channels, the approval attributable to the human |
+| 1:05–1:50 | A real phone, filmed: the page lands, a voice note is heard at **98%**, and the CloudTrail entry that removed the rule |
+| 1:50–2:10 | **The approval refused at 75%, refused again at 74%, and typed instead** — the confidence gate, unscripted, on a live account |
+| 2:10–3:05 | The same night on a laptop: read-back → barge-in withdraws the fix → *approve fix one* → verified → contract → *open the pull request* → the recording in the audit |
+| 3:05–4:10 | Business case: who it is for, market, revenue model, why it needed this generation of AI |
+| 4:10–4:44 | Built solo in ten days; what is next; the live URL and passcode |
 
 ## Judge's 90 seconds
 
