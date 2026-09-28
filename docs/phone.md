@@ -109,6 +109,13 @@ who authorised what (channel 1 = caller, 2 = agent):
 A change whose phrase appears **only** on the agent's channel fails the check. That
 is the failure this exists to catch: the agent talking itself into a change.
 
+The search runs over each channel's text **joined**, not utterance by utterance. A
+transcriber may cut a channel wherever it likes, and on a real call it returned
+`"Approve"`, `"fix"`, `"one."` as three separate utterances — where a per-utterance
+regex finds nothing and reports, wrongly, that nobody authorised a change the caller
+had plainly authorised. What somebody said does not depend on where the transcript
+was chopped.
+
 ## Running it
 
 ### A call with no carrier

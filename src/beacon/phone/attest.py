@@ -90,26 +90,40 @@ def phrase_confidence(
     return best
 
 
+def _by_channel(utterances: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for utterance in utterances:
+        grouped.setdefault(str(utterance.get("channel") or ""), []).append(utterance)
+    return grouped
+
+
 def attribute(utterances: list[dict[str, Any]]) -> dict[str, Any]:
     """Split a dual-channel transcript into who said what, and find the phrases.
 
     ``utterances`` is what ``aai.transcribe_call`` returns. Channels are named as
     AssemblyAI names them for a two-channel file: ``"1"`` is the left channel, which
     the bridge records the caller on.
+
+    The search runs over each channel's text **joined**, not utterance by utterance.
+    A transcriber is free to cut a channel wherever it likes, and on a real call it
+    returned ``"Approve"``, ``"fix"``, ``"one."`` as three separate utterances — a
+    per-utterance regex finds nothing there and reports, wrongly, that nobody
+    authorised the change. What the caller said does not depend on where the
+    transcript was chopped.
     """
     found: dict[str, list[dict[str, Any]]] = {}
-    for utterance in utterances:
-        channel = str(utterance.get("channel") or "")
-        text = _norm(str(utterance.get("text") or ""))
+    for channel, group in _by_channel(utterances).items():
+        joined = _norm(" ".join(str(u.get("text") or "") for u in group))
+        starts = [u.get("start") for u in group if u.get("start") is not None]
         for tool, pattern in CONSENT_PATTERNS.items():
-            for match in pattern.finditer(text):
+            for match in pattern.finditer(joined):
                 found.setdefault(tool, []).append(
                     {
                         "channel": channel,
                         "who": "caller" if channel == CALLER_CHANNEL else "agent",
                         "said": match.group(0),
-                        "start_ms": utterance.get("start"),
-                        "confidence": utterance.get("confidence"),
+                        "start_ms": starts[0] if starts else None,
+                        "confidence": None,
                     }
                 )
     return {
@@ -161,9 +175,12 @@ def voices_around(
         None,
     )
     if anchor is None:
-        pattern = re.compile(r"\s+".join(map(re.escape, _words_of(phrase))), re.I)
+        # The phrase may be spread across several utterances, because a transcriber
+        # can cut a channel wherever it likes -- on a real call this channel came
+        # back as "Approve", "fix", "one." Anchor on its first word instead.
+        head = (_words_of(phrase) or [""])[0]
         anchor = next(
-            (u for u in mine if pattern.search(_norm(str(u.get("text") or "")))), None
+            (u for u in mine if head in _words_of(str(u.get("text") or ""))), None
         )
     if anchor is None:
         return {

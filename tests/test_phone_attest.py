@@ -78,3 +78,34 @@ def test_a_contract_granted_by_the_caller_is_attributed_with_its_own_phrase() ->
     verdict = attest.verify(READ_BACK_THEN_APPROVAL, ["grant_sleep_contract"])
     check = verdict["checks"][0]
     assert check["ok"] and check["quote"] == "Grant contract for seven days"
+
+
+def test_a_phrase_split_across_utterances_is_still_found() -> None:
+    """A transcriber may cut a channel anywhere, and on a real call it did.
+
+    The caller's channel came back as "Approve", "fix", "one." — three separate
+    utterances — and a per-utterance search reported that nobody had authorised a
+    change that the caller had plainly authorised.
+    """
+    chopped = [
+        utterance("2", "Say exactly: approve fix one.", 1000),
+        utterance("1", "Approve", 5000),
+        utterance("1", "fix", 5400),
+        utterance("1", "one.", 5800),
+    ]
+    verdict = attest.verify(chopped, ["approve_fix"])
+    assert verdict["ok"], verdict["problems"]
+    check = verdict["checks"][0]
+    assert check["caller_occurrences"] == 1
+    assert check["agent_occurrences"] == 1, "the read-back is still attributed"
+
+
+def test_the_one_voice_check_survives_a_split_phrase_too() -> None:
+    chopped = [
+        utterance("1", "Approve", 5000),
+        utterance("1", "fix one.", 5400),
+    ]
+    for u in chopped:
+        u["speaker"] = "1A"
+    found = attest.voices_around(chopped, "Approve fix one")
+    assert found["ok"] is True and found["voices"] == ["1A"]
