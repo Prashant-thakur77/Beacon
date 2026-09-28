@@ -367,7 +367,7 @@ ranked: destructive verbs first · Beacon's own writes tagged</pre></div>
   <div class="center" style="gap:50px">
     <div class="kicker fade d1">Built solo, in ten days</div>
     <div class="next-grid">
-      <div class="col fade d2"><div class="h">Shipped</div><div class="b"><b>156</b> commits<br/><b>371</b> tests<br/><b>3</b> channels, one socket<br/><span class="dimx">live URL, open during judging</span></div></div>
+      <div class="col fade d2"><div class="h">Shipped</div><div class="b"><b>173</b> commits<br/><b>405</b> tests<br/><b>3</b> channels, one socket<br/><span class="dimx">live URL, open during judging</span></div></div>
       <div class="col fade d3"><div class="h">Proven, not claimed</div><div class="b">socket killed mid-approval &rarr; <b>nothing ran</b><br/>barge-in &rarr; <b>fix withdrawn</b><br/>a keypress &rarr; <b>never consent</b><br/><span class="dimx">each one is a test or a spoken run</span></div></div>
       <div class="col fade d4"><div class="h">Next</div><div class="b">WhatsApp as the fourth channel<br/>a carrier number, always on<br/>contract policies for teams<br/><span class="dimx">a second cloud</span></div></div>
     </div>
@@ -410,19 +410,18 @@ ranked: destructive verbs first · Beacon's own writes tagged</pre></div>
 
 
 <section class="scene" id="voicetest">
-  <div class="center" style="gap:34px">
+  <div class="center" style="gap:30px">
     <div class="kicker fade d1">Tests that speak</div>
     <h2 class="display fade d1" style="font-size:52px;margin-bottom:6px">Real audio · the Voice Agent API · the real tools</h2>
     <div class="vt">
-      <div class="row3 fade" style="animation-delay:0.35s"><span class="nm">approve</span><span class="ds">the exact phrase applies the fix and the verify loop starts</span><span class="ok">propose_fix → approve_fix</span></div>
-      <div class="row3 fade" style="animation-delay:0.63s"><span class="nm">wrong_phrase</span><span class="ds"><b>“yes, do it”</b> changes nothing — agreement is not consent</span><span class="ok">propose_fix only</span></div>
-      <div class="row3 fade" style="animation-delay:0.91s"><span class="nm">barge_in</span><span class="ds">speaking over the read-back <b>withdraws</b> the proposal</span><span class="ok">cancel_proposal</span></div>
-      <div class="row3 fade" style="animation-delay:1.19s"><span class="nm">hinglish</span><span class="ds"><b>“isko fix kar do”</b> reaches the same tool as “fix it”</span><span class="ok">propose_fix</span></div>
-      <div class="row3 fade" style="animation-delay:1.47s"><span class="nm">contract</span><span class="ds">a Sleep Contract needs the read-back <b>and then</b> the phrase</span><span class="ok">grant ×2</span></div>
-      <div class="row3 fade" style="animation-delay:1.75s"><span class="nm">undo</span><span class="ds">an applied fix can be reversed by phrase</span><span class="ok">undo_fix</span></div>
-      <div class="row3 fade" style="animation-delay:2.03s"><span class="nm">keypad</span><span class="ds">on a phone, <b>a keypress</b> may acknowledge — it may never approve</span><span class="ok">no consent tool</span></div>
+      <div class="row3 fade" style="animation-delay:0.35s"><span class="nm">approve</span><span class="ds">the exact phrase applies the fix and the verify loop starts</span><span class="ok">approve_fix</span></div>
+      <div class="row3 fade" style="animation-delay:0.60s"><span class="nm">wrong_phrase</span><span class="ds"><b>“yes, do it”</b> changes nothing — agreement is not consent</span><span class="ok">propose only</span></div>
+      <div class="row3 fade" style="animation-delay:0.85s"><span class="nm">barge_in</span><span class="ds">speaking over the read-back <b>withdraws</b> the proposal</span><span class="ok">cancel_proposal</span></div>
+      <div class="row3 fade" style="animation-delay:1.10s"><span class="nm">hinglish</span><span class="ds"><b>“isko fix kar do”</b> reaches the same tool</span><span class="ok">propose_fix</span></div>
+      <div class="row3 fade" style="animation-delay:1.35s"><span class="nm">keypad</span><span class="ds">on a phone, <b>a keypress</b> may acknowledge — it may never approve</span><span class="ok">no consent tool</span></div>
     </div>
-    <div class="assume fade" style="animation-delay:2.6s">make voice-test · make phone-test · each scenario speaks, then asserts on what was heard, which tools ran and how the incident ended · the right column is what must happen</div>
+    <div class="assume fade" style="animation-delay:1.9s;max-width:1480px"><b>5 of 5 down a telephone line</b>, at 8&nbsp;kHz, through the real API — plus six more in the browser. Each one speaks, then asserts on what was heard, which tools ran, and how the incident ended.</div>
+    <div class="assume fade" style="animation-delay:2.2s;max-width:1480px">It went 2/5 to 5/5 in an afternoon. Every step was a fault it found: two in the test harness that looked exactly like the product, and two in the product — a key-term list that primed the wrong fix number, and an attestation that could not read a phrase the transcriber had split into three.</div>
   </div>
 </section>
 
