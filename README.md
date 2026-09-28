@@ -89,35 +89,6 @@ CloudWatch alarm fires ──▶ Lambda (Nova 2 Lite on Bedrock)   RCA + change 
 
 The second incident under a contract runs the same loop with `source: contract` and sends the *"you were not woken"* email instead of a page.
 
-## Architecture
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-voice.png" />
-  <img src="docs/assets/architecture-voice-light.png" alt="The voice path: three channels on one socket, consent decided in code, and what may change production" />
-</picture>
-
-Three planes, and the middle one is the product: **the model decides whether to call a tool; code decides whether the call is allowed.** A full description is in [docs/architecture.md](docs/architecture.md); the safety argument is in [docs/safety.md](docs/safety.md).
-
-## Where AWS fits
-
-| Service / AWS open source | Role | Where |
-|---|---|---|
-| **Amazon Bedrock — Nova 2 Lite** | root-cause analysis; the voice agent's reasoning | `triage.py`, `voice_turn.py` |
-| **Amazon Bedrock — Nova 2 Multimodal Embeddings** | semantic log reduction via Cordon | `analyzer.py` |
-| **Strands Agents SDK** (AWS OSS) | the tool-calling voice agent | `voice_turn.py`, `voice_tools.py` |
-| **Powertools for AWS Lambda** (AWS OSS) | Function URL routing, tracing | `voice_turn.py`, `dashboard_api.py` |
-| **AWS Step Functions** | the verified remediation loop | `remediation-template.yaml`, `remediate.py` |
-| **AWS CloudTrail → Amazon EventBridge** | change ledger: what changed before the alarm | `changes.py` |
-| **Amazon Transcribe** (streaming) | speech to text in the browser, STS-scoped creds | `web/src/voice/transcribe.ts` |
-| **Amazon Polly** | Beacon's voice, sentence speech marks for UI sync | `voice_turn.py` |
-| **AWS Lambda** + Function URLs | triage, voice turn, remediate, change ledger, dashboard | all five functions |
-| **Amazon DynamoDB** | incidents, approvals, contracts (TTL), change ledger, idempotency | `store.py`, `approvals.py`, `contracts.py` |
-| **Amazon SNS** | pages, "not woken" emails, resolved / escalated | `notifier.py`, `remediate.py` |
-| **Amazon S3 + CloudFront** (or a Lambda Function URL proxy while a new account is under verification) | the Night Board console over HTTPS | `console-template.yaml`, `static_site.py` |
-| **Amazon CloudWatch** (alarms, metrics, logs) | the trigger and the verification oracle | `events.py`, `remediation/verify.py` |
-| **Amazon EC2 / ECS / RDS** | the patient: a real Fargate app behind a security group | `demo/` |
-| **AWS IAM** | two roles, one direction (see Safety) | all three templates |
-
 ## Built on AssemblyAI — the transcript *is* the authorisation
 
 Beacon is not a voice interface bolted onto a tool. **The words are the artifact a change to production is justified by**, afterwards, to somebody who was not in the room — and every property of that artifact comes from AssemblyAI:
@@ -148,19 +119,6 @@ The console's default voice path is the Voice Agent API; the AWS cascade (Transc
 | Temporary tokens (`GET /v1/token`) | The browser never sees the API key; the Lambda mints a 10-minute token per session. | `voice_turn.py` (`POST /assemblyai/token`) |
 
 Three behaviours the socket makes possible, each with a test or a harness run behind it: **barge-in withdraws the fix** (`cancel_proposal`, the interrupted read-back cannot be approved), **drop-safety** (an approval spoken before the socket dies never executes — execution is a Lambda call after `tool.call`, never socket state), and **the night ends with a pull request** (`open the pull request` → `open_fix_pr` restores the rule in the CloudFormation template and files the postmortem; nothing is merged). Details and measured latencies: [docs/assemblyai.md](docs/assemblyai.md); the plan: [docs/assemblyai-roadmap.md](docs/assemblyai-roadmap.md); Telegram: [docs/telegram.md](docs/telegram.md); the PR: [docs/fix-at-source.md](docs/fix-at-source.md).
-
-## Two faults, three actions, one allowlist
-
-Beacon answers two kinds of night, and refuses the rest:
-
-| What is wrong | How it is found | What it proposes |
-|---|---|---|
-| A security-group rule vanished | golden-snapshot drift + the CloudTrail change that took it | `sg.restore_ingress` with the exact ids — a diagnosis |
-| A service is short of tasks, or its deployment failed | `describe-services` against the remediable allowlist | `ecs.force_redeploy` with the reason |
-| Nothing explains the alarm, one service is restartable | everything else came back clean | a **last-resort restart**, and it says so: *"a remedy, not a diagnosis"* |
-| Anything else | — | nothing. It escalates to a human and says why |
-
-Each proposal is dry-run under the executor role, gated on your spoken phrase, and verified afterwards — with a **budget that fits the action**: a restored rule proves itself in a minute, a replaced task gets eight. That last number came from a live run where Beacon escalated a restart that had actually worked.
 
 ## Tests that speak
 
@@ -193,13 +151,27 @@ scenario's incident**, with no phrase and nobody woken, exactly as designed. Fiv
 pass on a given run; the one that flakes is almost always a misheard line, not the agent. Details,
 including what it is *not*: [docs/voice-testing.md](docs/voice-testing.md).
 
-## Who it is for, and what it is worth
+## Architecture
 
-**A backend engineer on a team of one to five, running production on AWS for users in another time zone** — a four-person startup in Bengaluru serving New York, the single DevOps hire at a 30-person SaaS. No follow-the-sun rotation, no second shift, a handful of faults that keep repeating.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-voice.png" />
+  <img src="docs/assets/architecture-voice-light.png" alt="The voice path: three channels on one socket, consent decided in code, and what may change production" />
+</picture>
 
-Industry MTTR is **53 minutes** and has improved 12 % in five years against a tripling of monitoring spend; **74 %** of DevOps engineers report burnout, with on-call load the leading indicator. On the live account a real alarm reaches a **verified** recovery in **2.4–5.5 minutes** without a laptop being opened — and under a Sleep Contract the repeat fault is fixed with **nobody woken**.
+Three planes, and the middle one is the product: **the model decides whether to call a tool; code decides whether the call is allowed.** A full description is in [docs/architecture.md](docs/architecture.md); the safety argument is in [docs/safety.md](docs/safety.md).
 
-Market, pricing and the reason this needed this generation of models: [docs/business-case.md](docs/business-case.md).
+## Two faults, three actions, one allowlist
+
+Beacon answers two kinds of night, and refuses the rest:
+
+| What is wrong | How it is found | What it proposes |
+|---|---|---|
+| A security-group rule vanished | golden-snapshot drift + the CloudTrail change that took it | `sg.restore_ingress` with the exact ids — a diagnosis |
+| A service is short of tasks, or its deployment failed | `describe-services` against the remediable allowlist | `ecs.force_redeploy` with the reason |
+| Nothing explains the alarm, one service is restartable | everything else came back clean | a **last-resort restart**, and it says so: *"a remedy, not a diagnosis"* |
+| Anything else | — | nothing. It escalates to a human and says why |
+
+Each proposal is dry-run under the executor role, gated on your spoken phrase, and verified afterwards — with a **budget that fits the action**: a restored rule proves itself in a minute, a replaced task gets eight. That last number came from a live run where Beacon escalated a restart that had actually worked.
 
 ## Safety model (the part that matters)
 
@@ -220,6 +192,44 @@ Auto-remediation is only worth shipping if it cannot do the wrong thing. Beacon'
 12. **One switch stops every write path.** `make apply-off` sets `APPLY_ENABLED=false` on the triage, voice and remediate functions.
 
 Details: [`docs/safety.md`](docs/safety.md).
+
+## Who it is for, and what it is worth
+
+**A backend engineer on a team of one to five, running production on AWS for users in another time zone** — a four-person startup in Bengaluru serving New York, the single DevOps hire at a 30-person SaaS. No follow-the-sun rotation, no second shift, a handful of faults that keep repeating.
+
+Industry MTTR is **53 minutes** and has improved 12 % in five years against a tripling of monitoring spend; **74 %** of DevOps engineers report burnout, with on-call load the leading indicator. On the live account a real alarm reaches a **verified** recovery in **2.4–5.5 minutes** without a laptop being opened — and under a Sleep Contract the repeat fault is fixed with **nobody woken**.
+
+**What it is worth, bottom up.** $29 per responder per month; **$2 per verified remediation**, charged only when a fix was applied *and* CloudWatch agreed, so noisy alerts earn us nothing; $15k/year self-hosted inside the customer's own account. TAM $4.8 B incident management → $12.99 B by 2035; SOM ≈ $125 M/yr on ~120k small AWS teams. Sources and assumptions: [docs/business-case.md](docs/business-case.md).
+
+### Why this could not have been built two years ago
+
+Not "an LLM got better at writing prose". Three specific things had to become true, and all three are properties of the speech layer rather than the model:
+
+1. **Consent has to rest on words somebody actually said** — half asleep, in two languages, down a bad line — and be *checkable afterwards*. That needs a transcript with per-word confidence, channel attribution and a recording, not a chat log.
+2. **An interruption has to be an event the application can act on.** Speaking over a read-back does not merely stop the audio here; it withdraws the fix, and the phrase stops working until it is proposed again. That is only possible when the transport tells you a reply was interrupted.
+3. **Tools have to be callable mid-sentence**, while the answer is still being spoken, or a 3 AM conversation becomes a sequence of forms.
+
+Take those away and you do not get a worse Beacon. You get a chatbot that cannot be trusted with a credential.
+
+## Where AWS fits
+
+| Service / AWS open source | Role | Where |
+|---|---|---|
+| **Amazon Bedrock — Nova 2 Lite** | root-cause analysis; the voice agent's reasoning | `triage.py`, `voice_turn.py` |
+| **Amazon Bedrock — Nova 2 Multimodal Embeddings** | semantic log reduction via Cordon | `analyzer.py` |
+| **Strands Agents SDK** (AWS OSS) | the tool-calling voice agent | `voice_turn.py`, `voice_tools.py` |
+| **Powertools for AWS Lambda** (AWS OSS) | Function URL routing, tracing | `voice_turn.py`, `dashboard_api.py` |
+| **AWS Step Functions** | the verified remediation loop | `remediation-template.yaml`, `remediate.py` |
+| **AWS CloudTrail → Amazon EventBridge** | change ledger: what changed before the alarm | `changes.py` |
+| **Amazon Transcribe** (streaming) | speech to text in the browser, STS-scoped creds | `web/src/voice/transcribe.ts` |
+| **Amazon Polly** | Beacon's voice, sentence speech marks for UI sync | `voice_turn.py` |
+| **AWS Lambda** + Function URLs | triage, voice turn, remediate, change ledger, dashboard | all five functions |
+| **Amazon DynamoDB** | incidents, approvals, contracts (TTL), change ledger, idempotency | `store.py`, `approvals.py`, `contracts.py` |
+| **Amazon SNS** | pages, "not woken" emails, resolved / escalated | `notifier.py`, `remediate.py` |
+| **Amazon S3 + CloudFront** (or a Lambda Function URL proxy while a new account is under verification) | the Night Board console over HTTPS | `console-template.yaml`, `static_site.py` |
+| **Amazon CloudWatch** (alarms, metrics, logs) | the trigger and the verification oracle | `events.py`, `remediation/verify.py` |
+| **Amazon EC2 / ECS / RDS** | the patient: a real Fargate app behind a security group | `demo/` |
+| **AWS IAM** | two roles, one direction (see Safety) | all three templates |
 
 ## Run it
 

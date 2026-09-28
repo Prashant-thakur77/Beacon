@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.6.0 — 28 Sep 2026 (the phone, and the transcript as the authorisation)
+
+Added
+- **A phone channel** (`src/beacon/phone/`). A telephone call is bridged into the *same* AssemblyAI Voice Agent socket the console uses — same nine tools, same consent rules. The API takes G.711 µ-law natively (`audio/pcmu`) and a phone line is µ-law already, so the audio is forwarded **untouched in both directions**: no resampling, no transcoding. The bridge holds no IAM role, touches no table and decides nothing; every `tool.call` becomes `POST /tools/<name>` on the voice Lambda, because a new channel must not become a new way around the rules. Write-up: `docs/phone.md`.
+- **Two rules the phone adds.** A keypress can acknowledge, re-brief, repeat or hang up; it can never approve, and pressing anything else makes the agent say so — an approval has to be words somebody can be held to. And only the caller's audio is ever streamed to the transcriber, so the transcript the consent check reads cannot contain the agent reading a phrase back to itself.
+- **Consent certificates** (`certificate.py`). Every applied change ships one artifact answering *why was this allowed*: the phrase, how clearly it was heard and **whether that number gated the change or only reviewed it**, which allowlisted action it authorised, the parameters that passed a dry run, the CloudWatch checks that had to agree, the CloudTrail entry that caused the fault, and a link to play the words back. Printed into the pull request ahead of the diff. Its digest detects an edited certificate and is **not** a signature.
+- **Word-level confidence on every channel** (`aai.audit_session`, `POST /sessions/<id>/attest`). A live turn carries no confidence — `transcript.user` has text and no number — so a browser or phone approval was applied without one while a Telegram voice note had to clear 85 %. AssemblyAI now re-transcribes its own recording afterwards and scores each phrase by its **weakest word**. A poor score is flagged, not undone: by then the fix is applied and verified, and waiting a minute for a transcript before touching production would be the wrong trade at 3 AM.
+- **One voice, not two.** `dual_channel` and `speaker_labels` can be requested together — verified, not assumed — and the speaker comes back as channel-then-speaker (`1A`, `2A`), so a second person on the caller's side arrives as `1B`. A second voice near the approval is flagged rather than treated as a forgery. A browser session cannot be checked this way at all, and the certificate says nothing rather than guessing.
+- **One brief for every channel** (`voice_brief.py`, `GET /brief/<id>`), with a test pinning the console's fallback copy to the served text — three channels opening sessions from three copies of one prompt is a drift waiting to happen.
+- `make phone-test`: five scripted calls at telephone quality through the real Voice Agent API, each leaving a two-channel WAV and a verdict on which channel the approval came from. `scripts/twilio_probe.py` proves the carrier side without a carrier.
+- `tests/test_claims.py`: the README's claims checked against the code — tool count, allowlist size (and that it is stated correctly in the console too), one confidence bar, release links, and that the retired transcoding claim cannot come back.
+
+Fixed
+- **The agent ignored its own approval rule.** A real recording caught it hearing *"Approve fix 3"* and answering that the fix needs the spoken phrase. The prompt now says that if the words contain "approve fix" and a number, `approve_fix` must be called before the agent says anything — and that the tool decides whether the phrase counts, not the model.
+- **Key terms primed the wrong phrase.** They listed `approve fix one` and `approve fix two` and stopped, while proposals are numbered per incident — so an incident on its eighth attempt asked for *"approve fix eight"* with the transcriber primed for neither.
+- **The attestation could not read a split phrase.** A transcriber returned `"Approve"`, `"fix"`, `"one."` as three utterances and the per-utterance search reported that nobody had authorised a change the caller had plainly authorised. It searches each channel's text joined now.
+- **"Two allowlisted actions"** in the console FAQ and the README safety list, when the IAM policy grants three. Now test-locked.
+- The console reported a version hard-coded in a CloudFormation template, so it announced 0.5.0 while the Lambda beside it — from the same image — announced 0.6.0.
+
 ## v0.5.0 — 28 Sep 2026 (the core answers a second fault)
 
 Added
