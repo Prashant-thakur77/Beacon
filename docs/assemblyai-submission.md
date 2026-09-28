@@ -107,7 +107,7 @@ video/script-assemblyai.md; the pipeline is in the repo.
 - Live console (passcode in the form): https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/
 - Repository (MIT, branch `assemblyai`): https://github.com/Prashant-thakur77/Beacon/tree/assemblyai
 - The pull request Beacon opened by voice: https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2
-- Film (4:44): *(YouTube link — upload `Beacon-AssemblyAI.mp4` from the release)* · direct download: https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4
+- Film (4:46): *(YouTube link — upload `Beacon-AssemblyAI.mp4` from the release)* · direct download: https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4
 - Deck (11 slides): https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-deck.pdf
 - Release with every artefact: https://github.com/Prashant-thakur77/Beacon/releases/tag/v0.6.0
 - Telegram bot: https://t.me/GoodNightShiftbot (allowlisted to the author; the film shows it)
@@ -126,7 +126,7 @@ Voice Agent API · Universal-3 Pro · pre-recorded transcription · dual-channel
 | 1:50–2:10 | **The approval refused at 75%, refused again at 74%, and typed instead** — the confidence gate, unscripted, on a live account |
 | 2:10–3:05 | The same night on a laptop: read-back → barge-in withdraws the fix → *approve fix one* → verified → contract → *open the pull request* → the recording in the audit |
 | 3:05–4:10 | Business case: who it is for, market, revenue model, why it needed this generation of AI |
-| 4:10–4:44 | Built solo in ten days; what is next; the live URL and passcode |
+| 4:10–4:46 | Built solo in ten days; what is next; the live URL and passcode |
 
 ## Judge's 90 seconds
 

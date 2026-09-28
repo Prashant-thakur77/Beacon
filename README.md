@@ -10,7 +10,7 @@
 [![Python](https://img.shields.io/badge/python-3.12-3776ab)](pyproject.toml)
 [![Built on AWS](https://img.shields.io/badge/built%20on-AWS-ff9900)](docs/architecture.md)
 
-**Live console:** https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/ · **Film (4:44):** [download](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4) · **Deck:** [PDF](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-deck.pdf) · **Architecture:** [the voice path](#architecture) · **Business case:** [docs/business-case.md](docs/business-case.md) · **Built on AssemblyAI:** [the transcript is the authorisation](#built-on-assemblyai--the-transcript-is-the-authorisation) · **Try it locally, no AWS:** `make setup && make local`
+**Live console:** https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/ · **Film (4:46):** [download](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4) · **Deck:** [PDF](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-deck.pdf) · **Architecture:** [the voice path](#architecture) · **Business case:** [docs/business-case.md](docs/business-case.md) · **Built on AssemblyAI:** [the transcript is the authorisation](#built-on-assemblyai--the-transcript-is-the-authorisation) · **Try it locally, no AWS:** `make setup && make local`
 
 It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. You need four answers — *is it real, what changed, what do I do, can I go back to sleep* — and today's tools answer, at most, the first one.
 
