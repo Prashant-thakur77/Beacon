@@ -64,6 +64,8 @@ LAMBDA_ARCH := $(if $(filter arm64,$(HOST_ARCH)),arm64,x86_64)
 # new URI on every code change (a ':latest' URI never redeploys the Lambda)
 # while docs-only commits do not invalidate a built image.
 IMAGE_TAG ?= $(shell bash scripts/image_tag.sh)
+# The single source of truth for the version the console reports.
+BEACON_VERSION ?= $(shell sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)
 
 # Persist KEY=VALUE into .beacon.env (upsert) so the next make run remembers it.
 define save_env
@@ -538,6 +540,7 @@ deploy-console: web-build
 		--region $(REGION) \
 		--capabilities CAPABILITY_NAMED_IAM \
 		--parameter-overrides BaseStackName=$(STACK_NAME) AgentImageUri=$(AGENT_IMAGE_URI) \
+			BeaconVersion=$(BEACON_VERSION) \
 			LambdaArchitecture=$(LAMBDA_ARCH) RemediateFunctionArn=$$REMEDIATE_ARN Passcode=$(PASSCODE) \
 			SnsTopicArn=$$SNS_ARN UseCloudFront=$(USE_CLOUDFRONT) $(CHANNELS) \
 			PollyVoiceId=$(POLLY_VOICE_ID) SttLanguage=$(STT_LANGUAGE) VoiceEngine=$(VOICE_ENGINE) \
@@ -807,10 +810,17 @@ phone-test:
 
 # Answer real calls. Needs TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM_NUMBER
 # and a public https URL that reaches PORT (Twilio requires wss://).
+# The voice Lambda's Function URL is a stack output, not something to paste; an
+# empty --base-url would send every tool call nowhere, quietly.
 phone-serve:
 	$(call check_param,PUBLIC_URL)
-	$(PYTHON) -m beacon.phone serve --base-url $(VOICE_URL) --passcode $(PASSCODE) \
-	    --public-url $(PUBLIC_URL) --recordings $(PHONE_OUT)
+	$(call check_param,PASSCODE)
+	@VOICE_URL=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
+		--query 'Stacks[0].Outputs[?OutputKey==`VoiceTurnUrl`].OutputValue' --output text) && \
+	  [ -n "$$VOICE_URL" ] || { echo "no VoiceTurnUrl output on $(CONSOLE_STACK); deploy the console first" >&2; exit 1; } && \
+	  echo "==> voice Lambda: $$VOICE_URL" && \
+	  $(PYTHON) -m beacon.phone serve --base-url "$${VOICE_URL%/}" --passcode $(PASSCODE) \
+	    --public-url $(PUBLIC_URL) --recordings $(PHONE_OUT) $(if $(INCIDENT),--incident $(INCIDENT),)
 
 lint:
 	ruff check src/ tests/
