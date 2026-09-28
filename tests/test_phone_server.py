@@ -14,23 +14,6 @@ from typing import Any
 from beacon.phone.server import PhoneService
 
 
-class FakeConnection:
-    """websockets' connection object, as far as `process_request` uses it."""
-
-    def __init__(self) -> None:
-        self.status: int | None = None
-        self.body = ""
-
-    def respond(self, status: int, body: str) -> tuple[int, str]:
-        self.status, self.body = status, body
-        return status, body
-
-
-class FakeRequest:
-    def __init__(self, path: str) -> None:
-        self.path = path
-
-
 def service(**kw: Any) -> PhoneService:
     return PhoneService(
         base_url="http://voice.invalid",
@@ -40,17 +23,8 @@ def service(**kw: Any) -> PhoneService:
     )
 
 
-def twiml_for(svc: PhoneService) -> str:
-    conn = FakeConnection()
-    svc.process_request(conn, FakeRequest("/twiml"))
-    assert conn.status == 200
-    return conn.body
-
-
-def test_the_media_path_is_left_alone_so_the_socket_can_upgrade() -> None:
-    conn = FakeConnection()
-    assert service().process_request(conn, FakeRequest("/media")) is None
-    assert conn.status is None
+def twiml_for(svc: PhoneService, host: str = "", proto: str = "https") -> str:
+    return svc.twiml_document(host, proto)
 
 
 def test_the_webhook_hands_back_a_wss_stream_on_the_public_host() -> None:
@@ -58,6 +32,22 @@ def test_the_webhook_hands_back_a_wss_stream_on_the_public_host() -> None:
     body = twiml_for(service(default_incident="inc-1"))
     assert 'url="wss://beacon.example/media"' in body
     assert 'name="incident_id" value="inc-1"' in body
+
+
+def test_the_stream_host_comes_from_the_request_the_carrier_actually_made() -> None:
+    """A tunnel gets a new hostname on every restart; being told one at startup
+    fails silently — the call connects and the stream goes nowhere."""
+    svc = service(default_incident="inc-1")
+    body = twiml_for(svc, host="abc-def.trycloudflare.com")
+    assert 'url="wss://abc-def.trycloudflare.com/media"' in body
+    assert "beacon.example" not in body
+
+
+def test_a_plain_http_forwarder_gets_ws_not_wss() -> None:
+    svc = service(default_incident="inc-1")
+    assert 'url="ws://localhost:8080/media"' in twiml_for(
+        svc, host="localhost:8080", proto="http"
+    )
 
 
 def test_a_pinned_incident_is_used_without_asking_anybody() -> None:
@@ -119,15 +109,13 @@ def test_a_quiet_night_says_so_instead_of_opening_a_silent_line(
     assert "<Stream" not in body
 
 
-def test_health_reports_how_many_calls_have_been_taken() -> None:
-    conn = FakeConnection()
-    svc = service()
-    svc.calls.append({"incident_id": "inc-1"})
-    svc.process_request(conn, FakeRequest("/health"))
-    assert json.loads(conn.body) == {"ok": True, "calls": 1}
+def test_the_routes_the_carrier_needs_are_all_served_on_one_port() -> None:
+    """Twilio fetches the TwiML with POST, so the webhook must accept any method."""
+    import inspect
 
+    from beacon.phone import server as mod
 
-def test_anything_else_is_a_404_not_a_stream() -> None:
-    conn = FakeConnection()
-    service().process_request(conn, FakeRequest("/wp-login.php"))
-    assert conn.status == 404
+    source = inspect.getsource(mod.serve)
+    assert 'add_route("*", twilio.TWIML_PATH' in source, "the webhook must take POST"
+    assert 'request.method == "POST"' in source, "the form body must be read"
+    assert "add_get(twilio.MEDIA_PATH" in source

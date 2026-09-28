@@ -31,6 +31,7 @@ import base64
 import json
 import logging
 import os
+import urllib.error
 import urllib.parse
 import urllib.request
 from typing import TYPE_CHECKING, Any
@@ -45,20 +46,28 @@ MEDIA_PATH = "/media"
 API = "https://api.twilio.com/2010-04-01"
 
 
-def twiml(stream_url: str, *, incident_id: str = "") -> str:
+def twiml(stream_url: str, *, incident_id: str = "", say: str = "") -> str:
     """Tell Twilio to hand us the call's audio, in both directions.
 
     ``<Connect><Stream>`` is the bidirectional form; ``<Start><Stream>`` would only
     give us a copy of the caller, which cannot answer them.
+
+    ``say`` speaks one line before the stream opens. It costs a second and earns
+    two things: the caller knows the line is alive while the socket and the agent
+    session come up, and when something is wrong it separates "Twilio never ran our
+    TwiML" from "Twilio ran it and would not open the stream" — which otherwise look
+    identical from here, because neither reaches our log.
     """
     params = (
         f'\n      <Parameter name="incident_id" value="{incident_id}" />'
         if incident_id
         else ""
     )
+    spoken = f"  <Say>{say}</Say>\n" if say else ""
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         "<Response>\n"
+        f"{spoken}"
         "  <Connect>\n"
         f'    <Stream url="{stream_url}">{params}\n'
         "    </Stream>\n"
@@ -157,6 +166,10 @@ def place_call(to: str, twiml_url: str) -> str:
     engineer can simply call Beacon back.
     """
     sid, token, number = _auth()
+    # No `Method` here on purpose. Twilio fetches the TwiML with POST, which is
+    # fine — `beacon.phone.server` serves the webhook with aiohttp and reads the
+    # form body. Asking for GET would be refused anyway: a trial account may not
+    # set that parameter ("trial accounts have limited parameter access").
     body = urllib.parse.urlencode({"To": to, "From": number, "Url": twiml_url}).encode()
     req = urllib.request.Request(
         f"{API}/Accounts/{sid}/Calls.json", data=body, method="POST"
@@ -164,5 +177,14 @@ def place_call(to: str, twiml_url: str) -> str:
     basic = base64.b64encode(f"{sid}:{token}".encode()).decode()
     req.add_header("Authorization", f"Basic {basic}")
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    with urllib.request.urlopen(req, timeout=20) as resp:  # noqa: S310
-        return str(json.loads(resp.read().decode()).get("sid") or "")
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:  # noqa: S310
+            return str(json.loads(resp.read().decode()).get("sid") or "")
+    except urllib.error.HTTPError as exc:
+        # Twilio says exactly what is wrong; a traceback says nothing useful.
+        detail = json.loads(exc.read().decode() or "{}")
+        raise RuntimeError(
+            f"Twilio refused the call ({exc.code}): "
+            f"{detail.get('message') or 'no reason given'}"
+            + (f" — {detail.get('more_info')}" if detail.get("more_info") else "")
+        ) from None

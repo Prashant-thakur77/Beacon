@@ -31,6 +31,19 @@ def get(url: str, sid: str, token: str) -> dict:
         return dict(json.loads(resp.read().decode()))
 
 
+def try_get(url: str, sid: str, token: str) -> dict | None:
+    """None when Twilio will not answer at all -- a trial account cannot read
+    every endpoint, and "we could not check" is different from "it is wrong"."""
+    try:
+        return get(url, sid, token)
+    except urllib.error.HTTPError as exc:
+        print(f"  ?   {url.rsplit('/', 2)[-2]}/{url.rsplit('/', 1)[-1]}: {exc.code}")
+        return None
+    except Exception as exc:
+        print(f"  ?   could not reach Twilio: {exc}")
+        return None
+
+
 def main() -> int:
     to = sys.argv[1] if len(sys.argv) > 1 else "+919015954507"
     sid = os.environ.get("TWILIO_ACCOUNT_SID", "")
@@ -57,7 +70,9 @@ def main() -> int:
     trial = account.get("type") == "Trial"
     print(f"  ok  account {account.get('friendly_name')} · {account.get('type')}")
 
-    numbers = get(f"{API}/Accounts/{sid}/IncomingPhoneNumbers.json", sid, token)
+    numbers = (
+        try_get(f"{API}/Accounts/{sid}/IncomingPhoneNumbers.json", sid, token) or {}
+    )
     voice_numbers = [
         n
         for n in numbers.get("incoming_phone_numbers") or []
@@ -75,7 +90,7 @@ def main() -> int:
             "      number: those need a regulatory bundle and days of review."
         )
 
-    verified = get(f"{API}/Accounts/{sid}/OutgoingCallerIds.json", sid, token)
+    verified = try_get(f"{API}/Accounts/{sid}/OutgoingCallerIds.json", sid, token) or {}
     ids = {c.get("phone_number") for c in verified.get("outgoing_caller_ids") or []}
     if to in ids or not trial:
         print(
@@ -90,8 +105,13 @@ def main() -> int:
             "      → Add a new Caller ID. Twilio reads you a code; type it in."
         )
 
-    india = get(f"{VOICE}/DialingPermissions/Countries/IN", sid, token)
-    if india.get("low_risk_numbers_enabled"):
+    india = try_get(f"{VOICE}/DialingPermissions/Countries/IN", sid, token)
+    if india is None:
+        # Trial accounts cannot read the dialing-permissions API. A call that
+        # actually connected is better evidence than the setting anyway.
+        print("  ?   cannot read Geographic Permissions on a trial account")
+        print("      If a test call to India has connected, this is already on.")
+    elif india.get("low_risk_numbers_enabled"):
         print("  ok  outbound calls to India are enabled")
     else:
         problems.append(

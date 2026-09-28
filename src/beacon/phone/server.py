@@ -40,6 +40,7 @@ class PhoneService:
         default_incident: str = "",
         dashboard_url: str = "",
         recordings_dir: str = "",
+        greeting_line: str = "Connecting you to Beacon.",
     ) -> None:
         self.base_url = base_url
         self.passcode = passcode
@@ -47,6 +48,7 @@ class PhoneService:
         self.default_incident = default_incident
         self.dashboard_url = dashboard_url.rstrip("/")
         self.recordings_dir = recordings_dir
+        self.greeting_line = greeting_line
         self.calls: list[dict[str, Any]] = []
 
     # -- the webhook -------------------------------------------------------
@@ -82,33 +84,36 @@ class PhoneService:
             )
         return incident_id
 
-    def process_request(self, connection: Any, request: Any) -> Any:
-        """Answer plain HTTP on the same port; let the media path upgrade."""
-        path = request.path.split("?")[0]
-        if path == twilio.MEDIA_PATH:
-            return None  # proceed with the WebSocket handshake
-        if path == twilio.TWIML_PATH:
-            stream = self.public_url.replace("https://", "wss://").replace(
-                "http://", "ws://"
+    def stream_url(self, host: str = "", proto: str = "https") -> str:
+        """Where the carrier should open the media socket.
+
+        Taken from the request the carrier actually made, not from what this process
+        was told its own address is at startup. A tunnel gets a new hostname every
+        time it restarts, and being wrong here does not fail loudly -- the call
+        connects, the stream goes nowhere, and Twilio reads "we cannot reach your
+        server" to the person holding the phone.
+        """
+        if host:
+            scheme = "wss" if proto == "https" else "ws"
+            return f"{scheme}://{host}{twilio.MEDIA_PATH}"
+        fallback = self.public_url.replace("https://", "wss://").replace(
+            "http://", "ws://"
+        )
+        return f"{fallback}{twilio.MEDIA_PATH}"
+
+    def twiml_document(self, host: str = "", proto: str = "https") -> str:
+        """The TwiML the webhook answers with, for whichever incident is live."""
+        incident_id = self.live_incident()
+        if not incident_id:
+            # Better a spoken sentence than a silent line the caller blames on us.
+            return (
+                '<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n'
+                "  <Say>Beacon has no open incident to discuss. Goodbye.</Say>\n"
+                "</Response>\n"
             )
-            incident_id = self.live_incident()
-            if not incident_id:
-                # Better a spoken sentence than a silent line the caller blames on us.
-                return connection.respond(
-                    200,
-                    '<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n'
-                    "  <Say>Beacon has no open incident to discuss. Goodbye.</Say>\n"
-                    "</Response>\n",
-                )
-            body = twilio.twiml(
-                f"{stream}{twilio.MEDIA_PATH}", incident_id=incident_id
-            ).encode()
-            return connection.respond(200, body.decode())
-        if path == "/health":
-            return connection.respond(
-                200, json.dumps({"ok": True, "calls": len(self.calls)})
-            )
-        return connection.respond(404, "not found\n")
+        stream = self.stream_url(host, proto)
+        logger.info("twiml → %s (incident %s)", stream, incident_id)
+        return twilio.twiml(stream, incident_id=incident_id, say=self.greeting_line)
 
     # -- one call ----------------------------------------------------------
 
@@ -217,23 +222,85 @@ def attest_call(
     return verdict
 
 
+class _AiohttpSocket:
+    """An aiohttp WebSocketResponse wearing the shape ``TwilioLeg`` expects.
+
+    The leg was written against the ``websockets`` API — ``async for`` over text
+    frames, ``await send(str)`` — and that is the right shape for it. This keeps it,
+    so the carrier adapter and its tests do not care which server is underneath.
+    """
+
+    def __init__(self, ws: Any) -> None:
+        self._ws = ws
+
+    async def send(self, raw: str) -> None:
+        await self._ws.send_str(raw)
+
+    async def close(self) -> None:
+        await self._ws.close()
+
+    def __aiter__(self) -> _AiohttpSocket:
+        return self
+
+    async def __anext__(self) -> str:
+        from aiohttp import WSMsgType
+
+        msg = await self._ws.receive()
+        if msg.type is WSMsgType.TEXT:
+            return str(msg.data)
+        if msg.type is WSMsgType.BINARY:
+            return bytes(msg.data).decode()
+        raise StopAsyncIteration
+
+
 async def serve(
     service: PhoneService, *, host: str = "0.0.0.0", port: int = 8080
 ) -> None:
-    from websockets.asyncio.server import serve as ws_serve
+    """Serve the webhook and the media socket on one port.
 
-    async with ws_serve(
-        service.handle,
+    aiohttp rather than ``websockets.serve(process_request=…)``, for one specific
+    reason: Twilio fetches the TwiML with **POST**, and a POST carries a form body.
+    The WebSocket server answers the request line and never reads that body, so the
+    fetch fails and the caller hears "we cannot reach your server" — while nothing
+    at all appears in our log, because the request never completed. Passing
+    ``Method=GET`` would avoid it, and a trial account is not allowed to set that
+    parameter. So the server has to be one that speaks HTTP properly.
+    """
+    from aiohttp import web
+
+    async def twiml_route(request: web.Request) -> web.Response:
+        # Twilio POSTs a form; read it even though nothing here needs it, because a
+        # body left unread is what broke this in the first place.
+        if request.method == "POST":
+            await request.post()
+        proto = request.headers.get("X-Forwarded-Proto", "https")
+        body = service.twiml_document(request.headers.get("Host", ""), proto)
+        return web.Response(text=body, content_type="text/xml")
+
+    async def health_route(_: web.Request) -> web.Response:
+        return web.json_response({"ok": True, "calls": len(service.calls)})
+
+    async def media_route(request: web.Request) -> web.WebSocketResponse:
+        ws = web.WebSocketResponse(heartbeat=20, max_msg_size=0)
+        await ws.prepare(request)
+        logger.info("media socket open from %s", request.remote)
+        await service.handle(_AiohttpSocket(ws))
+        return ws
+
+    app = web.Application()
+    app.router.add_route("*", twilio.TWIML_PATH, twiml_route)
+    app.router.add_route("*", "/health", health_route)
+    app.router.add_get(twilio.MEDIA_PATH, media_route)
+
+    runner = web.AppRunner(app, access_log=None)
+    await runner.setup()
+    site = web.TCPSite(runner, host, port)
+    await site.start()
+    logger.info(
+        "phone bridge on %s:%s  twiml=%s%s",
         host,
         port,
-        process_request=service.process_request,
-        ping_interval=20,
-    ):
-        logger.info(
-            "phone bridge on %s:%s  twiml=%s%s",
-            host,
-            port,
-            service.public_url,
-            twilio.TWIML_PATH,
-        )
-        await asyncio.Future()
+        service.public_url,
+        twilio.TWIML_PATH,
+    )
+    await asyncio.Future()

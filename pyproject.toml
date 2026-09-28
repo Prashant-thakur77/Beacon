@@ -27,6 +27,12 @@ agent = [
     "litellm",
     "pyyaml",
 ]
+# The phone bridge is a long-running service, not a Lambda: it serves Twilio's
+# webhook (a POST with a form body) and the media socket on one port, which needs a
+# real HTTP server rather than a WebSocket server answering HTTP on the side.
+phone = [
+    "aiohttp",
+]
 dev = [
     "pytest",
     "moto[logs,sns,dynamodb,cloudwatch,ec2,ecs,ssm,stepfunctions,events,sts]",
