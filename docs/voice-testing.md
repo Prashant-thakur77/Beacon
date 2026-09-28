@@ -112,33 +112,58 @@ a real run: *"A key press cannot approve a change."*
 
 The phone suite does not pass five out of five every time, and the published report
 says whatever the last run said. That is deliberate: a number you re-roll until it is
-green is a decoration, not a result.
+green is a decoration, not a result. Recent runs have been 3/5 and 4/5, with
+`approve` the usual failure.
 
-**`approve` is the fragile one**, and for a reason worth naming. It is the only
-scenario that needs the model to call a *consent* tool — `propose_fix` and
-`check_recovery` change nothing, so the prompt tells the agent to call them without
-asking, but `approve_fix` writes to production and the model is correspondingly
-cautious about it. Twice now it has heard the phrase perfectly and answered *"the fix
-needs the spoken phrase"* while looking straight at it.
+### What is actually wrong, as far as the evidence goes
 
-Two changes have made that rarer rather than impossible:
+I have been wrong about this twice, and the two-channel recording corrected me both
+times — which is a fair advertisement for recording both channels.
 
-* the prompt now says that if the words contain "approve fix" and a number, in any
-  sentence and any casing, `approve_fix` must be called before the agent says
-  anything — and that **the tool decides whether the phrase counts, not the model**;
-* the key terms prime the phrase for the proposal *actually on the table*. Proposals
-  are numbered per incident, so an incident on its eighth attempt needs "approve fix
-  eight" primed; listing only one and two left the live phrase unprimed exactly when
-  it decided whether a change happened.
+**First guess, wrong:** the model balks at calling a *consent* tool. The recording
+disproved it: on the failing runs the agent never got the chance, because it never
+received the turn.
 
-**The suite has also been wrong**, twice, and both times it looked like a product
-bug. It inferred the end of a turn from a gap in the agent's audio, and a long
-read-back has gaps — so the scripted caller talked over the sentence carrying the
-phrase. Driving turn-taking from `reply.done` fixed that, and then counted
-*interrupted* replies as answers, which broke it differently: three of five scenarios
-failed on a build where nothing about the product had changed. Only completed replies
-count now.
+**Second guess, wrong:** the scripted caller was talking over an unfinished turn.
+Making it wait 1.6 s instead of 0.9 s did not help, and the run that followed was
+worse.
+
+**What the evidence says.** On a failing `approve` run the recording contains all
+four of the caller's lines — *"What is going on?"*, *"Can you fix it?"*, *"Approve
+fix one."*, *"Is it fixed?"* — and the API reported only **two** of them as turns:
+
+```
+heard  'What is going on?'   → get_evidence
+heard  'Approve fix one.'    → propose_fix
+```
+
+`propose_fix` firing on the approval is the agent behaving correctly with what it
+was given: it had never heard *"Can you fix it?"*, so there was no proposal to
+approve and the words read as a request to fix. Two utterances were spoken into an
+open line, are audible in the recording, and never became `transcript.user` at all.
+
+**Why that happens is not yet established**, and the honest thing is to say so rather
+than publish a third guess. The event stream is now kept in the report
+(`docs/assets/phone-test-report.json`) so the next run can be read rather than
+speculated about.
+
+### Two harness bugs this did find
+
+Both looked exactly like product bugs:
+
+* turn-taking inferred the end of a reply from a gap in the agent's audio, and a long
+  read-back has gaps — so the caller talked over the sentence carrying the phrase.
+  `reply.done` is the protocol saying so exactly;
+* and the first version of that counted *interrupted* replies as answers, which took
+  the suite from 5/5 to 2/5 on a build where nothing about the product had changed.
+
+### One product bug it found
+
+The key terms primed `approve fix one` and `approve fix two` and stopped, while
+proposals are numbered per incident — so an incident on its eighth attempt asked the
+engineer for *"approve fix eight"* with the transcriber primed for neither. The live
+proposals now go in first, in spoken and digit form.
 
 The lesson is not that the harness is unreliable. It is that turn-taking is the hard
-part of testing a voice agent, and that a suite which speaks is the only thing that
-finds either kind of fault.
+part of testing a voice agent, and that a suite which speaks — and records both
+channels — is the only thing that tells you which side a fault is on.
