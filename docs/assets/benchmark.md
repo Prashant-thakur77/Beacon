@@ -1,6 +1,6 @@
 # Measured, not asserted
 
-Generated 2026-09-28 20:45 UTC from 5 real call(s) by `make bench`. Every number below is read out of a report written while the call was happening — none of it is typed in by hand.
+Generated 2026-09-28 20:46 UTC from 5 real call(s) by `make bench`. Every number below is read out of a report written while the call was happening — none of it is typed in by hand.
 
 ## Time to first audio
 
@@ -50,7 +50,7 @@ The agent reads the phrase back, so it is in the recording twice — once from e
 
 | | |
 |---|---|
-| Commit | `37ea0a3` |
+| Commit | `4241620` |
 | Transcription | AssemblyAI Voice Agent API, `wss://agents.assemblyai.com/v1/ws` |
 | Audio | G.711 µ-law (`audio/pcmu`) in and out, 8 kHz, forwarded untouched |
 | Turn detection | `vad_threshold` 0.65, `min_silence` 700 ms, `max_silence` 2200 ms |
