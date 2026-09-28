@@ -110,59 +110,55 @@ a real run: *"A key press cannot approve a change."*
 
 ## What the pass rate actually means
 
-The phone suite does not pass five out of five every time, and the published report
-says whatever the last run said. That is deliberate: a number you re-roll until it is
-green is a decoration, not a result. Recent runs have been 3/5 and 4/5, with
-`approve` the usual failure.
+The published report says whatever the last run said. A number you re-roll until it
+is green is a decoration, not a result — so it is worth recording that this went
+**2/5 → 3/5 → 4/5 → 5/5** over an afternoon, and that every step was a real fault
+found and fixed rather than a better roll of the dice.
 
-### What is actually wrong, as far as the evidence goes
+### Four faults, and where each one lived
 
-I have been wrong about this twice, and the two-channel recording corrected me both
-times — which is a fair advertisement for recording both channels.
-
-**First guess, wrong:** the model balks at calling a *consent* tool. The recording
-disproved it: on the failing runs the agent never got the chance, because it never
-received the turn.
-
-**Second guess, wrong:** the scripted caller was talking over an unfinished turn.
-Making it wait 1.6 s instead of 0.9 s did not help, and the run that followed was
-worse.
-
-**What the evidence says.** On a failing `approve` run the recording contains all
-four of the caller's lines — *"What is going on?"*, *"Can you fix it?"*, *"Approve
-fix one."*, *"Is it fixed?"* — and the API reported only **two** of them as turns:
-
-```
-heard  'What is going on?'   → get_evidence
-heard  'Approve fix one.'    → propose_fix
-```
-
-`propose_fix` firing on the approval is the agent behaving correctly with what it
-was given: it had never heard *"Can you fix it?"*, so there was no proposal to
-approve and the words read as a request to fix. Two utterances were spoken into an
-open line, are audible in the recording, and never became `transcript.user` at all.
-
-**Why that happens is not yet established**, and the honest thing is to say so rather
-than publish a third guess. The event stream is now kept in the report
-(`docs/assets/phone-test-report.json`) so the next run can be read rather than
-speculated about.
-
-### Two harness bugs this did find
-
-Both looked exactly like product bugs:
+**In the harness**, and both looked exactly like the product misbehaving:
 
 * turn-taking inferred the end of a reply from a gap in the agent's audio, and a long
-  read-back has gaps — so the caller talked over the sentence carrying the phrase.
-  `reply.done` is the protocol saying so exactly;
-* and the first version of that counted *interrupted* replies as answers, which took
-  the suite from 5/5 to 2/5 on a build where nothing about the product had changed.
+  read-back has gaps — so the scripted caller talked over the sentence carrying the
+  phrase;
+* replacing that with `reply.done` was *more correct* and measurably worse. That event
+  fires **before the agent has spoken** on a turn that called a tool, so the caller
+  spoke at the exact moment the agent began and the API never turned those utterances
+  into turns. They are audible in the recording and appear in no event we logged,
+  which is what made it so hard to see. Waiting for the agent's **voice** is the
+  honest signal; `reply.done` is kept only to tell an interruption from an answer.
 
-### One product bug it found
+**In the product:**
 
-The key terms primed `approve fix one` and `approve fix two` and stopped, while
-proposals are numbered per incident — so an incident on its eighth attempt asked the
-engineer for *"approve fix eight"* with the transcriber primed for neither. The live
-proposals now go in first, in spoken and digit form.
+* the key terms primed `approve fix one` and `approve fix two` and stopped, while
+  proposals are numbered per incident — so an incident on its eighth attempt asked the
+  engineer for *"approve fix eight"* with the transcriber primed for neither;
+* and the attestation searched utterance by utterance, so when a transcriber returned
+  `"Approve"`, `"fix"`, `"one."` as three utterances it reported that **nobody had
+  authorised** a change the caller had plainly authorised. For a check whose whole job
+  is answering *who said the sentence that changed production*, that is the worst
+  available way to be wrong.
+
+### How each one was actually found
+
+Not by reading the code. The report now keeps, for every line the caller speaks, the
+moment it went out and what the agent was doing then:
+
+```
+13.89s  What is going on?   agent_talking=False  quiet= 1.60s   → heard
+25.91s  Can you fix it?     agent_talking=True   quiet=-0.15s   → heard
+```
+
+against the failing run, where the two dropped lines sat **6.7 s and 7.8 s** after
+audio that turned out to be the *greeting* — the reply to the line before them had
+not started at all. Three theories died to that table, two of which had already been
+written down here as fact.
+
+The two-channel recording did the rest. It is built for the audit — so an approval can
+be attributed to the human who gave it — and it turned out to be the best debugging
+tool in the project, because it is the only record of what was actually said when the
+API's own event stream disagrees.
 
 The lesson is not that the harness is unreliable. It is that turn-taking is the hard
 part of testing a voice agent, and that a suite which speaks — and records both
