@@ -100,6 +100,8 @@ Narration: Chatterbox TTS. No editor was used — the film is assembled by ffmpe
 video/script-assemblyai.md; the pipeline is in the repo.
 ```
 
+**Captions** `Beacon-AssemblyAI.srt` in the release — upload it with the video. They were produced by **AssemblyAI's pre-recorded transcription**, the same API that reads the engineer's voice notes and re-scores an approval against its own recording. Captioning our own film with it is the shortest honest demonstration that the transcription is good enough to build consent on.
+
 **Thumbnail** `docs/assets/thumbnail-aai.jpg` · **Visibility** public · **Category** Science & Technology
 
 ## Links

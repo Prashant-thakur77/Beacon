@@ -1,4 +1,4 @@
-.PHONY: judge voice-test phone-call phone-test phone-serve deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
+.PHONY: judge subtitles voice-test phone-call phone-test phone-serve deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
        test lint check-image-tags smoke-strands export-tools deploy-remediation teardown-remediation \
        snapshot-sg tag-remediable dry-run changes incidents lint-templates remediable-ecs break-demo-deploy fix-demo-deploy \
@@ -780,6 +780,12 @@ test:
 voice-test:
 	$(call check_param,ASSEMBLYAI_API_KEY)
 	$(PYTHON) scripts/voice_test.py $(if $(ONLY),--only $(ONLY),) --json docs/assets/voice-test-report.json
+
+# Captions for the film, produced by the same API the product runs on. A sidecar,
+# not burned in: a caption a viewer cannot switch off is worse than none.
+subtitles:
+	$(call check_param,ASSEMBLYAI_API_KEY)
+	$(PYTHON) video/subtitles.py $(HOME)/beacon-video/Beacon-AssemblyAI.mp4
 
 # The whole night in a terminal, against `make local`: no microphone, no AWS
 # account, the real tools and the real consent rules. For anyone judging this who
