@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-28T07:31:00Z",
+  "generated": "2026-09-28T08:32:16Z",
   "channel": "phone",
   "results": [
     {
@@ -10,29 +10,24 @@
         "incident ended awaiting_engineer, not resolved",
         "nothing was written to the approvals ledger"
       ],
-      "incident_id": "ffd42e96-e083-4505-89ea-f51285eddbc8",
+      "incident_id": "60d712b5-1e96-4d26-a4c7-8c02489c76ae",
       "status": "awaiting_engineer",
       "tools": [
         "get_evidence",
-        "propose_fix",
-        "check_recovery"
+        "propose_fix"
       ],
       "heard": [
         "What is going on?",
-        "Can you fix it?",
-        "Approve fix three.",
-        "Is it fixed?"
+        "Approve fix one."
       ],
       "dtmf": [],
       "interruptions": 0,
       "carrier_clears": 0,
       "ttfa_ms": [
-        4103,
-        1986,
-        908,
-        3448
+        4670,
+        3674
       ],
-      "seconds": 75.4,
+      "seconds": 57.8,
       "recording": "/home/prashant/beacon-video/phone/approve.wav",
       "attestation": {
         "ok": true,
@@ -41,129 +36,88 @@
         "caller_said": [
           "What is going on?",
           "Can you fix it?",
-          "Approve fix 3.",
+          "Approve fix one.",
           "Is it fixed?"
         ],
         "agent_said": [
           "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it and I will propose the fix.",
-          "The demo web service in us-east-1 can't reach its database. It looks like the security group rule for port 5432 was removed.",
-          "One change: restore the missing security group rule, the TCP port 5432 rule from the application security group into the database security group. Nothing else changes. To fix this, say approve fix 3. Again, please say approve fix 3.",
-          "I'm sorry, but the fix needs the spoken phrase. Please say, approve fix 3.",
-          "I cannot check if it is fixed because the fix was never applied. Please say, approve fix 3."
+          "I am sorry, I do not see any recent changes in the CloudTrail logs in The problem seems to be that the ECS tasks cannot reach the RDS instance.",
+          "One change: restore the missing security group rule, the TCP port 5432 rule from the application security group into the database security group. Nothing else changes. To apply this, please say approve fix 2. I will repeat that. Approve fix 2."
         ],
         "phrases": {
           "approve_fix": [
             {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 3",
-              "start_ms": 32340,
-              "confidence": 0.9852856
-            },
-            {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 3",
-              "start_ms": 32340,
-              "confidence": 0.9852856
-            },
-            {
               "channel": "1",
               "who": "caller",
-              "said": "Approve fix 3",
-              "start_ms": 50970,
-              "confidence": 0.9803578
+              "said": "Approve fix one",
+              "start_ms": 34250,
+              "confidence": 0.9053127
             },
             {
               "channel": "2",
               "who": "agent",
-              "said": "approve fix 3",
-              "start_ms": 55070,
-              "confidence": 0.9807266
+              "said": "approve fix 2",
+              "start_ms": 40070,
+              "confidence": 0.9629106
             },
             {
               "channel": "2",
               "who": "agent",
-              "said": "approve fix 3",
-              "start_ms": 67470,
-              "confidence": 0.9926966
+              "said": "Approve fix 2",
+              "start_ms": 40070,
+              "confidence": 0.9629106
             }
           ]
         },
-        "transcript_id": "6c67c0ba-4075-4188-b376-8c74a3300484",
-        "seconds": 76
+        "transcript_id": "ba593dc6-8c7d-4adc-bd7f-0b43f4336d84",
+        "seconds": 58
       }
     },
     {
       "scenario": "wrong_phrase",
-      "ok": true,
-      "problems": [],
-      "incident_id": "ffd42e96-e083-4505-89ea-f51285eddbc8",
+      "ok": false,
+      "problems": [
+        "the agent never told the caller the phrase to say"
+      ],
+      "incident_id": "60d712b5-1e96-4d26-a4c7-8c02489c76ae",
       "status": "awaiting_engineer",
       "tools": [
         "propose_fix"
       ],
       "heard": [
         "Fix it.",
-        "Yes, do it."
+        "Right."
       ],
       "dtmf": [],
-      "interruptions": 0,
-      "carrier_clears": 0,
+      "interruptions": 1,
+      "carrier_clears": 1,
       "ttfa_ms": [
-        3798,
-        2545
+        3800
       ],
-      "seconds": 48.0,
+      "seconds": 19.8,
       "recording": "/home/prashant/beacon-video/phone/wrong_phrase.wav",
       "attestation": {
         "ok": true,
         "checks": [],
         "problems": [],
         "caller_said": [
-          "Fix",
-          "it.",
+          "Fix it.",
           "Yes, do it."
         ],
         "agent_said": [
-          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it, and I will propose the fix.",
-          "One change: restore the missing security group rule, the TCP port 5432 rule from the application security group into the database security group. Nothing else changes. To proceed, please say, approve fix 4. I repeat, approve fix 4.",
-          "The fix needs the spoken phrase. Please say, approve fix 4."
+          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it and I will propose the fix.",
+          "One change."
         ],
-        "phrases": {
-          "approve_fix": [
-            {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 4",
-              "start_ms": 18320,
-              "confidence": 0.9639261
-            },
-            {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 4",
-              "start_ms": 18320,
-              "confidence": 0.9639261
-            },
-            {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 4",
-              "start_ms": 41940,
-              "confidence": 0.99770236
-            }
-          ]
-        },
-        "transcript_id": "14ce79e5-75a9-48da-addf-35fe7cbc1eb9",
-        "seconds": 48
+        "phrases": {},
+        "transcript_id": "256eeaad-f0e1-4348-9a79-b92408b28134",
+        "seconds": 20
       }
     },
     {
       "scenario": "barge_in",
       "ok": true,
       "problems": [],
-      "incident_id": "ffd42e96-e083-4505-89ea-f51285eddbc8",
+      "incident_id": "60d712b5-1e96-4d26-a4c7-8c02489c76ae",
       "status": "awaiting_engineer",
       "tools": [
         "propose_fix",
@@ -171,78 +125,82 @@
       ],
       "heard": [
         "Fix it.",
-        "No, wait.",
-        "App.",
-        "Approve fix 5."
+        "Wait."
       ],
       "dtmf": [],
-      "interruptions": 1,
+      "interruptions": 2,
       "carrier_clears": 2,
       "ttfa_ms": [
-        3759,
-        3103,
-        2316
+        3648,
+        832
       ],
-      "seconds": 42.0,
+      "seconds": 45.7,
       "recording": "/home/prashant/beacon-video/phone/barge_in.wav",
       "attestation": {
         "ok": true,
         "checks": [],
         "problems": [],
         "caller_said": [
-          "Fix it. No, wait,",
+          "Fix it.",
+          "No,",
+          "wait,",
           "stop.",
-          "Approve fix 5."
+          "Approve",
+          "fix",
+          "4."
         ],
         "agent_said": [
-          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it and I will propose the fix.",
-          "One change. Restore the",
-          "missing\u2014 Fix withdrawn. Nothing was applied. Tell me if you want me to propose it again.",
-          "I need you to say the exact phrase, approve fix 5."
+          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it, and I will propose the fix.",
+          "One change:",
+          "restore",
+          "the\u2014",
+          "one change\u2014 one change: restore the missing security group rule, the TCP port 5432 rule from the application security group into the database security group. Group. Nothing else changes. To fix this, please say approve fix 4. I will repeat that. Please say approve fix 4. The fix",
+          "has been",
+          "withdrawn,",
+          "so nothing"
         ],
         "phrases": {
           "approve_fix": [
             {
-              "channel": "1",
-              "who": "caller",
-              "said": "Approve fix 5",
-              "start_ms": 31370,
-              "confidence": 0.96843064
+              "channel": "2",
+              "who": "agent",
+              "said": "approve fix 4",
+              "start_ms": 20800,
+              "confidence": 0.9690308
             },
             {
               "channel": "2",
               "who": "agent",
-              "said": "approve fix 5",
-              "start_ms": 37250,
-              "confidence": 0.9756009
+              "said": "approve fix 4",
+              "start_ms": 20800,
+              "confidence": 0.9690308
             }
           ]
         },
-        "transcript_id": "17c13e02-0a63-4f38-b614-411f4d4935ec",
-        "seconds": 42
+        "transcript_id": "d36079f2-39f0-4144-bd40-5db074bb1c65",
+        "seconds": 46
       }
     },
     {
       "scenario": "hinglish",
-      "ok": true,
-      "problems": [],
-      "incident_id": "ffd42e96-e083-4505-89ea-f51285eddbc8",
-      "status": "awaiting_engineer",
-      "tools": [
-        "propose_fix"
+      "ok": false,
+      "problems": [
+        "'isko fix kar do' did not reach propose_fix"
       ],
+      "incident_id": "60d712b5-1e96-4d26-a4c7-8c02489c76ae",
+      "status": "awaiting_engineer",
+      "tools": [],
       "heard": [
         "\u0915\u094d\u092f\u093e \u0939\u0941\u0906 \u0939\u0948?",
-        "\u0907\u0938\u0915\u094b \u092b\u093f\u0915\u094d\u0938 \u0915\u0930 \u0926\u094b\u0964"
+        "\u0907\u0938\u0915\u094b \u092b\u093f\u0915\u094d\u0938 \u0915\u0930 \u0926\u0942\u0901\u0964"
       ],
       "dtmf": [],
-      "interruptions": 0,
-      "carrier_clears": 0,
+      "interruptions": 1,
+      "carrier_clears": 1,
       "ttfa_ms": [
-        2470,
-        3531
+        2553
       ],
-      "seconds": 51.4,
+      "seconds": 29.8,
       "recording": "/home/prashant/beacon-video/phone/hinglish.wav",
       "attestation": {
         "ok": true,
@@ -250,40 +208,27 @@
         "problems": [],
         "caller_said": [
           "\u0915\u094d\u092f\u093e \u0939\u0941\u0906 \u0939\u0948?",
-          "\u0907\u0938\u0915\u094b \u092b\u093f\u0915\u094d\u0938 \u0915\u0930 \u0926\u094b\u0964"
+          "\u0907\u0938\u0915\u094b",
+          "\u092b\u093f\u0915\u094d\u0938",
+          "\u0915\u0930 \u0926\u094b\u0964"
         ],
         "agent_said": [
-          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it, and I will propose the fix.",
-          "ECS tasks RDS connect not able to connect. Security group rule missing. Hi, one.",
-          "One change: restore the missing security group rule, the TCP port 5432 rule from the application security group into the database security group. Nothing else changes. Please say approve fix 6. I will repeat that. Please say approve fix 6."
+          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it and I will propose the fix.",
+          "Demo web service ECS tasks RDS database CConnect nahi kar pa rahiin. Security group rule missing",
+          "hone ki",
+          "waja",
+          "say errors a rahiin."
         ],
-        "phrases": {
-          "approve_fix": [
-            {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 6",
-              "start_ms": 32890,
-              "confidence": 0.981057
-            },
-            {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 6",
-              "start_ms": 32890,
-              "confidence": 0.981057
-            }
-          ]
-        },
-        "transcript_id": "ef319ac4-fda2-401c-8b22-2e6b3aebf5b3",
-        "seconds": 52
+        "phrases": {},
+        "transcript_id": "a9eb2250-837d-4743-8938-eca6d5233263",
+        "seconds": 30
       }
     },
     {
       "scenario": "keypad",
       "ok": true,
       "problems": [],
-      "incident_id": "ffd42e96-e083-4505-89ea-f51285eddbc8",
+      "incident_id": "60d712b5-1e96-4d26-a4c7-8c02489c76ae",
       "status": "awaiting_engineer",
       "tools": [
         "propose_fix"
@@ -298,53 +243,24 @@
       ],
       "interruptions": 1,
       "carrier_clears": 1,
-      "ttfa_ms": [
-        2334,
-        2451
-      ],
-      "seconds": 47.5,
+      "ttfa_ms": [],
+      "seconds": 21.9,
       "recording": "/home/prashant/beacon-video/phone/keypad.wav",
       "attestation": {
         "ok": true,
         "checks": [],
         "problems": [],
         "caller_said": [
-          "Fix",
-          "it.",
+          "Fix it.",
           "I press 5. Did that do it?"
         ],
         "agent_said": [
-          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it, and I will propose the fix. The incident",
-          "has been resolved. One change: restore the missing security group rule, the TCP port 5432 rule from the application security group into the database security group. Nothing else changes. To proceed, say approve fix 7. Again, please say approve fix 7.",
-          "The fix needs the spoken phrase. Please say approve fix 7."
+          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it and I will propose the fix. Incident acknowledge ho gaya",
+          "hai. Mainline."
         ],
-        "phrases": {
-          "approve_fix": [
-            {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 7",
-              "start_ms": 17700,
-              "confidence": 0.96832144
-            },
-            {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 7",
-              "start_ms": 17700,
-              "confidence": 0.96832144
-            },
-            {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 7",
-              "start_ms": 41270,
-              "confidence": 0.99920714
-            }
-          ]
-        },
-        "transcript_id": "99f6e25a-c3e8-4881-877f-70f75352c7b8",
-        "seconds": 48
+        "phrases": {},
+        "transcript_id": "b738df94-7a1e-4af8-b7fd-b8256f522228",
+        "seconds": 22
       }
     }
   ]

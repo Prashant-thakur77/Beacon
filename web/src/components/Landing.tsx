@@ -62,7 +62,7 @@ const QUOTES = [
 ];
 
 const FAQ = [
-  { q: "Is it safe?", a: "Only two allowlisted actions exist; params must match the schema exactly; every action is dry-run under the write-only executor role; approval is checked against the engineer's raw transcript, never the model's claim; one approval executes exactly once; and APPLY_ENABLED=false stops every write path." },
+  { q: "Is it safe?", a: "Only three allowlisted actions exist; params must match the schema exactly; every action is dry-run under the write-only executor role; approval is checked against the engineer's raw transcript, never the model's claim; one approval executes exactly once; and APPLY_ENABLED=false stops every write path." },
   { q: "What can it change?", a: "Restore one security-group ingress rule that exists in the golden snapshot, or force a new deployment of one ECS service. Both are scoped by the beacon:remediable resource tag in IAM." },
   { q: "What if the fix fails?", a: "Verification needs three things: the alarm back to OK after the fix, the error metric at zero, and the post-condition. After the retry window it escalates to a human and says so on the board." },
   { q: "What happens without Bedrock?", a: "Triage falls back to a deterministic summary and the console still shows the alarm, the CloudTrail change and the timeline. On a fresh AWS account under verification hold, that is the state the live URL is in today." },

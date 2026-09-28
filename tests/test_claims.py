@@ -86,3 +86,33 @@ def test_the_readme_does_not_promise_a_carrier_we_do_not_have() -> None:
     text = readme().lower()
     for overclaim in ("call our number", "phone us on", "dial beacon at"):
         assert overclaim not in text
+
+
+def test_the_allowlist_size_is_stated_correctly_everywhere_it_is_stated() -> None:
+    """'Two allowlisted actions' survived a year after a third was added.
+
+    The count appears in the README, in the console's own FAQ and in the judge card,
+    and every one of them is a claim about what this can do to somebody's account.
+    """
+    import re
+
+    from beacon.remediation import registry
+
+    words = {1: "one", 2: "two", 3: "three", 4: "four"}
+    right = words[len(registry.REGISTRY)]
+    web = pathlib.Path(__file__).resolve().parents[1] / "web/src/components"
+    texts = {"README.md": readme()}
+    for name in ("Landing.tsx", "NightBoard.tsx"):
+        texts[name] = (web / name).read_text(encoding="utf-8")
+
+    # Only the *size* of the allowlist. "one allowlisted fix" is a different claim
+    # — exactly one fix is proposed — and it is correct, so it must not be caught.
+    pattern = re.compile(
+        r"\b(one|two|three|four)\s+allowlisted\s+(actions?|writes?)\b", re.I
+    )
+    for where, text in texts.items():
+        for said, _noun in pattern.findall(text):
+            assert said.lower() == right, (
+                f"{where} says '{said} allowlisted' but the registry has "
+                f"{len(registry.REGISTRY)}"
+            )

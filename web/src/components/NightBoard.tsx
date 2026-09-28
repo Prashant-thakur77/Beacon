@@ -198,24 +198,38 @@ export function JudgeBody({ hasPasscode }: { hasPasscode: boolean }) {
   return (
     <>
         <div>
-          <b>What it is.</b> An on-call agent for AWS. An alarm fires → Beacon finds the root cause on Bedrock and the CloudTrail change behind it → you talk to it
-          in this browser → it proposes one allowlisted fix, dry-runs it, and applies it only when you say <span className="mono">approve fix one</span> → a Step
-          Functions loop proves the recovery → you can grant a <span className="moon">Sleep Contract</span> so the repeat never wakes you.
+          <b>An on-call agent that holds write access to production</b> — and the only thing that unlocks it is a
+          sentence <b>AssemblyAI</b> heard you say. An alarm fires, Beacon finds the CloudTrail change behind it,
+          proposes exactly one allowlisted fix and dry-runs it. Nothing is applied until you say{" "}
+          <span className="mono">approve fix one</span>. Then a Step Functions loop refuses to call it recovered
+          until CloudWatch agrees.
+        </div>
+        <div>
+          <b>Why the transcript matters.</b> The words are the audit artifact: what unlocked the change, how clearly
+          it was heard, which channel it came from, and a recording to play back. On a real run a voice note came
+          back at <b>75%</b> and was refused, again at <b>74%</b> and refused again — nothing reached AWS until the
+          words were certain.
         </div>
         <ol className="rules">
           <li>
-            Press <b>Replay an archived run</b> to watch a real incident end to end (no passcode needed). Click any <span className="chip">E2</span> chip: every
-            sentence Beacon speaks is pinned to evidence.
+            Press <b>Replay an archived run</b> to watch a real incident end to end — no passcode, no microphone.
+            Click any <span className="chip">E2</span> chip: every sentence is pinned to evidence.
           </li>
           <li>
-            Open <b>Contracts</b> to see a standing approval with the engineer’s own words, and <b>Safety</b> for the allowlist, the two-role IAM split and the kill switch.
+            Open <b>Audit</b> and press <b>◎ How clearly was it heard?</b> on an approval. AssemblyAI re-transcribes
+            its own recording and scores the phrase by its weakest word.
           </li>
           <li>
-            {hasPasscode ? "You are unlocked: when an incident is live you can talk to Beacon with the mic or the text box." : "With the judge passcode from the submission, you can talk to Beacon on a live incident."}
+            Open <b>Safety</b> for the three allowlisted actions, the two-role IAM split and the kill switch.
+            {hasPasscode
+              ? " You are unlocked: when an incident is live you can talk to Beacon with the mic or the text box."
+              : " With the judge passcode from the submission you can talk to Beacon on a live incident."}
           </li>
         </ol>
         <div className="faint">
-          Reads are public and redacted (no account ids). Writes need the passcode and are limited to the two allowlisted actions on tagged demo resources.
+          Reads are public and redacted (no account ids). Writes need the passcode and are limited to the three
+          allowlisted actions on tagged demo resources. Root-cause prose runs on Bedrock where it is available; this
+          account is under a new-account hold, so triage uses the deterministic checks and says so on the incident.
         </div>
     </>
   );
