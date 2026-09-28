@@ -180,3 +180,37 @@ def test_the_pull_request_leads_with_why_the_change_was_allowed() -> None:
     assert body.index("### Consent certificate") < body.index(
         "### The approval that applied the runtime fix"
     )
+
+
+def _attested(one_voice: dict[str, Any] | None) -> dict[str, Any]:
+    check: dict[str, Any] = {
+        "phrase": "approve fix one",
+        "ok": True,
+        "confidence": 0.93,
+        "weakest_word": "one",
+    }
+    if one_voice is not None:
+        check["one_voice"] = one_voice
+    return {**INCIDENT, "voice_attestation": {"sess_x": {"checks": [check]}}}
+
+
+def test_a_caller_who_was_alone_is_said_to_have_been_alone() -> None:
+    incident = _attested({"ok": True, "voices": ["1A"], "window_ms": 15000})
+    cert = certificate.build(incident, LIVE_TURN)
+    assert cert["consent"]["one_voice"]["alone"] is True
+    assert "the caller was alone" in certificate.to_markdown(cert)
+
+
+def test_a_second_voice_in_the_room_is_on_the_certificate() -> None:
+    incident = _attested({"ok": False, "voices": ["1A", "1B"], "window_ms": 15000})
+    cert = certificate.build(incident, LIVE_TURN)
+    assert cert["consent"]["one_voice"]["alone"] is False
+    md = certificate.to_markdown(cert)
+    assert "2 voices" in md and "1A, 1B" in md
+
+
+def test_a_browser_session_says_nothing_rather_than_guessing() -> None:
+    """One channel cannot separate a second person in the room. Silence, not a guess."""
+    cert = certificate.build(_attested(None), LIVE_TURN)
+    assert cert["consent"]["one_voice"] is None
+    assert "One voice" not in certificate.to_markdown(cert)

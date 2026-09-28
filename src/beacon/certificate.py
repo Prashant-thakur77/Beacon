@@ -11,6 +11,8 @@ That artifact is almost entirely AssemblyAI's work, which is the point:
 * **what was said** — the phrase, from the transcript, never from the model's argument
 * **how clearly** — per-word confidence, scored by the weakest word in the phrase
 * **through which channel** — and on a phone, which side of a two-channel recording
+* **who else was there** — on a phone call, whether a second voice was on the
+  caller's own channel when the phrase was said
 * **the recording itself** — so the words can be played back, not just read
 
 Around that sits the part code decides: the one allowlisted action, the parameters
@@ -81,6 +83,26 @@ def attest_of(
     return None
 
 
+def _one_voice_of(
+    approval: dict[str, Any], attested: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Whether the caller was alone, when the recording can answer that.
+
+    Only a two-channel phone recording can: the browser mixes the engineer and the
+    agent into one channel, so a second person in that room is not separable and the
+    certificate says nothing rather than guessing.
+    """
+    check = attest_of(approval, attested)
+    found = (check or {}).get("one_voice")
+    if not isinstance(found, dict) or found.get("ok") is None:
+        return None
+    return {
+        "alone": bool(found.get("ok")),
+        "voices": list(found.get("voices") or []),
+        "window_ms": found.get("window_ms"),
+    }
+
+
 def build(
     incident: dict[str, Any],
     approval: dict[str, Any],
@@ -114,6 +136,7 @@ def build(
             "transcriber": attestation.get("stt"),
             "session_id": attestation.get("session_id"),
             "confidence": _confidence_of(approval, attested),
+            "one_voice": _one_voice_of(approval, attested),
         },
         "change": {
             "action": approval.get("action") or proposal.get("action"),
@@ -201,6 +224,14 @@ def to_markdown(cert: dict[str, Any]) -> str:
     ]
     if change.get("blast_radius"):
         lines.append(f"- **Blast radius** {change['blast_radius']}")
+    alone = consent.get("one_voice")
+    if alone is not None:
+        lines.append(
+            "- **One voice** the caller was alone on their channel when they said it."
+            if alone["alone"]
+            else f"- **⚠ {len(alone['voices'])} voices** were on the caller's channel "
+            f"({', '.join(alone['voices'])}); somebody else was in the room."
+        )
     if verification.get("of"):
         lines.append(
             f"- **Verified** {verification['passed']}/{verification['of']} checks on "

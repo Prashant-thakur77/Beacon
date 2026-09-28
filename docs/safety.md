@@ -60,6 +60,32 @@ already exist:
 | what caused the fault | the CloudTrail change ledger |
 | the recording | the AssemblyAI session artifact |
 
+### One voice, not two
+
+A two-channel recording proves the approval came from the caller's side rather than
+from the agent reading the phrase back. It does not, by itself, say whether the
+caller was **alone** — and "somebody in the room told them to say it" is a different
+failure from "the agent talked itself into it".
+
+AssemblyAI answers that too, and this was worth checking rather than assuming:
+`dual_channel` and `speaker_labels` can be requested **together**, and the speaker
+comes back as channel-then-speaker — `1A`, `2A`. So a second person on the caller's
+side arrives as `1B`, and `attest.voices_around()` looks only at the caller's channel,
+in a 15-second window around the phrase, and reports every distinct voice it finds.
+
+Three things it is careful about:
+
+* the agent is on the other channel by construction, so it can never be mistaken for
+  somebody in the room;
+* a remark ninety seconds earlier is outside the window and is not held against the
+  caller;
+* and a second voice is **flagged, not treated as a forgery** — somebody did say the
+  phrase. It is a fact about the room that whoever reviews the change should be told.
+
+A browser session cannot be checked this way at all: one channel carries both the
+engineer and the agent, so a second person in that room is not separable. The
+certificate says nothing rather than guessing.
+
 Two things it deliberately does not do. It does not compute anything new — inventing
 a number at certificate time would be the one place you must not. And its digest is
 **not a signature**: it detects a certificate edited after issue, which is all it is

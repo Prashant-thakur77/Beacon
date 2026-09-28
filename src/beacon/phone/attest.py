@@ -127,6 +127,76 @@ def attribute(utterances: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+# How far either side of the approval to look for a second voice. Long enough to
+# catch somebody prompting the engineer, short enough that an unrelated remark
+# earlier in the call is not held against them.
+CONSENT_WINDOW_MS = 15_000
+
+
+def voices_around(
+    utterances: list[dict[str, Any]],
+    phrase: str,
+    *,
+    channel: str = CALLER_CHANNEL,
+    window_ms: int = CONSENT_WINDOW_MS,
+) -> dict[str, Any]:
+    """Was the caller alone when they authorised the change?
+
+    AssemblyAI labels a two-channel transcript by channel *and* speaker -- ``1A``,
+    ``2A`` -- so a second person on the caller's side comes back as ``1B``. This
+    looks only at the caller's channel, inside a window around the phrase, and
+    reports every distinct voice it finds.
+
+    The agent is on the other channel by construction, so it is never mistaken for a
+    person in the room; and a colleague who says nothing is invisible here, which is
+    worth being plain about rather than implying the room was empty.
+    """
+    mine = [u for u in utterances if str(u.get("channel") or "") == channel]
+    anchor = next(
+        (
+            u
+            for u in mine
+            if _norm(str(u.get("text") or "")).lower().find(phrase.lower()) >= 0
+        ),
+        None,
+    )
+    if anchor is None:
+        pattern = re.compile(r"\s+".join(map(re.escape, _words_of(phrase))), re.I)
+        anchor = next(
+            (u for u in mine if pattern.search(_norm(str(u.get("text") or "")))), None
+        )
+    if anchor is None:
+        return {
+            "ok": None,
+            "why": "the phrase is not on the caller's channel",
+            "voices": [],
+        }
+    at = anchor.get("start")
+    near = mine
+    if isinstance(at, int | float):
+        near = [
+            u
+            for u in mine
+            if isinstance(u.get("start"), int | float)
+            and abs(float(u["start"]) - float(at)) <= window_ms
+        ]
+    voices = sorted({str(u.get("speaker") or "") for u in near if u.get("speaker")})
+    return {
+        "ok": len(voices) <= 1,
+        "voices": voices,
+        "spoke": [
+            {"speaker": u.get("speaker"), "text": _norm(str(u.get("text") or ""))}
+            for u in near
+        ],
+        "window_ms": window_ms,
+        "why": (
+            "one voice on the caller's channel"
+            if len(voices) <= 1
+            else f"{len(voices)} voices on the caller's channel around the approval"
+        ),
+    }
+
+
 def verify_confidence(
     words: list[dict[str, Any]], approvals: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -191,6 +261,11 @@ def verify(
         by_caller = [h for h in hits if h["who"] == "caller"]
         by_agent = [h for h in hits if h["who"] == "agent"]
         ok = bool(by_caller)
+        alone = (
+            voices_around(utterances, by_caller[0]["said"])
+            if by_caller
+            else {"ok": None}
+        )
         checks.append(
             {
                 "tool": tool,
@@ -198,11 +273,21 @@ def verify(
                 "caller_occurrences": len(by_caller),
                 "agent_occurrences": len(by_agent),
                 "quote": by_caller[0]["said"] if by_caller else None,
+                "one_voice": alone,
             }
         )
         if not ok:
             problems.append(
                 f"{tool} ran but its phrase is not on the caller's channel"
                 + (f" (only the agent said it, {len(by_agent)}x)" if by_agent else "")
+            )
+        elif alone.get("ok") is False:
+            # Not a failure of consent — somebody did say the phrase. It is a fact
+            # about the room that whoever reviews this change should be told.
+            voices: list[str] = list(alone.get("voices") or [])
+            problems.append(
+                f"{tool} was approved with {len(voices)} voices on the caller's "
+                f"channel ({', '.join(voices)}); consent should come from the "
+                "person who was called"
             )
     return {"ok": not problems, "checks": checks, "problems": problems, **attributed}

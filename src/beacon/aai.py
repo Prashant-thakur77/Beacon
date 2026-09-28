@@ -181,12 +181,22 @@ def transcribe_call(
     the human beyond argument. Diarisation would have to infer that; two channels
     carry it in the file.
 
-    Returns ``{"text", "utterances": [{"channel", "text", "confidence", "start"}],
-    "transcript_id", "seconds"}``.
+    Speaker labels are requested as well, which AssemblyAI returns as channel then
+    speaker -- ``1A``, ``2A`` -- so a *second* voice on the caller's channel shows up
+    as ``1B``. Consent that arrived while somebody else was in the room is then a
+    fact about the recording rather than something nobody thought to check.
+
+    Returns ``{"text", "utterances": [{"channel", "speaker", "text", "confidence",
+    "start"}], "transcript_id", "seconds"}``.
     """
     body: dict[str, Any] = {
         "audio_url": url,
         "dual_channel": True,
+        # Asked for alongside dual_channel on purpose, and verified to work: the
+        # speaker comes back as channel-then-speaker ("1A", "2A"), so a second
+        # person on the caller's side of the call appears as "1B". That is the
+        # difference between "somebody approved this" and "the person we called did".
+        "speaker_labels": True,
         "language_code": language,
         "punctuate": True,
         "format_text": True,
@@ -203,6 +213,7 @@ def transcribe_call(
                 "utterances": [
                     {
                         "channel": str(u.get("channel") or ""),
+                        "speaker": str(u.get("speaker") or ""),
                         "text": str(u.get("text") or "").strip(),
                         "confidence": u.get("confidence"),
                         "start": u.get("start"),
