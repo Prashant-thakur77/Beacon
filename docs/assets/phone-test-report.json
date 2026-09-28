@@ -1,12 +1,12 @@
 {
-  "generated": "2026-09-28T09:20:00Z",
+  "generated": "2026-09-28T13:05:40Z",
   "channel": "phone",
   "results": [
     {
       "scenario": "approve",
       "ok": true,
       "problems": [],
-      "incident_id": "e9ac1c3d-ec4e-4fd3-8188-8e36f9bd2883",
+      "incident_id": "8a3ecd80-ebaa-4255-b941-9380409bb32e",
       "status": "resolved",
       "tools": [
         "get_evidence",
@@ -17,23 +17,23 @@
       "heard": [
         "What is going on?",
         "Can you fix it?",
-        "Approve fix 5.",
+        "Approve fix one.",
         "Is it fixed?"
       ],
       "dtmf": [],
       "interruptions": 2,
       "carrier_clears": 2,
       "ttfa_ms": [
-        4381,
-        3495,
-        3335,
-        3533
+        4067,
+        3606,
+        3670,
+        3372
       ],
-      "seconds": 69.7,
+      "seconds": 67.9,
       "events": [
         {
           "kind": "session.ready",
-          "session_id": "sess_2699bf268d5d43cfa4bc9b505c1735d1"
+          "session_id": "sess_23c58ab236f14fc182468372899d29f5"
         },
         {
           "kind": "said",
@@ -53,11 +53,11 @@
           "args": {
             "kind": "changes"
           },
-          "ms": 52
+          "ms": 249
         },
         {
           "kind": "said",
-          "text": "It looks like the E C S service in U S east 1 lost connection to the R D S database. The"
+          "text": "It looks like the R D S security group is missing a rule for the E C S service on port 5 4 3 2 [E1]."
         },
         {
           "kind": "caller.speaking"
@@ -74,11 +74,11 @@
           "kind": "tool",
           "name": "propose_fix",
           "args": {},
-          "ms": 78
+          "ms": 70
         },
         {
           "kind": "said",
-          "text": "One change: restore the missing security group rule, the T C P port 5 4 3 2 rule from the application security group into the database security group."
+          "text": "One change: restore the missing security group rule, the T C P port 5 4 3 2 rule from the application security group into the database security group. Nothing"
         },
         {
           "kind": "caller.speaking"
@@ -88,21 +88,21 @@
         },
         {
           "kind": "heard",
-          "text": "Approve fix 5.",
+          "text": "Approve fix one.",
           "confidence": null
         },
         {
           "kind": "tool",
           "name": "approve_fix",
           "args": {
-            "confirmation_phrase": "approve fix 5",
-            "fix_id": 5
+            "confirmation_phrase": "approve fix one",
+            "fix_id": 1
           },
-          "ms": 244
+          "ms": 147
         },
         {
           "kind": "said",
-          "text": "I am applying the fix and verifying it now. I will let you know as soon as the alarm clears."
+          "text": "I am applying the fix now and will let you know as soon as the alarm clears."
         },
         {
           "kind": "caller.speaking"
@@ -116,45 +116,45 @@
           "kind": "tool",
           "name": "check_recovery",
           "args": {},
-          "ms": 137
+          "ms": 48
         },
         {
           "kind": "said",
-          "text": "Yes, it is fixed. The alarm has cleared and the error count is back to zero. \n\nSince everything is stable, would you like a Sleep Contract so I can handle this automatically next time?"
+          "text": "Yes, the service is recovered and the error metrics are back to zero. Would you like a Sleep Contract so I can handle this automatically if it happens again?"
         },
         {
           "kind": "call.ended",
           "reason": "caller hung up",
-          "seconds": 69.7
+          "seconds": 67.9
         }
       ],
       "spoken": [
         {
           "line": "What is going on?",
-          "at": 12.65,
+          "at": 13.39,
           "agent_talking": false,
-          "agent_quiet_for": 1.61,
+          "agent_quiet_for": 1.62,
           "replies_done": 1
         },
         {
           "line": "Can you fix it?",
-          "at": 24.67,
+          "at": 25.4,
           "agent_talking": true,
-          "agent_quiet_for": -0.09,
+          "agent_quiet_for": -0.12,
           "replies_done": 2
         },
         {
           "line": "Approve fix {fix}.",
-          "at": 36.67,
+          "at": 37.41,
           "agent_talking": true,
-          "agent_quiet_for": -0.11,
+          "agent_quiet_for": -0.14,
           "replies_done": 3
         },
         {
           "line": "Is it fixed?",
-          "at": 49.86,
+          "at": 51.03,
           "agent_talking": true,
-          "agent_quiet_for": -0.42,
+          "agent_quiet_for": -0.08,
           "replies_done": 4
         }
       ],
@@ -167,7 +167,7 @@
             "ok": true,
             "caller_occurrences": 1,
             "agent_occurrences": 0,
-            "quote": "Approve fix 5",
+            "quote": "Approve fix one",
             "one_voice": {
               "ok": true,
               "voices": [
@@ -188,7 +188,7 @@
                 },
                 {
                   "speaker": "1A",
-                  "text": "5."
+                  "text": "one."
                 },
                 {
                   "speaker": "1A",
@@ -206,61 +206,58 @@
           "Can you fix it?",
           "Approve",
           "fix",
-          "5.",
+          "one.",
           "Is it fixed?"
         ],
         "agent_said": [
           "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it, and I will propose the fix.",
-          "It looks like the ECS service in us-east-1 lost connection to the RDS",
-          "database.",
-          "One change: restore the missing security group rule, the TCP port 5432 rule from the application security",
-          "group into",
-          "the",
+          "It looks like the RDS security group is missing a rule for the ECS service on port 5432e1.",
+          "One change: Restore the missing security group rule, the TCP port 5432 rule from the application security group into the",
           "database security",
-          "group. I am applying the fix and verifying it now. I will let you know as soon as the alarm clears.",
-          "Yes, it is fixed. The alarm has cleared and the error count is back to 0. Since everything is stable, would you like a sleep contract so I can handle this automatically next time?"
+          "group.",
+          "I am applying the fix now and will let you know as soon as the alarm clears.",
+          "Yes, the service is recovered and the error metrics are back to zero. Would you like a sleep contract so I can handle this automatically if it happens again?"
         ],
         "phrases": {
           "approve_fix": [
             {
               "channel": "1",
               "who": "caller",
-              "said": "Approve fix 5",
-              "start_ms": 12880,
+              "said": "Approve fix one",
+              "start_ms": 13600,
               "confidence": null
             }
           ]
         },
-        "transcript_id": "652fee8d-f7f7-4574-9f04-90ffbab0747c",
-        "seconds": 70
+        "transcript_id": "9856a10e-5ef3-438e-b9b0-4895949d501e",
+        "seconds": 68
       }
     },
     {
       "scenario": "wrong_phrase",
       "ok": true,
       "problems": [],
-      "incident_id": "c67918bb-e2fa-43a9-b824-0110cddba8fb",
+      "incident_id": "9f5b45fb-e6a0-42e8-bd18-039295c69970",
       "status": "awaiting_engineer",
       "tools": [
         "propose_fix"
       ],
       "heard": [
         "Fix it.",
-        "Yes.",
-        "Do it."
+        "Yes, do it."
       ],
       "dtmf": [],
       "interruptions": 1,
       "carrier_clears": 1,
       "ttfa_ms": [
-        3828,
-        681
+        3748,
+        777
       ],
-      "seconds": 39.3,
+      "seconds": 43.6,
       "events": [
         {
           "kind": "session.ready",
-          "session_id": "sess_d5d9e7006f8f4f23a76e7f0abb420937"
+          "session_id": "sess_ada84df2a05c404d81bc83d5de265a47"
         },
         {
           "kind": "said",
@@ -282,16 +279,11 @@
         },
         {
           "kind": "said",
-          "text": "One change: restore the missing security group rule, the T C P port 5 4 3 2 rule from the application security group into the database security group. Nothing"
+          "text": "One change: restore the missing security-group rule, the tcp port 5 4 3 2 rule from the application security group into the database security group."
         },
         {
           "kind": "heard",
-          "text": "Yes.",
-          "confidence": null
-        },
-        {
-          "kind": "heard",
-          "text": "Do it.",
+          "text": "Yes, do it.",
           "confidence": null
         },
         {
@@ -302,27 +294,35 @@
         },
         {
           "kind": "said",
-          "text": "I need you to say exactly: approve fix 1. Say it twice for me: approve fix 1, approve fix 1."
+          "text": "group. Nothing else changes. To go ahead, say, approve fix 1. \n\nTo confirm, that is, approve fix 1."
+        },
+        {
+          "kind": "said",
+          "text": "Nothing else changes. To proceed, please say, approve fix one. Approve fix one."
+        },
+        {
+          "kind": "said",
+          "text": "approve fix 1. Please say, approve fix 1."
         },
         {
           "kind": "call.ended",
           "reason": "caller hung up",
-          "seconds": 39.3
+          "seconds": 43.6
         }
       ],
       "spoken": [
         {
           "line": "Fix it.",
-          "at": 14.03,
+          "at": 13.68,
           "agent_talking": false,
           "agent_quiet_for": 1.61,
           "replies_done": 1
         },
         {
           "line": "Yes, do it.",
-          "at": 26.05,
+          "at": 25.69,
           "agent_talking": true,
-          "agent_quiet_for": -0.09,
+          "agent_quiet_for": -0.33,
           "replies_done": 2
         }
       ],
@@ -332,18 +332,17 @@
         "checks": [],
         "problems": [],
         "caller_said": [
-          "Fix",
-          "it.",
+          "Fix it.",
           "Yes,",
           "do",
           "it."
         ],
         "agent_said": [
           "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it, and I will propose the fix.",
-          "One change: restore the missing security group rule, the TCP port 5432 rule from the application security",
-          "group",
-          "into",
-          "the database security group. Group. Nothing else changes. To proceed, please say approve fix 1. Approve fix 1."
+          "One change: restore the missing security group rule, the TCP port 5432 rule, from the",
+          "application",
+          "security",
+          "group into the database security group. Group. Nothing else changes. To proceed, please say approve fix 1. Approve fix 1. Approve fix 1. Please say approve fix 1."
         ],
         "phrases": {
           "approve_fix": [
@@ -351,50 +350,66 @@
               "channel": "2",
               "who": "agent",
               "said": "approve fix 1",
-              "start_ms": 2080,
+              "start_ms": 2160,
               "confidence": null
             },
             {
               "channel": "2",
               "who": "agent",
               "said": "Approve fix 1",
-              "start_ms": 2080,
+              "start_ms": 2160,
+              "confidence": null
+            },
+            {
+              "channel": "2",
+              "who": "agent",
+              "said": "Approve fix 1",
+              "start_ms": 2160,
+              "confidence": null
+            },
+            {
+              "channel": "2",
+              "who": "agent",
+              "said": "approve fix 1",
+              "start_ms": 2160,
               "confidence": null
             }
           ]
         },
-        "transcript_id": "c1e88698-00d2-45c5-a4e6-6de9b7c735a9",
-        "seconds": 40
+        "transcript_id": "bce85ffd-2ecd-4666-9b37-6fac43675b03",
+        "seconds": 44
       }
     },
     {
       "scenario": "barge_in",
       "ok": true,
       "problems": [],
-      "incident_id": "c67918bb-e2fa-43a9-b824-0110cddba8fb",
+      "incident_id": "9f5b45fb-e6a0-42e8-bd18-039295c69970",
       "status": "awaiting_engineer",
       "tools": [
         "propose_fix",
-        "cancel_proposal"
+        "cancel_proposal",
+        "approve_fix"
       ],
       "heard": [
         "Fix it.",
-        "Wait, stop.",
-        "Approve fix 2."
+        "Wait.",
+        "Stop.",
+        "Approve fix two."
       ],
       "dtmf": [],
       "interruptions": 1,
-      "carrier_clears": 1,
+      "carrier_clears": 2,
       "ttfa_ms": [
-        3916,
-        3973,
-        2323
+        4023,
+        3069,
+        3586
       ],
-      "seconds": 46.8,
+      "seconds": 51.8,
       "events": [
         {
           "kind": "session.ready",
-          "session_id": "sess_d42fe5ae8d434479a7519220c43fed52"
+          "session_id": "sess_68f59e584c8446329cf15b73c0bfd212"
         },
         {
           "kind": "said",
@@ -412,11 +427,11 @@
           "kind": "tool",
           "name": "propose_fix",
           "args": {},
-          "ms": 65
+          "ms": 61
         },
         {
           "kind": "said",
-          "text": "One change: restore the missing security"
+          "text": "One change: restore the missing security group rule,"
         },
         {
           "kind": "caller.speaking"
@@ -426,7 +441,15 @@
         },
         {
           "kind": "heard",
-          "text": "Wait, stop.",
+          "text": "Wait.",
+          "confidence": null
+        },
+        {
+          "kind": "caller.speaking"
+        },
+        {
+          "kind": "heard",
+          "text": "Stop.",
           "confidence": null
         },
         {
@@ -436,7 +459,7 @@
             "fix_id": 2,
             "reason": "engineer said stop"
           },
-          "ms": 43
+          "ms": 44
         },
         {
           "kind": "said",
@@ -447,46 +470,89 @@
         },
         {
           "kind": "heard",
-          "text": "Approve fix 2.",
+          "text": "Approve fix two.",
           "confidence": null
         },
         {
+          "kind": "tool",
+          "name": "approve_fix",
+          "args": {
+            "confirmation_phrase": "Approve fix two.",
+            "fix_id": 2
+          },
+          "ms": 54
+        },
+        {
           "kind": "said",
-          "text": "I'm sorry, but the fix needs the spoken phrase. Please say exactly, approve fix 2."
+          "text": "Fix withdrawn; nothing was applied. Say fix it and I will propose it again with a fresh number."
         },
         {
           "kind": "call.ended",
           "reason": "caller hung up",
-          "seconds": 46.8
+          "seconds": 51.8
         }
       ],
       "spoken": [
         {
           "line": "Fix it.",
-          "at": 12.58,
+          "at": 13.58,
           "agent_talking": false,
-          "agent_quiet_for": 1.61,
+          "agent_quiet_for": 1.6,
           "replies_done": 1
         },
         {
           "line": "No, wait, stop.",
-          "at": 18.32,
+          "at": 20.06,
           "agent_talking": true,
-          "agent_quiet_for": -0.14,
+          "agent_quiet_for": -0.11,
           "replies_done": 2
         },
         {
           "line": "Approve fix {fix}.",
-          "at": 31.7,
+          "at": 33.24,
           "agent_talking": false,
-          "agent_quiet_for": 1.61,
+          "agent_quiet_for": 1.6,
           "replies_done": 4
         }
       ],
       "recording": "/home/prashant/beacon-video/phone/barge_in.wav",
       "attestation": {
         "ok": true,
-        "checks": [],
+        "checks": [
+          {
+            "tool": "approve_fix",
+            "ok": true,
+            "caller_occurrences": 1,
+            "agent_occurrences": 0,
+            "quote": "Approve fix 2",
+            "one_voice": {
+              "ok": true,
+              "voices": [
+                "1A"
+              ],
+              "spoke": [
+                {
+                  "speaker": "1A",
+                  "text": "No,"
+                },
+                {
+                  "speaker": "1A",
+                  "text": "wait,"
+                },
+                {
+                  "speaker": "1A",
+                  "text": "stop."
+                },
+                {
+                  "speaker": "1A",
+                  "text": "Approve fix 2."
+                }
+              ],
+              "window_ms": 15000,
+              "why": "one voice on the caller's channel"
+            }
+          }
+        ],
         "problems": [],
         "caller_said": [
           "Fix it.",
@@ -496,61 +562,60 @@
           "Approve fix 2."
         ],
         "agent_said": [
-          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it and I will propose the fix.",
+          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it, and I will propose the fix.",
           "One",
-          "change.",
-          "Restore the",
-          "missing security.",
-          "Fix withdrawn. Nothing was applied. Ask again if you want it proposed.",
-          "I'm sorry, but the fix needs the spoken phrase. Please say exactly, approve fix 2."
+          "change:",
+          "restore the",
+          "missing security group rule.",
+          "Fix withdrawn, nothing was applied. Ask again if you want it proposed.",
+          "Fix withdrawn, nothing was applied. Say fix it and I will propose it again with a fresh number."
         ],
         "phrases": {
           "approve_fix": [
             {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 2",
-              "start_ms": 2080,
-              "confidence": null
-            },
-            {
               "channel": "1",
               "who": "caller",
               "said": "Approve fix 2",
-              "start_ms": 12800,
+              "start_ms": 13840,
               "confidence": null
             }
           ]
         },
-        "transcript_id": "ea4c8624-1b00-4d8a-a598-9394bc9f277f",
-        "seconds": 47
+        "transcript_id": "a61749df-55fb-4c6d-8e39-71f3a22fa237",
+        "seconds": 52
       }
     },
     {
       "scenario": "hinglish",
       "ok": true,
       "problems": [],
-      "incident_id": "c67918bb-e2fa-43a9-b824-0110cddba8fb",
-      "status": "awaiting_engineer",
+      "incident_id": "9f5b45fb-e6a0-42e8-bd18-039295c69970",
+      "status": "resolved",
       "tools": [
-        "propose_fix"
+        "propose_fix",
+        "approve_fix",
+        "check_recovery"
       ],
       "heard": [
         "\u0915\u094d\u092f\u093e \u0939\u0941\u0906 \u0939\u0948?",
-        "\u0907\u0938\u0915\u094b \u092b\u093f\u0915\u094d\u0938 \u0915\u0930 \u0926\u094b\u0964"
+        "\u0907\u0938\u0915\u094b \u092b\u093f\u0915\u094d\u0938 \u0915\u0930 \u0926\u0942\u0901\u0964",
+        "Approve fix three.",
+        "\u0920\u0940\u0915 \u0939\u094b \u0917\u092f\u093e\u0964"
       ],
       "dtmf": [],
-      "interruptions": 1,
-      "carrier_clears": 1,
+      "interruptions": 3,
+      "carrier_clears": 3,
       "ttfa_ms": [
-        2664,
-        3537
+        2609,
+        3450,
+        3379,
+        712
       ],
-      "seconds": 48.6,
+      "seconds": 76.4,
       "events": [
         {
           "kind": "session.ready",
-          "session_id": "sess_10dbcf5b2fb44d339b8b5c518cdb6514"
+          "session_id": "sess_ecad5d3453504da4a4c21951d7ae85bc"
         },
         {
           "kind": "said",
@@ -566,7 +631,7 @@
         },
         {
           "kind": "said",
-          "text": "E C S service R D S se connect nahi kar paa rahi hai. Security group ka rule delete ho gaya hai [E1]."
+          "text": "E C S service R D S database se connect nahi kar paa rahi hai. Security group rule missing hone ki wajah se errors aa rahe hain."
         },
         {
           "kind": "caller.speaking"
@@ -576,86 +641,220 @@
         },
         {
           "kind": "heard",
-          "text": "\u0907\u0938\u0915\u094b \u092b\u093f\u0915\u094d\u0938 \u0915\u0930 \u0926\u094b\u0964",
+          "text": "\u0907\u0938\u0915\u094b \u092b\u093f\u0915\u094d\u0938 \u0915\u0930 \u0926\u0942\u0901\u0964",
           "confidence": null
         },
         {
           "kind": "tool",
           "name": "propose_fix",
           "args": {},
-          "ms": 79
+          "ms": 71
         },
         {
           "kind": "said",
-          "text": "One change: restore the missing security-group rule, the tcp port 5432 rule from the application security group into the database security group. Nothing else changes.\n\nPlease say, approve fix 3. \n\nApprove fix 3."
+          "text": "One change: restore the missing security group rule, the T C P port five four three two rule from the application security group into the database security group."
+        },
+        {
+          "kind": "caller.speaking"
+        },
+        {
+          "kind": "interrupted"
+        },
+        {
+          "kind": "heard",
+          "text": "Approve fix three.",
+          "confidence": null
+        },
+        {
+          "kind": "tool",
+          "name": "approve_fix",
+          "args": {
+            "confirmation_phrase": "Approve fix three.",
+            "fix_id": 3
+          },
+          "ms": 168
+        },
+        {
+          "kind": "said",
+          "text": "Fix apply ho raha hai aur verify ho raha hai. Jab alarm clear ho jayega, main aapko bata"
+        },
+        {
+          "kind": "heard",
+          "text": "\u0920\u0940\u0915 \u0939\u094b \u0917\u092f\u093e\u0964",
+          "confidence": null
+        },
+        {
+          "kind": "caller.speaking"
+        },
+        {
+          "kind": "interrupted"
+        },
+        {
+          "kind": "said",
+          "text": "The fix is being applied and verified now. I will let you know as soon as the alarm clears."
+        },
+        {
+          "kind": "said",
+          "text": "The fix is being applied. I will let you know as soon as the alarm clears and recovery is verified."
+        },
+        {
+          "kind": "tool",
+          "name": "check_recovery",
+          "args": {},
+          "ms": 58
+        },
+        {
+          "kind": "said",
+          "text": "Sab theek ho gaya hai, service recover ho chuki hai. Kya aap ek Sleep Contract lena chahenge?"
         },
         {
           "kind": "call.ended",
           "reason": "caller hung up",
-          "seconds": 48.6
+          "seconds": 76.4
         }
       ],
       "spoken": [
         {
           "line": "Kya hua hai?",
-          "at": 12.86,
+          "at": 13.6,
           "agent_talking": false,
-          "agent_quiet_for": 1.61,
+          "agent_quiet_for": 1.62,
           "replies_done": 1
         },
         {
           "line": "Isko fix kar do.",
-          "at": 24.88,
+          "at": 25.6,
           "agent_talking": true,
-          "agent_quiet_for": -0.16,
+          "agent_quiet_for": -0.17,
           "replies_done": 1
+        },
+        {
+          "line": "Approve fix {fix}.",
+          "at": 37.61,
+          "agent_talking": true,
+          "agent_quiet_for": -0.13,
+          "replies_done": 2
+        },
+        {
+          "line": "Theek ho gaya?",
+          "at": 51.31,
+          "agent_talking": true,
+          "agent_quiet_for": -0.15,
+          "replies_done": 3
         }
       ],
       "recording": "/home/prashant/beacon-video/phone/hinglish.wav",
       "attestation": {
         "ok": true,
-        "checks": [],
+        "checks": [
+          {
+            "tool": "approve_fix",
+            "ok": true,
+            "caller_occurrences": 1,
+            "agent_occurrences": 0,
+            "quote": "\u0905\u092a\u094d\u0930\u0942\u0935 \u092b\u093f\u0915\u094d\u0938 \u0925\u094d\u0930\u0940",
+            "one_voice": {
+              "ok": true,
+              "voices": [
+                "1A"
+              ],
+              "spoke": [
+                {
+                  "speaker": "1A",
+                  "text": "\u0907\u0938\u0915\u094b"
+                },
+                {
+                  "speaker": "1A",
+                  "text": "\u092b\u093f\u0915\u094d\u0938"
+                },
+                {
+                  "speaker": "1A",
+                  "text": "\u0915\u0930"
+                },
+                {
+                  "speaker": "1A",
+                  "text": "\u0926\u094b\u0964"
+                },
+                {
+                  "speaker": "1A",
+                  "text": "\u0905\u092a\u094d\u0930\u0942\u0935"
+                },
+                {
+                  "speaker": "1A",
+                  "text": "\u092b\u093f\u0915\u094d\u0938"
+                },
+                {
+                  "speaker": "1A",
+                  "text": "\u0925\u094d\u0930\u0940\u0964"
+                },
+                {
+                  "speaker": "1A",
+                  "text": "\u0920\u0940\u0915"
+                },
+                {
+                  "speaker": "1A",
+                  "text": "\u0939\u094b"
+                },
+                {
+                  "speaker": "1A",
+                  "text": "\u0917\u092f\u093e\u0964"
+                }
+              ],
+              "window_ms": 15000,
+              "why": "one voice on the caller's channel"
+            }
+          }
+        ],
         "problems": [],
         "caller_said": [
           "\u0915\u094d\u092f\u093e \u0939\u0941\u0906 \u0939\u0948?",
           "\u0907\u0938\u0915\u094b",
           "\u092b\u093f\u0915\u094d\u0938",
-          "\u0915\u0930 \u0926\u094b\u0964"
+          "\u0915\u0930",
+          "\u0926\u094b\u0964",
+          "\u0905\u092a\u094d\u0930\u0942\u0935",
+          "\u092b\u093f\u0915\u094d\u0938",
+          "\u0925\u094d\u0930\u0940\u0964",
+          "\u0920\u0940\u0915",
+          "\u0939\u094b",
+          "\u0917\u092f\u093e\u0964"
         ],
         "agent_said": [
-          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it and I will propose the fix.",
-          "ECS service RDS, say connect nahi kar pa rahi hai. Security group ka rule delete",
-          "ho gaya",
-          "hai.",
-          "One change: restore the missing security group rule, the TCP port 5432 rule from the application security group into the database security group. Nothing else changes. Please say approve fix 3. Approve fix 3."
+          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it, and I will propose the fix.",
+          "ECS service RDS database C connect nahi kar pa rahi hai. Security group rule missing hone",
+          "ki",
+          "waja",
+          "say",
+          "errors a rahi hai.",
+          "One change: restore the missing security group rule, the TCP port 5432 rule, from the application security",
+          "group",
+          "into",
+          "the database security",
+          "group. Fix apply ho raha hai or verify ho raha hai.",
+          "Job",
+          "alarm",
+          "clear ho j\u093e\u090f\u0917\u093e\u0964 Main app go by. The fix is being\u2014 the fix is being applied. I will let you know as soon as the alarm clears and recovery is verified."
         ],
         "phrases": {
           "approve_fix": [
             {
-              "channel": "2",
-              "who": "agent",
-              "said": "approve fix 3",
-              "start_ms": 2240,
-              "confidence": null
-            },
-            {
-              "channel": "2",
-              "who": "agent",
-              "said": "Approve fix 3",
-              "start_ms": 2240,
+              "channel": "1",
+              "who": "caller",
+              "said": "\u0905\u092a\u094d\u0930\u0942\u0935 \u092b\u093f\u0915\u094d\u0938 \u0925\u094d\u0930\u0940",
+              "start_ms": 14140,
               "confidence": null
             }
           ]
         },
-        "transcript_id": "d8b32547-568f-48ef-bb18-f978fb1a11dc",
-        "seconds": 49
+        "transcript_id": "3410ddc1-de44-43e7-ad82-601176490e73",
+        "seconds": 76
       }
     },
     {
       "scenario": "keypad",
       "ok": true,
       "problems": [],
-      "incident_id": "c67918bb-e2fa-43a9-b824-0110cddba8fb",
+      "incident_id": "1c5de50e-baa0-4e44-9e2c-2f0f8f199594",
       "status": "awaiting_engineer",
       "tools": [
         "propose_fix"
@@ -671,10 +870,10 @@
       "interruptions": 2,
       "carrier_clears": 2,
       "ttfa_ms": [
-        1990,
-        2407
+        3863,
+        2604
       ],
-      "seconds": 40.1,
+      "seconds": 44.9,
       "events": [
         {
           "kind": "dtmf",
@@ -682,15 +881,24 @@
         },
         {
           "kind": "session.ready",
-          "session_id": "sess_7d5c446a32bf43069f8b1f848c64f273"
+          "session_id": "sess_13f82dc3033145e2878bdc13eafd548b"
         },
         {
           "kind": "said",
-          "text": "The incident is acknowledged and I will stay on the line."
+          "text": "Incident acknowledge ho gaya hai, main line par hi hoon."
         },
         {
           "kind": "dtmf",
           "digit": "5"
+        },
+        {
+          "kind": "said",
+          "text": "A keypress won't work."
+        },
+        {
+          "kind": "heard",
+          "text": "Fix it.",
+          "confidence": null
         },
         {
           "kind": "caller.speaking"
@@ -699,19 +907,14 @@
           "kind": "interrupted"
         },
         {
-          "kind": "heard",
-          "text": "Fix it.",
-          "confidence": null
-        },
-        {
           "kind": "tool",
           "name": "propose_fix",
           "args": {},
-          "ms": 67
+          "ms": 58
         },
         {
           "kind": "said",
-          "text": "One change: restore the missing security group rule, the T C P port 5 4 3 2 rule from the application security group into the database security group. Nothing else changes."
+          "text": "One change: restore the missing security-group rule, the tcp port 5 4 3 2 rule from the application security group into the database security group. Nothing else changes. Please say, approve fix"
         },
         {
           "kind": "caller.speaking"
@@ -726,41 +929,41 @@
         },
         {
           "kind": "said",
-          "text": "The fix needs the spoken phrase. Please say exactly, approve fix 4."
+          "text": "The fix needs the spoken phrase. Please say, approve fix 1."
         },
         {
           "kind": "call.ended",
           "reason": "caller hung up",
-          "seconds": 40.1
+          "seconds": 44.9
         }
       ],
       "spoken": [
         {
           "line": "press 1",
-          "at": 1.35,
+          "at": 1.39,
           "agent_talking": false,
           "agent_quiet_for": 0.0,
           "replies_done": 0
         },
         {
           "line": "Fix it.",
-          "at": 13.36,
+          "at": 13.41,
           "agent_talking": true,
-          "agent_quiet_for": -0.1,
+          "agent_quiet_for": -0.39,
           "replies_done": 0
         },
         {
           "line": "press 5",
-          "at": 14.09,
+          "at": 14.13,
           "agent_talking": true,
-          "agent_quiet_for": -0.06,
+          "agent_quiet_for": -0.38,
           "replies_done": 0
         },
         {
           "line": "I pressed five. Did that do it?",
-          "at": 26.09,
+          "at": 26.14,
           "agent_talking": true,
-          "agent_quiet_for": -0.1,
+          "agent_quiet_for": -0.34,
           "replies_done": 2
         }
       ],
@@ -772,30 +975,41 @@
         "caller_said": [
           "Fix",
           "it.",
-          "I press",
-          "5.",
-          "Did that do it?"
+          "I",
+          "press 5.",
+          "Did that",
+          "do it?"
         ],
         "agent_said": [
-          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it and I will propose the fix. The incident is acknowledged and I will stay",
-          "on the line. One change: restore the missing security group rule, the TCP port 5432 rule, from the application security group into the database security group.",
-          "Nothing",
-          "else changes.",
-          "The fix needs the spoken phrase. Please say exactly, approve fix 4."
+          "This is Beacon calling about your production alarm. Your demo web service in us-east-1 can no longer reach its database. Say fix it and I will propose the fix. Incident acknowledge ho gaya hai,",
+          "mainline par hai hoon. A key press.",
+          "One change. Restore the missing security group rule, TCP port 5432. Rule",
+          "from the",
+          "application security group",
+          "into the",
+          "database security group. Nothing else changes. Please say approve fix one.",
+          "The fix needs the spoken phrase. Please say approve fix one."
         ],
         "phrases": {
           "approve_fix": [
             {
               "channel": "2",
               "who": "agent",
-              "said": "approve fix 4",
+              "said": "approve fix one",
+              "start_ms": 2000,
+              "confidence": null
+            },
+            {
+              "channel": "2",
+              "who": "agent",
+              "said": "approve fix one",
               "start_ms": 2000,
               "confidence": null
             }
           ]
         },
-        "transcript_id": "202ad84f-1053-4b26-ab3d-240b73d6d824",
-        "seconds": 40
+        "transcript_id": "2cdf9d5e-2bf5-4041-9e2c-f097eb68e772",
+        "seconds": 44
       }
     }
   ]
