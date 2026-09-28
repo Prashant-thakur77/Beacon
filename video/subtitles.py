@@ -135,8 +135,17 @@ def main() -> int:
     job = aai._json("POST", f"{aai.API}/transcript", body)  # noqa: SLF001
     import time
 
+    got: dict = {}
     for _ in range(200):
-        got = aai._json("GET", f"{aai.API}/transcript/{job['id']}")  # noqa: SLF001
+        try:
+            got = aai._json("GET", f"{aai.API}/transcript/{job['id']}")  # noqa: SLF001
+        except Exception as exc:
+            # A blip while polling is not a failed transcription. The job is running
+            # on their side; dropping it here would throw away four minutes of audio
+            # that has already been uploaded and paid for.
+            print(f"  (polling hiccup: {type(exc).__name__}; still waiting)")
+            time.sleep(3)
+            continue
         if got.get("status") == "completed":
             break
         if got.get("status") == "error":
