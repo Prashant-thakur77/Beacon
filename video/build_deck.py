@@ -1,4 +1,4 @@
-"""Render the eleven pitch slides from the film's own scene engine, then bind them into a PDF.
+"""Render the twelve pitch slides from the film's own scene engine, then bind them into a PDF.
 
 Deck and film are the same design system: image slides (`slide.html`) carrying a real screenshot and the architecture drawing. Needs the
 scene server running:  cd ~/beacon-video/scenes && python3 -m http.server 8877
@@ -43,7 +43,8 @@ SLIDES: list[tuple[str, str]] = [
     ("08-voicetest", f"{BASE}/scenes.html?theme=light&scene=voicetest"),
     ("09-market", f"{BASE}/scenes.html?theme=light&scene=market"),
     ("10-revenue", f"{BASE}/scenes.html?theme=light&scene=revenue"),
-    ("11-next", f"{BASE}/scenes.html?theme=light&scene=next"),
+    ("11-competitors", f"{BASE}/scenes.html?theme=light&scene=competitors"),
+    ("12-next", f"{BASE}/scenes.html?theme=light&scene=next"),
 ]
 
 

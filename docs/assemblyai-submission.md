@@ -116,7 +116,7 @@ video/script-assemblyai.md; the pipeline is in the repo.
 - Repository (MIT, branch `assemblyai`): https://github.com/Prashant-thakur77/Beacon/tree/assemblyai
 - The pull request Beacon opened by voice: https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2
 - Film (4:46): *(YouTube link — upload `Beacon-AssemblyAI.mp4` from the release)* · direct download: https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4
-- Deck (11 slides): https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-deck.pdf
+- Deck (12 slides): https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-deck.pdf
 - Release with every artefact: https://github.com/Prashant-thakur77/Beacon/releases/tag/v0.6.0
 - Telegram bot: https://t.me/GoodNightShiftbot (allowlisted to the author; the film shows it)
 

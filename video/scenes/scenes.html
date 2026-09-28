@@ -56,6 +56,11 @@
   .next-grid .h { font-size:22px; letter-spacing:.16em; text-transform:uppercase; color:var(--faint); margin-bottom:18px; }
   .next-grid .b { font-size:30px; line-height:1.5; }
   .next-grid .b .dimx { color:var(--dim); }
+  .next-grid.vs { max-width:1660px; margin:0 auto; gap:56px; }
+  .next-grid.vs .col { flex:1 1 0; min-width:0; }
+  .next-grid.vs .b { font-size:27px; }
+  .next-grid .col.mine .h { color:var(--green); }
+  .next-grid .col.mine { border-left:3px solid var(--green); padding-left:26px; }
 
   /* telegram: the page and the voice-note reply, with the exact strings the bot sends */
   .tg { display:flex; gap:56px; align-items:center; }
@@ -359,6 +364,17 @@ ranked: destructive verbs first · Beacon's own writes tagged</pre></div>
       <div class="line fade d2"><span class="i">01</span><span class="t">Consent has to rest on <i>words an engineer actually said</i> &mdash; half asleep, in two languages. A keypad cannot say <i>which</i> fix on <i>which</i> resource.</span></div>
       <div class="line fade d3"><span class="i">02</span><span class="t">An interruption has to be an <i>event the application can act on</i>. Speaking over the read-back withdraws the fix.</span></div>
       <div class="line fade d4"><span class="i">03</span><span class="t">Nine tools have to be callable <i>mid-sentence</i>, with each result feeding the next thing said.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="scene" id="competitors">
+  <div class="center" style="gap:50px">
+    <div class="kicker fade d1">Everything else is on one side of a line</div>
+    <div class="next-grid vs">
+      <div class="col fade d2"><div class="h">Asks, cannot act</div><div class="b">PagerDuty routes the page<br/>incident.io opens a channel<br/><span class="dimx">the minutes that matter still contain &ldquo;engineer finds laptop&rdquo;</span></div></div>
+      <div class="col fade d3"><div class="h">Acts, never asks</div><div class="b">SSM runbooks<br/>EventBridge auto-remediation<br/><span class="dimx">restores the rule <i>including</i> when it was removed on purpose &mdash; a runbook sees a condition, never a cause</span></div></div>
+      <div class="col mine fade d4"><div class="h">Beacon</div><div class="b">finds the cause, proposes <b>one</b> fix, dry-runs it<br/>then <b>asks, out loud</b><br/><span class="dimx">and the sentence that unlocked it is scored, attributed to a channel and replayable</span></div></div>
     </div>
   </div>
 </section>
