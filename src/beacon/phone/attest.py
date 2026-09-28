@@ -20,6 +20,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from beacon import consent_phrase
+
 CALLER_CHANNEL = "1"
 AGENT_CHANNEL = "2"
 
@@ -45,7 +47,13 @@ def _norm(text: str) -> str:
 
 
 def _words_of(phrase: str) -> list[str]:
-    return [w for w in re.sub(r"[^\w\s]", " ", phrase.lower()).split() if w]
+    """The same comparison the gate uses, so the audit cannot disagree with it.
+
+    This split its own way until a live Hinglish call was applied by the gate and
+    then flagged by this audit: the caller's channel re-transcribed as
+    "अप्रूव फिक्स थ्री।", which only the gate could read.
+    """
+    return consent_phrase.words(phrase)
 
 
 def caller_words(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -105,6 +113,38 @@ def _by_channel(utterances: list[dict[str, Any]]) -> dict[str, list[dict[str, An
     return grouped
 
 
+def _comparable(raw: list[str]) -> tuple[str, list[int]]:
+    """The channel's words in comparable form, and which raw word each came from.
+
+    A live Hinglish call's caller channel came back as "अप्रूव फिक्स थ्री।", which no
+    English regex finds, so the audit reported that nobody had authorised a change
+    the gate had correctly applied. Matching the comparable form fixes that, but the
+    audit's evidence has to stay verbatim -- "Approve fix one", not "approve fix 1" --
+    so the mapping back to the spoken words is kept.
+    """
+    words: list[str] = []
+    origin: list[int] = []
+    for index, token in enumerate(raw):
+        for word in consent_phrase.words(token):
+            words.append(word)
+            origin.append(index)
+    return " ".join(words), origin
+
+
+def _verbatim(
+    raw: list[str], origin: list[int], comparable: str, match: re.Match[str]
+) -> str:
+    """The words as they were actually said, for the span *match* covers."""
+    first = comparable[: match.start()].count(" ")
+    last = comparable[: match.end()].count(" ")
+    if not origin or first >= len(origin):
+        return match.group(0)
+    span = raw[origin[first] : origin[min(last, len(origin) - 1)] + 1]
+    # Verbatim in words, without the sentence punctuation the transcriber added:
+    # the quote is evidence of what was said, not of where the full stop landed.
+    return " ".join(span).strip(consent_phrase.EDGE)
+
+
 def attribute(utterances: list[dict[str, Any]]) -> dict[str, Any]:
     """Split a dual-channel transcript into who said what, and find the phrases.
 
@@ -118,18 +158,24 @@ def attribute(utterances: list[dict[str, Any]]) -> dict[str, Any]:
     per-utterance regex finds nothing there and reports, wrongly, that nobody
     authorised the change. What the caller said does not depend on where the
     transcript was chopped.
+
+    Nor on which script it was written in: the phrases are matched against
+    ``consent_phrase.normalise``\'s output, so "approve fix three" and
+    ``अप्रूव फिक्स थ्री।`` are the same consent. ``said`` therefore carries the
+    canonical phrase; ``caller_said`` carries the words verbatim.
     """
     found: dict[str, list[dict[str, Any]]] = {}
     for channel, group in _by_channel(utterances).items():
-        joined = _norm(" ".join(str(u.get("text") or "") for u in group))
+        raw = _norm(" ".join(str(u.get("text") or "") for u in group)).split()
+        comparable, origin = _comparable(raw)
         starts = [u.get("start") for u in group if u.get("start") is not None]
         for tool, pattern in CONSENT_PATTERNS.items():
-            for match in pattern.finditer(joined):
+            for match in pattern.finditer(comparable):
                 found.setdefault(tool, []).append(
                     {
                         "channel": channel,
                         "who": "caller" if channel == CALLER_CHANNEL else "agent",
-                        "said": match.group(0),
+                        "said": _verbatim(raw, origin, comparable, match),
                         "start_ms": starts[0] if starts else None,
                         "confidence": None,
                     }

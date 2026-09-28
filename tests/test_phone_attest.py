@@ -109,3 +109,30 @@ def test_the_one_voice_check_survives_a_split_phrase_too() -> None:
         u["speaker"] = "1A"
     found = attest.voices_around(chopped, "Approve fix one")
     assert found["ok"] is True and found["voices"] == ["1A"]
+
+
+def test_a_hinglish_approval_is_attributed_and_quoted_as_it_was_said() -> None:
+    """A live Hinglish call was applied by the gate and flagged by this audit.
+
+    The caller's channel came back as "अप्रूव फिक्स थ्री।", which no English regex
+    finds, so the audit reported "approve_fix ran but its phrase is not on the
+    caller's channel" for a change the caller had correctly authorised. A false
+    alarm on the safety artifact is nearly as bad as a miss.
+
+    The phrases are matched in comparable form; the quote stays verbatim, because
+    the quote is the evidence.
+    """
+    verdict = attest.verify(
+        [
+            {"channel": "2", "text": "Please say approve fix three.", "start": 30000},
+            {"channel": "1", "text": "अप्रूव", "start": 40000},
+            {"channel": "1", "text": "फिक्स थ्री।", "start": 40500},
+        ],
+        ["approve_fix"],
+    )
+    check = verdict["checks"][0]
+    assert check["ok"] and check["caller_occurrences"] == 1
+    assert check["quote"] == "अप्रूव फिक्स थ्री", (
+        "the audit quotes what was said, not a normalised rewrite of it"
+    )
+    assert verdict["caller_said"] == ["अप्रूव", "फिक्स थ्री।"]
