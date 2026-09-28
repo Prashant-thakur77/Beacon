@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/python-3.12-3776ab)](pyproject.toml)
 [![Built on AWS](https://img.shields.io/badge/built%20on-AWS-ff9900)](docs/architecture.md)
 
-**Live console:** https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/ · **Film (3:26):** [download](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.3.0/Beacon-AssemblyAI.mp4) · **Deck:** [PDF](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.3.0/Beacon-deck.pdf) · **Architecture:** [the voice path](#architecture) · **Business case:** [docs/business-case.md](docs/business-case.md) · **Built on AssemblyAI:** [what runs where](#built-on-assemblyai-the-voice-you-can-interrupt) · **Try it locally, no AWS:** `make setup && make local`
+**Live console:** https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/ · **Film (4:21):** [download](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.3.0/Beacon-AssemblyAI.mp4) · **Deck:** [PDF](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.3.0/Beacon-deck.pdf) · **Architecture:** [the voice path](#architecture) · **Business case:** [docs/business-case.md](docs/business-case.md) · **Built on AssemblyAI:** [what runs where](#built-on-assemblyai-the-voice-you-can-interrupt) · **Try it locally, no AWS:** `make setup && make local`
 
 It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. You need four answers — *is it real, what changed, what do I do, can I go back to sleep* — and today's tools answer, at most, the first one.
 
@@ -88,7 +88,10 @@ The second incident under a contract runs the same loop with `source: contract` 
 
 ## Architecture
 
-<img src="docs/assets/architecture-voice.png" alt="The voice path: where the engineer is, consent decided in code, and what may change production" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-voice.png" />
+  <img src="docs/assets/architecture-voice-light.png" alt="The voice path: three channels on one socket, consent decided in code, and what may change production" />
+</picture>
 
 Three planes, and the middle one is the product: **the model decides whether to call a tool; code decides whether the call is allowed.** A full description is in [docs/architecture.md](docs/architecture.md); the safety argument is in [docs/safety.md](docs/safety.md).
 
@@ -269,7 +272,7 @@ template.yaml           base stack (triage)          remediation-template.yaml  
 demo/                   the patient: VPC + RDS + Fargate app + alarm, and the sticky-wedge failure mode
 requirements/           pinned image dependencies (triage.txt, agent.txt)
 scripts/                gate.sh · commit.sh · local_server.py (make local) · dev/assemblyai_loop.py + dev/assemblyai_audio.py (voice harnesses) · capture, replay builders
-tests/                  300+ tests: moto for AWS, FakeAgent for the model, fake Telegram/GitHub/AssemblyAI, template safety + ops, local mode
+tests/                  350 tests: moto for AWS, FakeAgent for the model, fake Telegram/GitHub/AssemblyAI, template safety + ops, local mode
 docs/                   architecture.md (Mermaid) · safety.md · assemblyai.md · telegram.md · fix-at-source.md · human-runbook.md · submission.md · blog.md
 video/                  how the demo film is generated (Chatterbox narration, three.js scenes, Playwright captures, ffmpeg)
 .github/                CI (gate + console build), manual Deploy workflow, issue/PR templates

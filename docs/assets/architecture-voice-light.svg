@@ -1,26 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 940" width="1440" height="940" font-family="Geist, Inter, system-ui, sans-serif">
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#55555c"/>
+      <path d="M0 0 L10 5 L0 10 z" fill="#8A8A78"/>
     </marker>
     <marker id="al" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#b4a7ff"/>
+      <path d="M0 0 L10 5 L0 10 z" fill="#6B4FD8"/>
     </marker>
     <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#6ee7a0"/>
+      <path d="M0 0 L10 5 L0 10 z" fill="#03796A"/>
     </marker>
     <style>
-      .t  { fill:#f5f5f4; font-size:19px; font-weight:600; }
-      .s  { fill:#a1a1aa; font-size:15px; }
-      .m  { fill:#a1a1aa; font-size:13.5px; font-family:"Geist Mono", ui-monospace, monospace; }
-      .k  { fill:#55555c; font-size:13px; letter-spacing:.16em; font-weight:600; }
-      .lil{ fill:#b4a7ff; } .grn{ fill:#6ee7a0; } .amb{ fill:#f5b942; } .red{ fill:#ff6b6b; }
-      .box{ fill:#141417; stroke:#26262b; }
-      .plane { fill:#0e0e11; stroke:#1c1c21; }
+      .t  { fill:#1A1A1A; font-size:19px; font-weight:600; }
+      .s  { fill:#55554E; font-size:15px; }
+      .m  { fill:#55554E; font-size:13.5px; font-family:"Geist Mono", ui-monospace, monospace; }
+      .k  { fill:#8A8A78; font-size:13px; letter-spacing:.16em; font-weight:600; }
+      .lil{ fill:#6B4FD8; } .grn{ fill:#03796A; } .amb{ fill:#B26B00; } .red{ fill:#C02626; }
+      .box{ fill:#FFFDF2; stroke:#DCDCC6; }
+      .plane { fill:#FBFBE8; stroke:#E6E6D2; }
     </style>
   </defs>
 
-  <rect width="1440" height="940" fill="#0b0b0d"/>
+  <rect width="1440" height="940" fill="#FFFFEB"/>
   <text x="56" y="56" class="t" font-size="26">Beacon Night Shift — the voice path</text>
   <text x="56" y="82" class="s">Nine tools on one socket. The model decides whether to call one; code decides whether the call is allowed.</text>
 
@@ -34,7 +34,7 @@
   <text x="82" y="238" class="m lil" font-size="12.5">wss://agents.assemblyai.com</text>
   <text x="82" y="262" class="m" font-size="12.5">Universal-3 Pro · TTS</text>
 
-  <rect x="336" y="158" width="254" height="128" rx="14" class="box" stroke="#f5b942"/>
+  <rect x="336" y="158" width="254" height="128" rx="14" class="box" stroke="#B26B00"/>
   <text x="356" y="188" class="t" font-size="17">Phone call · no laptop</text>
   <text x="356" y="212" class="s" font-size="14">it rings; you answer it</text>
   <text x="356" y="238" class="m lil" font-size="12.5">8 kHz µ-law ⇄ 24 kHz PCM</text>
@@ -56,7 +56,7 @@
   <rect x="40" y="340" width="1360" height="248" rx="20" class="plane"/>
   <text x="62" y="370" class="k">2 · CONSENT — DECIDED IN CODE, NOT BY THE MODEL</text>
 
-  <rect x="62" y="388" width="470" height="176" rx="14" class="box" stroke="#b4a7ff"/>
+  <rect x="62" y="388" width="470" height="176" rx="14" class="box" stroke="#6B4FD8"/>
   <text x="84" y="418" class="t">voice Lambda · <tspan class="m lil" font-size="15">POST /tools/&lt;name&gt;</tspan></text>
   <text x="84" y="446" class="s">every tool.call from the socket runs here</text>
   <text x="84" y="474" class="m">TurnContext(transcript, confidence, session)</text>
@@ -97,7 +97,7 @@
   <text x="414" y="750" class="m amb">DryRunOperation</text>
   <text x="414" y="774" class="s">blast radius, read aloud</text>
 
-  <rect x="690" y="670" width="360" height="118" rx="14" class="box" stroke="#6ee7a0"/>
+  <rect x="690" y="670" width="360" height="118" rx="14" class="box" stroke="#03796A"/>
   <text x="712" y="700" class="t">Step Functions · verify loop</text>
   <text x="712" y="726" class="s">execute once → wait → verify ×6</text>
   <text x="712" y="750" class="m grn" font-size="11.5">alarm OK after the fix ∧ metric 0 ∧ post-check</text>
@@ -113,21 +113,21 @@
   <text x="84" y="836" class="t">Sleep Contract</text>
   <text x="84" y="860" class="s">scoped, counted, expiring — the second night, nobody is woken</text>
 
-  <rect x="712" y="806" width="666" height="70" rx="14" class="box" stroke="#b4a7ff"/>
+  <rect x="712" y="806" width="666" height="70" rx="14" class="box" stroke="#6B4FD8"/>
   <text x="734" y="836" class="t">open_fix_pr → GitHub</text>
   <text x="734" y="860" class="s">the rule restored in the template + the postmortem. Beacon never merges.</text>
 
   <!-- flows -->
-  <path d="M189 286 L230 388" stroke="#b4a7ff" stroke-width="2" fill="none" marker-end="url(#al)"/>
+  <path d="M189 286 L230 388" stroke="#6B4FD8" stroke-width="2" fill="none" marker-end="url(#al)"/>
   <text x="196" y="342" class="m lil">tool.call</text>
-  <path d="M463 286 L297 388" stroke="#f5b942" stroke-width="2" fill="none" marker-end="url(#a)"/>
-  <path d="M737 286 L380 388" stroke="#55555c" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <path d="M463 286 L297 388" stroke="#B26B00" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <path d="M737 286 L380 388" stroke="#8A8A78" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
   <text x="600" y="352" class="m">one route, three channels</text>
-  <path d="M297 564 L297 670" stroke="#55555c" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <path d="M297 564 L297 670" stroke="#8A8A78" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
   <text x="309" y="622" class="m">only after the gates</text>
-  <path d="M362 729 L392 729" stroke="#55555c" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
-  <path d="M660 729 L690 729" stroke="#55555c" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
-  <path d="M1050 729 L1080 729" stroke="#6ee7a0" stroke-width="1.6" fill="none" marker-end="url(#ag)"/>
-  <path d="M1175 564 L1175 670" stroke="#55555c" stroke-width="1.6" fill="none" marker-end="url(#a)" stroke-dasharray="5 4"/>
+  <path d="M362 729 L392 729" stroke="#8A8A78" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <path d="M660 729 L690 729" stroke="#8A8A78" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <path d="M1050 729 L1080 729" stroke="#03796A" stroke-width="1.6" fill="none" marker-end="url(#ag)"/>
+  <path d="M1175 564 L1175 670" stroke="#8A8A78" stroke-width="1.6" fill="none" marker-end="url(#a)" stroke-dasharray="5 4"/>
   <text x="1187" y="622" class="m">every outcome recorded</text>
 </svg>

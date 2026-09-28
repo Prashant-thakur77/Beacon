@@ -1,7 +1,6 @@
 """Render the eleven pitch slides from the film's own scene engine, then bind them into a PDF.
 
-Deck and film are the same design system: nine slides are scenes from `scenes.html`, two are
-image slides (`slide.html`) carrying a real screenshot and the architecture drawing. Needs the
+Deck and film are the same design system: image slides (`slide.html`) carrying a real screenshot and the architecture drawing. Needs the
 scene server running:  cd ~/beacon-video/scenes && python3 -m http.server 8877
 
     ~/.pyenv/versions/3.10.13/bin/python video/build_deck.py [out.pdf]
@@ -19,13 +18,13 @@ BASE = "http://localhost:8877"
 
 # (filename, url) — scenes render themselves; slide.html takes the image ones.
 def img_slide(**kw: str) -> str:
-    return f"{BASE}/slide.html?" + urlencode(kw)
+    return f"{BASE}/slide.html?" + urlencode({**kw, "theme": "light"})
 
 
 SLIDES: list[tuple[str, str]] = [
-    ("01-title", f"{BASE}/scenes.html?scene=title"),
-    ("02-problem", f"{BASE}/scenes.html?scene=problem-stats"),
-    ("03-who", f"{BASE}/scenes.html?scene=who"),
+    ("01-title", f"{BASE}/scenes.html?theme=light&scene=title"),
+    ("02-problem", f"{BASE}/scenes.html?theme=light&scene=problem-stats"),
+    ("03-who", f"{BASE}/scenes.html?theme=light&scene=who"),
     ("04-demo", img_slide(
         k="Live, not a mock-up",
         h="Speak over the read-back, and <em>the fix is withdrawn</em>.",
@@ -39,12 +38,12 @@ SLIDES: list[tuple[str, str]] = [
         img="arch.png", fit="contain",
         c="The Voice Agent API is the mouth and the ears; every <b>tool.call</b> returns to the browser, "
           "which runs it on our Lambda with the transcript the API produced.")),
-    ("06-phone", f"{BASE}/scenes.html?scene=call"),
-    ("07-why", f"{BASE}/scenes.html?scene=whyai"),
-    ("08-voicetest", f"{BASE}/scenes.html?scene=voicetest"),
-    ("09-market", f"{BASE}/scenes.html?scene=market"),
-    ("10-revenue", f"{BASE}/scenes.html?scene=revenue"),
-    ("11-next", f"{BASE}/scenes.html?scene=next"),
+    ("06-phone", f"{BASE}/scenes.html?theme=light&scene=call"),
+    ("07-why", f"{BASE}/scenes.html?theme=light&scene=whyai"),
+    ("08-voicetest", f"{BASE}/scenes.html?theme=light&scene=voicetest"),
+    ("09-market", f"{BASE}/scenes.html?theme=light&scene=market"),
+    ("10-revenue", f"{BASE}/scenes.html?theme=light&scene=revenue"),
+    ("11-next", f"{BASE}/scenes.html?theme=light&scene=next"),
 ]
 
 
