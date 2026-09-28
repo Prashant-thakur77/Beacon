@@ -49,6 +49,12 @@ logger = logging.getLogger(__name__)
 
 WS_URL = "wss://agents.assemblyai.com/v1/ws"
 VOICE = "jane"
+# The Voice Agent API speaks G.711 mu-law natively -- it offers audio/pcm,
+# audio/pcma and audio/pcmu -- and a phone line is mu-law already. So the call's
+# audio is forwarded in both directions untouched: no resampling, no transcoding,
+# and none of the quality a trip through 24 kHz and back would cost. Asked directly
+# on 28 Sep 2026; 'pcm_mulaw' (which the streaming STT API uses) is refused here.
+PHONE_ENCODING = "audio/pcmu"
 # A tool.result may only be sent once the reply that asked for it is done, which is
 # the same rule the browser transport follows.
 _TOOL_TIMEOUT = 60
@@ -222,7 +228,7 @@ class PhoneBridge:
                     "system_prompt": self.brief["system_prompt"],
                     "greeting": self.brief.get("greeting", ""),
                     "input": {
-                        "format": {"encoding": "audio/pcm"},
+                        "format": {"encoding": PHONE_ENCODING},
                         # A phone line is noisier than a laptop and callers pause
                         # mid-sentence when they are half awake, so turns close
                         # later than they do in the browser.
@@ -240,7 +246,7 @@ class PhoneBridge:
                             else {}
                         ),
                     },
-                    "output": {"voice": VOICE, "format": {"encoding": "audio/pcm"}},
+                    "output": {"voice": VOICE, "format": {"encoding": PHONE_ENCODING}},
                     "tools": [
                         {
                             "type": "function",
@@ -289,11 +295,12 @@ class PhoneBridge:
                 continue
             if self.recorder:
                 self.recorder.add_caller(frame)
+            # Straight through: the carrier's frame is already what the API wants.
             await self._ws.send(
                 json.dumps(
                     {
                         "type": "input.audio",
-                        "audio": base64.b64encode(codec.phone_to_agent(frame)).decode(),
+                        "audio": base64.b64encode(frame).decode(),
                     }
                 )
             )
@@ -341,7 +348,7 @@ class PhoneBridge:
         elif kind == "reply.audio":
             data = msg.get("data") or msg.get("audio") or ""
             if data:
-                ulaw = codec.agent_to_phone(base64.b64decode(data))
+                ulaw = base64.b64decode(data)
                 if self.recorder:
                     self.recorder.add_agent(ulaw)
                 await self.leg.play(ulaw)

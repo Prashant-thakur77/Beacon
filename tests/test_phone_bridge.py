@@ -102,15 +102,34 @@ def a_word() -> bytes:
     return codec.pcm_to_ulaw(pcm)
 
 
-def test_the_callers_audio_reaches_the_transcriber_as_24_khz_pcm() -> None:
+def test_the_callers_audio_reaches_the_transcriber_untouched() -> None:
+    """The API takes mu-law natively, so the carrier's frame is forwarded as is.
+
+    Transcoding to 24 kHz and back was work the call did not need, and it cost
+    real quality at the top of the phone band on the way through.
+    """
     socket = FakeSocket([{"type": "session.ready", "session_id": "sess_x"}])
-    bridge, _ = bridge_for(socket, [Line(ulaw=a_word(), label="fix it")])
+    word = a_word()
+    bridge, _ = bridge_for(socket, [Line(ulaw=word, label="fix it")])
     record = run(bridge, socket)
     audio = socket.of_type("input.audio")
     assert audio, "nothing was streamed to the Voice Agent API"
-    # each 20 ms mu-law frame becomes 480 samples of PCM16
-    assert len(base64.b64decode(audio[0]["audio"])) == 480 * 2
+    sent = b"".join(base64.b64decode(chunk["audio"]) for chunk in audio)
+    # one 20 ms telephony frame in, the same 160 mu-law bytes out
+    assert len(base64.b64decode(audio[0]["audio"])) == codec.PHONE_FRAME_BYTES
+    assert word in sent, "the caller's own bytes must arrive unaltered"
     assert record.aai_session_id == "sess_x"
+
+
+def test_the_session_asks_for_mu_law_in_both_directions() -> None:
+    """audio/pcmu, which the API offers alongside audio/pcm and audio/pcma."""
+    from beacon.phone.bridge import PHONE_ENCODING
+
+    bridge, _ = bridge_for(FakeSocket([]), [])
+    session = json.loads(bridge._session_update())["session"]  # noqa: SLF001
+    assert PHONE_ENCODING == "audio/pcmu"
+    assert session["input"]["format"]["encoding"] == PHONE_ENCODING
+    assert session["output"]["format"]["encoding"] == PHONE_ENCODING
 
 
 def test_a_keypress_can_acknowledge_but_never_approve() -> None:

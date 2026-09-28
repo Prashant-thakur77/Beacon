@@ -123,7 +123,21 @@ ALB in production, or this process plus a tunnel during a demo.
 
 ## The audio path
 
-`beacon/phone/codec.py` is the whole conversion, in the standard library
+**The call's audio is not converted at all.** The Voice Agent API offers
+`audio/pcm`, `audio/pcma` and `audio/pcmu`, and a telephone line is G.711 mu-law
+already — so the carrier's frames go to AssemblyAI untouched, and its reply goes
+back to the carrier untouched. No resampling, no transcoding, and none of the
+quality a trip through 24 kHz and back would cost. This is also what AssemblyAI's
+own Twilio example does.
+
+(The first version of this did transcode, because the browser path sends 24 kHz PCM
+and it was not obvious the same socket would take mu-law. It does. Asked directly:
+`pcm_mulaw` — the string the *streaming STT* API uses — is refused here, and the
+error names the three that are accepted.)
+
+`beacon/phone/codec.py` therefore serves the parts either side of the call rather
+than the call itself: rendering the scripted caller's lines from Polly's 8 kHz PCM,
+and turning mu-law back into PCM for the two-channel WAV. It is the standard library
 (`audioop` did it in one line until Python 3.13 removed it):
 
 * **G.711 mu-law ↔ PCM16**, by lookup table — 8 bits logarithmic, so the round trip
