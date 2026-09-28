@@ -76,6 +76,15 @@ export function makeApi(config: Config, passcode: () => string) {
         { method: "POST", body: JSON.stringify({ incident_id: incidentId }) },
         passcode(),
       ),
+    /** Re-transcribe the session's own recording and score the phrase that
+     *  unlocked the change. A live turn carries no confidence; this is the
+     *  second opinion that gives it one. */
+    sessionAttest: (sessionId: string, incidentId: string) =>
+      request<{ ok: boolean; checks: Array<{ phrase: string; ok: boolean; confidence: number | null; weakest_word?: string | null; why?: string; one_voice?: { ok: boolean | null; voices: string[] } }>; problems: string[]; note?: string }>(
+        `${voice}/sessions/${encodeURIComponent(sessionId)}/attest`,
+        { method: "POST", body: JSON.stringify({ incident_id: incidentId }) },
+        passcode(),
+      ),
     recording: (sessionId: string) => request<{ session_id: string; status?: string; duration_seconds?: number | null; audio_url?: string | null }>(`${voice}/recordings/${encodeURIComponent(sessionId)}`, {}, passcode()),
     report: (night?: string) => request<MorningReport>(`${dash}/report/latest${night ? `?night=${encodeURIComponent(night)}` : ""}`),
     health: () => request<Health>(`${dash}/health`),

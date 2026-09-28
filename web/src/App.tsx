@@ -562,6 +562,21 @@ export default function App() {
                   }
                 : undefined
             }
+            onAttest={
+              api && config
+                ? (sid, incidentId) => {
+                    let code = passcode;
+                    if (!code) {
+                      code = window.prompt("Passcode (the check runs through the voice Lambda)") ?? "";
+                      if (!code) return Promise.resolve(null);
+                      setPasscode(code);
+                    }
+                    return makeApi(config, () => code)
+                      .sessionAttest(sid, incidentId)
+                      .catch(() => null);
+                  }
+                : undefined
+            }
             onListen={
               api
                 ? (id) => {

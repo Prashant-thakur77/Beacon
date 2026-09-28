@@ -153,11 +153,14 @@ export function Postmortem({ id, api, fallback, onToast }: { id: string; api: Ap
 type AuditFilter = "all" | "approvals" | "contracts" | "executed";
 
 /** Where the words came from — and, for AssemblyAI sessions, the recording itself. */
-function Attestation({ row, onListen, onSummarise }: { row: AuditRow; onListen?: (sessionId: string) => Promise<string | null>; onSummarise?: (sessionId: string, incidentId: string) => Promise<string | null> }) {
+function Attestation({ row, onListen, onSummarise, onAttest }: { row: AuditRow; onListen?: (sessionId: string) => Promise<string | null>; onSummarise?: (sessionId: string, incidentId: string) => Promise<string | null>; onAttest?: (sessionId: string, incidentId: string) => Promise<{ ok: boolean; checks: Array<{ phrase: string; ok: boolean; confidence: number | null; weakest_word?: string | null; why?: string; one_voice?: { ok: boolean | null; voices: string[] } }>; problems: string[]; note?: string } | null> }) {
   const [state, setState] = useState<"idle" | "loading" | "playing" | "gone">("idle");
   const [src, setSrc] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [summarising, setSummarising] = useState(false);
+  type Heard = Awaited<ReturnType<NonNullable<typeof onAttest>>>;
+  const [heard, setHeard] = useState<Heard>(null);
+  const [checking, setChecking] = useState(false);
   const a = row.attestation ?? {};
   const session = a.session_id && a.session_id.startsWith("sess_") ? a.session_id : null;
   const bits: string[] = [];
@@ -207,6 +210,47 @@ function Attestation({ row, onListen, onSummarise }: { row: AuditRow; onListen?:
           {summarising ? "Summarising…" : "✦ Summarise the session"}
         </button>
       ) : null}
+      {session && onAttest && row.incident_id ? (
+        <button
+          className="btn ghost small"
+          disabled={checking}
+          title="A live turn carries no confidence. AssemblyAI re-transcribes its own recording of this session and scores the phrase that unlocked the change by its weakest word."
+          onClick={() => {
+            setChecking(true);
+            void onAttest(session, row.incident_id!)
+              .then(setHeard)
+              .finally(() => setChecking(false));
+          }}
+        >
+          {checking ? "Checking…" : "◎ How clearly was it heard?"}
+        </button>
+      ) : null}
+      {heard ? (
+        <div className="session-summary">
+          <div className="eyebrow">Consent certificate · checked against the recording</div>
+          {heard.note ? <div className="dim">{heard.note}</div> : null}
+          {heard.checks.map((c, i) => (
+            <div key={i}>
+              {c.confidence == null ? (
+                <>“{c.phrase}” — {c.why ?? "not scored"}</>
+              ) : (
+                <>
+                  <b>{c.ok ? "✓" : "⚠"}</b> “{c.phrase}” heard at{" "}
+                  <b>{Math.round(c.confidence * 100)}%</b>
+                  {c.weakest_word ? <> (weakest word “{c.weakest_word}”)</> : null}
+                  {c.one_voice?.ok === true ? <> · one voice on your channel</> : null}
+                  {c.one_voice?.ok === false ? (
+                    <> · ⚠ {c.one_voice.voices.length} voices ({c.one_voice.voices.join(", ")})</>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ))}
+          {heard.problems.map((p, i) => (
+            <div key={`p${i}`} className="dim">! {p}</div>
+          ))}
+        </div>
+      ) : null}
       {summary ? (
         <div className="session-summary">
           <div className="eyebrow">What was said · summarised by AssemblyAI</div>
@@ -219,7 +263,7 @@ function Attestation({ row, onListen, onSummarise }: { row: AuditRow; onListen?:
   );
 }
 
-export function Audit({ rows, loading, csvUrl, onReplay, replay, onListen, onSummarise }: { rows: AuditRow[] | null; loading: boolean; csvUrl?: string; onReplay?: () => void; replay: boolean; onListen?: (sessionId: string) => Promise<string | null>; onSummarise?: (sessionId: string, incidentId: string) => Promise<string | null> }) {
+export function Audit({ rows, loading, csvUrl, onReplay, replay, onListen, onSummarise, onAttest }: { rows: AuditRow[] | null; loading: boolean; csvUrl?: string; onReplay?: () => void; replay: boolean; onListen?: (sessionId: string) => Promise<string | null>; onSummarise?: (sessionId: string, incidentId: string) => Promise<string | null>; onAttest?: (sessionId: string, incidentId: string) => Promise<{ ok: boolean; checks: Array<{ phrase: string; ok: boolean; confidence: number | null; weakest_word?: string | null; why?: string; one_voice?: { ok: boolean | null; voices: string[] } }>; problems: string[]; note?: string } | null> }) {
   const [filter, setFilter] = useState<AuditFilter>("all");
   const list = (rows ?? []).filter((r) => (filter === "all" ? true : filter === "approvals" ? r.kind === "approval" : filter === "contracts" ? r.kind === "contract" : !!r.executed));
   const json = () => download("beacon-audit.json", JSON.stringify({ rows: rows ?? [], count: rows?.length ?? 0 }, null, 2), "application/json");
@@ -294,7 +338,7 @@ export function Audit({ rows, loading, csvUrl, onReplay, replay, onListen, onSum
                   </td>
                   <td className="quote-cell">
                     “{r.quote}”
-                    <Attestation row={r} onListen={onListen} onSummarise={onSummarise} />
+                    <Attestation row={r} onListen={onListen} onSummarise={onSummarise} onAttest={onAttest} />
                   </td>
                   <td className="small dim">
                     {r.channel}

@@ -87,6 +87,10 @@ class Leg(Protocol):
 
     async def hangup(self) -> None: ...
 
+    # Optional. A scripted leg uses it to know a turn is genuinely over; a carrier
+    # does not need telling, because the person holding the phone can hear.
+    def reply_done(self, interrupted: bool) -> None: ...
+
 
 ToolRunner = Callable[
     [str, dict[str, Any], str, float | None], Awaitable[dict[str, Any]]
@@ -368,9 +372,16 @@ class PhoneBridge:
 
         elif kind == "reply.done":
             self._reply_open = False
-            if msg.get("status") == "interrupted":
+            interrupted = msg.get("status") == "interrupted"
+            if interrupted:
                 self.call.interruptions += 1
                 self.on_event("interrupted", {})
+            # The protocol knows when a turn is over. Inferring it from a gap in the
+            # audio guesses wrong on a long read-back, and the guess is expensive:
+            # the scripted caller speaks over the sentence carrying the phrase.
+            done = getattr(self.leg, "reply_done", None)
+            if callable(done):
+                done(interrupted)
             await self._flush()
 
         elif kind == "session.error":

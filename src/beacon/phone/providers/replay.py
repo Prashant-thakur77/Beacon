@@ -95,6 +95,11 @@ class ReplayLeg:
         self._play_until = 0.0
         self._reply_started = 0.0
         self._ever_played = False
+        # Replies the agent has finished, as the protocol reports them. Counting
+        # them is exact where waiting for a gap in the audio is a guess -- and the
+        # guess is wrong precisely on the long read-back that carries the phrase.
+        self._replies_done = 0
+        self._done_after: int | None = None
         # When the caller last finished a line, and therefore what the agent owes a
         # reply to. ``None`` means nothing is outstanding.
         self._spoke_at: float | None = None
@@ -122,6 +127,7 @@ class ReplayLeg:
                     self.spoken.append(f"[{line.dtmf}]")
                     yield b"DTMF:" + line.dtmf.encode()
                     self._spoke_at = time.monotonic()
+                    self._done_after = self._replies_done
                 else:
                     audio = line.ulaw
                     if line.render is not None:
@@ -139,6 +145,7 @@ class ReplayLeg:
                     self._spoke_at = time.monotonic() + len(queued) * (
                         codec.FRAME_MS / 1000
                     )
+                    self._done_after = self._replies_done
                 finished_at = 0.0
             else:
                 # The line stays open between lines: a carrier keeps sending frames
@@ -162,6 +169,17 @@ class ReplayLeg:
         self.cleared += 1
         self._play_until = time.monotonic()
 
+    def reply_done(self, interrupted: bool) -> None:
+        """The agent finished a turn -- said by the API rather than guessed.
+
+        An *interrupted* reply does not count. It was cut off, so the caller has not
+        been answered, and treating it as an answer sends the next line into the
+        reply the agent is still trying to give. That is the same mistake as
+        inferring the end of a turn from a gap in the audio, arrived at differently.
+        """
+        if not interrupted:
+            self._replies_done += 1
+
     async def hangup(self) -> None:
         self._hung_up = True
 
@@ -178,13 +196,18 @@ class ReplayLeg:
         return self._ever_played and self._quiet_for() < _TALKING_WINDOW
 
     def _answered(self) -> bool:
-        """Has the agent started a reply to what the caller last said?
+        """Has the agent finished a reply to what the caller last said?
 
         Without this the next line goes out into a reply that has not begun yet, the
         API treats it as an interruption, and the answer the caller was waiting for
-        is cancelled.
+        is cancelled. ``reply.done`` is the exact signal; the audio-gap test below is
+        the fallback for a turn that produced no spoken reply at all.
         """
-        return self._spoke_at is not None and self._reply_started > self._spoke_at
+        if self._spoke_at is None:
+            return False
+        if self._done_after is not None and self._replies_done > self._done_after:
+            return True
+        return self._reply_started > self._spoke_at and not self._talking()
 
     def _patience_gone(self) -> bool:
         since = self._spoke_at if self._spoke_at is not None else self._started

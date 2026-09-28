@@ -268,3 +268,46 @@ def test_the_recording_is_as_long_as_the_call_not_as_long_as_the_bursts() -> Non
     # a burst does not push the caller's channel out past it
     recorder.add_caller(codec.silence_ulaw(100))
     assert 3.9 < recorder.seconds() < 4.4
+
+
+def test_the_leg_is_told_when_a_reply_is_genuinely_over() -> None:
+    """A gap in the audio is a guess; reply.done is the protocol saying so.
+
+    The guess is wrong exactly where it is most expensive — on the long read-back
+    that carries the approval phrase, which the scripted caller then talks over.
+    """
+    socket = FakeSocket(
+        [
+            {"type": "session.ready", "session_id": "sess_x"},
+            {"type": "reply.started"},
+            {"type": "reply.done", "status": "completed"},
+            {"type": "reply.started"},
+            {"type": "reply.done", "status": "interrupted"},
+        ]
+    )
+    leg = ReplayLeg([], quiet_ms=60, lead_ms=20, patience_s=0.3, max_seconds=4)
+    bridge = PhoneBridge(
+        leg,
+        brief=BRIEF,
+        token="t",
+        run_tool=lambda *_: asyncio.sleep(0, {"ok": True, "result": {}}),
+    )
+    record = run(bridge, socket)
+    # only the completed one counts: an interrupted reply did not answer anybody
+    assert leg._replies_done == 1  # noqa: SLF001
+    assert record.interruptions == 1
+
+
+def test_a_carrier_leg_does_not_need_telling_and_is_not_broken_by_it() -> None:
+    """TwilioLeg has no reply_done; the bridge must not require one."""
+    from beacon.phone.providers.twilio import TwilioLeg
+
+    assert not hasattr(TwilioLeg, "reply_done")
+    socket = FakeSocket(
+        [
+            {"type": "session.ready", "session_id": "sess_x"},
+            {"type": "reply.done", "status": "completed"},
+        ]
+    )
+    bridge, _ = bridge_for(socket, [])
+    assert run(bridge, socket).aai_session_id == "sess_x"
