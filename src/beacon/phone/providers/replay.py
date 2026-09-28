@@ -28,7 +28,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from beacon.phone import codec
 
@@ -89,6 +89,10 @@ class ReplayLeg:
         self.caller = caller
         self.cleared = 0
         self.spoken: list[str] = []
+        # When each line went out, and what the agent was doing at that moment. An
+        # utterance the API never turned into a turn is invisible from our side
+        # otherwise: it is in the recording and in no event we logged.
+        self.timeline: list[dict[str, Any]] = []
         # When the audio handed to us will have finished playing. A carrier holds a
         # jitter buffer and plays at speaking speed; without modelling that, the
         # caller's next line lands while the agent is still mid-sentence.
@@ -123,11 +127,26 @@ class ReplayLeg:
             elif pending and self._ready(pending[0], waiting_since):
                 line = pending.pop(0)
                 waiting_since = time.monotonic()
+                self.timeline.append(
+                    {
+                        "line": line.label or line.dtmf,
+                        "at": round(time.monotonic() - self._started, 2),
+                        "agent_talking": self._talking(),
+                        "agent_quiet_for": round(self._quiet_for(), 2),
+                        "replies_done": self._replies_done,
+                    }
+                )
                 if line.dtmf:
                     self.spoken.append(f"[{line.dtmf}]")
                     yield b"DTMF:" + line.dtmf.encode()
                     self._spoke_at = time.monotonic()
                     self._done_after = self._replies_done
+                    # Whatever the agent was saying belongs to the last turn. Without
+                    # this, audio arriving back to back across two turns counts as one
+                    # burst, "has the agent replied to *this*?" stays false, and the
+                    # leg waits for reply.done instead — which is where the dropped
+                    # utterances were coming from.
+                    self._reply_started = 0.0
                 else:
                     audio = line.ulaw
                     if line.render is not None:
@@ -140,12 +159,21 @@ class ReplayLeg:
                         audio = task.result()
                     self.spoken.append(line.label or "(audio)")
                     queued = list(codec.frames(audio))
-                    # The line is not finished until its frames have gone out, so the
-                    # clock on the agent's reply starts then, not now.
-                    self._spoke_at = time.monotonic() + len(queued) * (
-                        codec.FRAME_MS / 1000
-                    )
+                    # When the line *starts*, not when it finishes streaming. Turn
+                    # detection often fires before the last frame is sent, so the
+                    # agent's reply begins mid-line; dating the line from its end
+                    # made "has the agent replied to this?" permanently false, and
+                    # the leg fell back to waiting for reply.done — which arrives
+                    # seconds after the audio stops. Lines spoken into that gap are
+                    # audible in the recording and never become a turn.
+                    self._spoke_at = time.monotonic()
                     self._done_after = self._replies_done
+                    # Whatever the agent was saying belongs to the last turn. Without
+                    # this, audio arriving back to back across two turns counts as one
+                    # burst, "has the agent replied to *this*?" stays false, and the
+                    # leg waits for reply.done instead — which is where the dropped
+                    # utterances were coming from.
+                    self._reply_started = 0.0
                 finished_at = 0.0
             else:
                 # The line stays open between lines: a carrier keeps sending frames
@@ -205,8 +233,14 @@ class ReplayLeg:
         """
         if self._spoke_at is None:
             return False
-        if self._done_after is not None and self._replies_done > self._done_after:
-            return True
+        # Deliberately *not* reply.done. That event can arrive before the agent has
+        # said anything — on a turn that called a tool it fires while the spoken
+        # answer is still coming — so treating it as "answered" let the caller speak
+        # at the exact moment the agent began. Measured on a failing run: the two
+        # lines the API never turned into turns were spoken 6.7 s and 7.8 s after
+        # the previous audio, which was the *greeting*; the reply to the line before
+        # them had not started yet. The audio is the honest signal, and
+        # `_patience_gone()` is the escape hatch for a turn that produces none.
         return self._reply_started > self._spoke_at and not self._talking()
 
     def _patience_gone(self) -> bool:

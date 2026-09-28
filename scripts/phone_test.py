@@ -57,6 +57,7 @@ class Run:
     cleared: int = 0
     ttfa_ms: list[float] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
+    spoken: list[dict[str, Any]] = field(default_factory=list)
     incident: dict[str, Any] = field(default_factory=dict)
     approvals: int = 0
     attestation: dict[str, Any] = field(default_factory=dict)
@@ -280,6 +281,7 @@ async def place(scenario: str, incident_id: str, out_dir: Path, attest: bool) ->
         on_event=note,
     )
     record = await bridge.run()
+    run.spoken = leg.timeline
     run.dtmf = record.dtmf
     run.interruptions = record.interruptions
     run.cleared = leg.cleared
@@ -371,6 +373,7 @@ async def main() -> int:
                 "ttfa_ms": run.ttfa_ms,
                 "seconds": run.seconds,
                 "events": run.events,
+                "spoken": run.spoken,
                 "recording": str(run.wav) if run.wav else None,
                 "attestation": run.attestation,
             }
