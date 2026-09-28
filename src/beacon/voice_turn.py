@@ -32,7 +32,7 @@ from aws_lambda_powertools.event_handler import (
     Response,
 )
 
-from beacon import aai, aws, observability, store, voice_tools
+from beacon import aai, aws, observability, store, voice_brief, voice_tools
 from beacon.turn_context import TurnContext, turn_context
 
 logger = logging.getLogger(__name__)
@@ -516,6 +516,31 @@ def tools_route(name: str) -> Response[str]:
     fresh.pop("rca", None)
     out["incident"] = fresh
     return _json(200, out)
+
+
+@app.get("/brief/<incident_id>")
+def voice_brief_route(incident_id: str) -> Response[str]:
+    """The session brief for one incident, for whichever channel is asking.
+
+    The browser, the phone bridge and the spoken regression suite all open an
+    AssemblyAI session against the same incident, and they have to open it with the
+    same rules. Building the brief here is what stops a channel added later from
+    quietly getting a different agent -- and the phone gets an extra paragraph,
+    because there is no screen on a telephone.
+    """
+    if not _passcode_ok(dict(app.current_event.headers)):
+        return _json(401, {"error": "passcode required"})
+    if not _ID_RE.match(incident_id):
+        return _json(400, {"error": "incident_id is required"})
+    incident = store.get_incident(incident_id, table_name=_incidents_table())
+    if not incident:
+        return _json(404, {"error": f"incident {incident_id} not found"})
+    params = app.current_event.query_string_parameters or {}
+    channel = str(params.get("channel") or "browser")[:16]
+    language = str(params.get("language") or "en")[:8]
+    return _json(
+        200, voice_brief.session_brief(incident, channel=channel, language=language)
+    )
 
 
 def _mint_assemblyai_token(api_key: str) -> dict[str, Any]:

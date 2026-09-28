@@ -159,6 +159,65 @@ def summarise(url: str, *, keyterms: list[str] | None = None) -> dict[str, Any]:
     raise TimeoutError("the summary did not finish in time")
 
 
+def upload(audio: bytes) -> str:
+    """Put a recording where AssemblyAI can read it; returns the internal URL.
+
+    Used for the phone bridge's own stereo recording, which no presigned URL
+    exists for because Beacon made it rather than a carrier.
+    """
+    return str(
+        _json("POST", f"{API}/upload", audio, "application/octet-stream")["upload_url"]
+    )
+
+
+def transcribe_call(
+    url: str, *, keyterms: list[str] | None = None, language: str = "en"
+) -> dict[str, Any]:
+    """Transcribe a two-channel call recording, keeping the channels apart.
+
+    A phone bridge records the caller on one channel and the agent on the other, so
+    ``dual_channel`` gives every utterance a channel without guessing at speakers --
+    and the one sentence that authorised a change to production can be attributed to
+    the human beyond argument. Diarisation would have to infer that; two channels
+    carry it in the file.
+
+    Returns ``{"text", "utterances": [{"channel", "text", "confidence", "start"}],
+    "transcript_id", "seconds"}``.
+    """
+    body: dict[str, Any] = {
+        "audio_url": url,
+        "dual_channel": True,
+        "language_code": language,
+        "punctuate": True,
+        "format_text": True,
+    }
+    if keyterms:
+        body["keyterms_prompt"] = [k for k in keyterms if k][:50]
+    job = _json("POST", f"{API}/transcript", body)
+    deadline = time.time() + _SUMMARY_WAIT_SECONDS
+    while time.time() < deadline:
+        got = _json("GET", f"{API}/transcript/{job['id']}")
+        if got.get("status") == "completed":
+            return {
+                "text": str(got.get("text") or "").strip(),
+                "utterances": [
+                    {
+                        "channel": str(u.get("channel") or ""),
+                        "text": str(u.get("text") or "").strip(),
+                        "confidence": u.get("confidence"),
+                        "start": u.get("start"),
+                    }
+                    for u in got.get("utterances") or []
+                ],
+                "transcript_id": got.get("id"),
+                "seconds": got.get("audio_duration"),
+            }
+        if got.get("status") == "error":
+            raise RuntimeError(str(got.get("error")))
+        time.sleep(1.5)
+    raise TimeoutError("the call transcript did not finish in time")
+
+
 def summarise_session(
     session_id: str, *, keyterms: list[str] | None = None
 ) -> dict[str, Any]:

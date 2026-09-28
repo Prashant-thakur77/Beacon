@@ -1,4 +1,4 @@
-.PHONY: voice-test deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
+.PHONY: voice-test phone-call phone-test phone-serve deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
        test lint check-image-tags smoke-strands export-tools deploy-remediation teardown-remediation \
        snapshot-sg tag-remediable dry-run changes incidents lint-templates remediable-ecs break-demo-deploy fix-demo-deploy \
@@ -777,6 +777,40 @@ test:
 voice-test:
 	$(call check_param,ASSEMBLYAI_API_KEY)
 	$(PYTHON) scripts/voice_test.py $(if $(ONLY),--only $(ONLY),) --json docs/assets/voice-test-report.json
+
+# ---------------------------------------------------------------------------
+# The phone channel (docs/phone.md)
+# ---------------------------------------------------------------------------
+
+PHONE_OUT ?= $(HOME)/beacon-video/phone
+SCENARIO ?= approve
+
+# One scripted call against `make local`: real speech at telephone quality into the
+# real Voice Agent API, real tools. Leaves a two-channel WAV and a JSON report.
+# Needs ASSEMBLYAI_API_KEY and AWS credentials (Polly speaks the caller's lines).
+phone-call:
+	$(call check_param,ASSEMBLYAI_API_KEY)
+	@mkdir -p $(PHONE_OUT)
+	@INC=$$(curl -s -H 'x-beacon-passcode: $(LOCAL_PASSCODE)' \
+	    http://localhost:$(LOCAL_PORT)/dash/incidents \
+	    | $(PYTHON) -c 'import sys,json;print(json.load(sys.stdin)["incidents"][0]["incident_id"])'); \
+	  $(PYTHON) -m beacon.phone replay \
+	    --base-url http://localhost:$(LOCAL_PORT)/voice --passcode $(LOCAL_PASSCODE) \
+	    --incident $$INC --scenario $(SCENARIO) \
+	    --out $(PHONE_OUT)/$(SCENARIO).wav --json $(PHONE_OUT)/$(SCENARIO).json
+
+# Every scenario, each on its own incident, with contracts revoked in between (a
+# Sleep Contract from one call silently fixes the next incident).
+phone-test:
+	$(call check_param,ASSEMBLYAI_API_KEY)
+	$(PYTHON) scripts/phone_test.py --out $(PHONE_OUT) --json docs/assets/phone-test-report.json
+
+# Answer real calls. Needs TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM_NUMBER
+# and a public https URL that reaches PORT (Twilio requires wss://).
+phone-serve:
+	$(call check_param,PUBLIC_URL)
+	$(PYTHON) -m beacon.phone serve --base-url $(VOICE_URL) --passcode $(PASSCODE) \
+	    --public-url $(PUBLIC_URL) --recordings $(PHONE_OUT)
 
 lint:
 	ruff check src/ tests/

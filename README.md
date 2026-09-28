@@ -119,7 +119,9 @@ The console's default voice path is the **AssemblyAI Voice Agent API**; the AWS 
 | AssemblyAI API | What it does here | Where |
 |---|---|---|
 | **Voice Agent API** (`wss://agents.assemblyai.com/v1/ws`) | Full duplex in the browser: Universal-3 Pro STT, turn detection, barge-in, the managed LLM, TTS, and the nine Beacon tools declared as client-side functions — every `tool.call` comes back to the browser, which runs it on the voice Lambda with the transcript the API produced. English and Hinglish in and out. | `web/src/voice/assemblyai.ts`, `voice_turn.py` (`POST /tools/<name>`) |
+| **Voice Agent API, on a telephone line** | The same socket, the same nine tools, with a phone call on the other side instead of a laptop: audio is transcoded 8 kHz G.711 µ-law ↔ 24 kHz PCM, turn detection is loosened for a noisy line, and the agent is told there is no screen. An engineer in bed reaches the same agent, under the same consent rules. | `beacon/phone/` ([docs/phone.md](docs/phone.md)) |
 | **Pre-recorded transcription** (`/v2/transcript`, language detection, `keyterms_prompt`) | Telegram voice notes: the file is uploaded from the Lambda, transcribed with **word-level confidence**, and a mumbled "approve fix one" is refused with the confidence it was heard at. | `telegram.py`, `telegram_bot.py` |
+| **Dual-channel transcription** (`dual_channel`) | The agent reads the approval phrase back, so it is in the recording twice — once from each party. A phone call is recorded with the caller on one channel and the agent on the other, and every utterance is labelled by channel, so **the sentence that changed production is attributable to the human** without inferring speakers. A change whose phrase appears only on the agent's channel fails the check. | `aai.py` (`transcribe_call`), `beacon/phone/attest.py` |
 | **Session recordings** (`GET /v1/sessions/{id}`) | Every approval and contract made in a live session stores the session id; the audit page plays the recording behind the quote (**▶ Listen**), and the postmortem cites it. | `voice_turn.py` (`GET /recordings/<id>`), `web/src/components/Reports.tsx` |
 | **Summarization** (`summary_model: conversational`) | *"Summarise the session"* on an audit row: AssemblyAI transcribes its own recording of the conversation and summarises it, redacted; the result is kept on the incident and printed in the postmortem as **the night in the engineer's words**. | `aai.py`, `voice_turn.py` (`POST /sessions/<id>/summary`) |
 | **PII redaction** (`redact_pii`, hashed) | A voice note at 3 AM can carry a colleague's name or a customer's number. Consent is checked against the words as heard, in memory; what is *written* to the approval row, the audit and the pull request is the redacted text. | `telegram.py`, `voice_tools.py` (`_quote`) |
@@ -147,7 +149,8 @@ that agreement is not consent, or that interrupting a read-back really withdraws
 properties live in speech and turn-taking.
 
 ```bash
-make local && make voice-test        # six spoken scenarios; ONLY=barge_in runs one
+make local && make voice-test        # six spoken scenarios in the browser path
+make local && make phone-test        # five scripted calls down a telephone line
 ```
 
 Each scenario renders the engineer's lines with Polly, streams them into the **AssemblyAI Voice
@@ -192,8 +195,9 @@ Auto-remediation is only worth shipping if it cannot do the wrong thing. Beacon'
 7. **Recovered means proven.** Verify requires all three: the alarm is `OK` *and its state changed after the execute time*, the alarm's own metric is at zero, and the action's post-condition holds. Anything else escalates to a human.
 8. **Contracts are scoped and expire.** Alarm + action + exact resources, a use counter, a TTL, and your quote. Revoke from the console.
 9. **Undo by phrase.** Every fix has an allowlisted inverse (`sg.revoke_ingress`); saying `undo fix 1` reverses exactly what Beacon applied, records it in the audit, and hands the incident back to you. Pages reach you where you are: Slack, PagerDuty and Telegram, deep-linked to `#board/<incident_id>`.
-10. **Telegram voice notes.** The page lands in your Telegram chat with *Talk · Fix 1 · Ack* buttons; you answer with a voice note in English or Hinglish. AssemblyAI's pre-recorded API transcribes it with word-level confidence, the same phrase router runs the same tools, and a mumbled `approve fix one` is refused with the confidence it was heard at. See [docs/telegram.md](docs/telegram.md).
-9. **One switch stops every write path.** `make apply-off` sets `APPLY_ENABLED=false` on the triage, voice and remediate functions.
+10. **A keypress is never consent.** On a phone call, DTMF can acknowledge (`1`), re-brief (`2`), repeat (`0`) or hang up (`9`); it can never approve, undo, grant a contract or open a pull request, and pressing any other key makes the agent say so. An approval has to be words somebody can be held to. Only the caller's microphone is ever streamed to the transcriber, so the transcript the consent check reads cannot contain the agent reading a phrase back to itself — and the two-channel recording lets anyone else verify that afterwards. See [docs/phone.md](docs/phone.md).
+11. **Telegram voice notes.** The page lands in your Telegram chat with *Talk · Fix 1 · Ack* buttons; you answer with a voice note in English or Hinglish. AssemblyAI's pre-recorded API transcribes it with word-level confidence, the same phrase router runs the same tools, and a mumbled `approve fix one` is refused with the confidence it was heard at. See [docs/telegram.md](docs/telegram.md).
+12. **One switch stops every write path.** `make apply-off` sets `APPLY_ENABLED=false` on the triage, voice and remediate functions.
 
 Details: [`docs/safety.md`](docs/safety.md).
 
@@ -246,7 +250,11 @@ src/beacon/
   remediate.py          remediate Lambda: dryrun · require_approval · execute · verify · resolve · escalate · all
   voice_tools.py        nine tools + TOOL_SCHEMAS (shared across voice backends): brief, evidence, propose, approve, cancel, undo, contract, PR, recovery
   turn_context.py       the raw transcript of the current turn + attestation (confidence, session, file); consent is decided here
-  voice_turn.py         Function URL: /tools/<name> (AssemblyAI path), /assemblyai/token, /recordings/<id>, /telegram/webhook, /session + /turn (AWS cascade)
+  voice_turn.py         Function URL: /tools/<name> (AssemblyAI path), /brief/<id>, /assemblyai/token, /recordings/<id>, /telegram/webhook, /session + /turn (AWS cascade)
+  voice_brief.py        one session brief for every channel: prompt, greeting, key terms, tools
+  phone/                the telephone channel: codec.py (G.711 + resampling), bridge.py (the
+                        socket pump), attest.py (which channel approved), providers/ (Twilio,
+                        and a replay leg that needs no carrier)
   telegram.py           Telegram outbound (pages with buttons), pre-recorded STT, Polly voice notes, the phrase router
   telegram_bot.py       Telegram inbound: one update → one tool → one reply (secret + allowlist)
   fix_pr.py             fix at the source: deterministic template patch + postmortem → GitHub pull request
