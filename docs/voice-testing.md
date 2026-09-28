@@ -61,3 +61,48 @@ suite now revokes contracts between scenarios, and that failure was the feature 
 The same machinery films the demo: [`video/capture_aai.py`](../video/capture_aai.py) feeds the
 identical kind of audio into a real browser, which is why the barge-in in the film is an actual
 interruption rather than an edit.
+
+## The phone suite
+
+`make phone-test` is the same idea down a telephone line. Five scripted calls, each
+on a fresh incident, each speaking Polly-rendered lines that have been degraded to
+8 kHz G.711 µ-law before the agent hears a word — so what is being tested is speech
+at the quality a phone actually delivers, not studio audio.
+
+```bash
+make local && make phone-test           # all five
+.venv/bin/python scripts/phone_test.py --only barge_in
+```
+
+| Scenario | The property it defends |
+|---|---|
+| `approve` | the exact phrase applies the fix and the verify loop starts |
+| `wrong_phrase` | *"yes, do it"* changes nothing — agreement is not consent |
+| `barge_in` | talking over the read-back withdraws the proposal; the phrase then fails |
+| `hinglish` | *"isko fix kar do"* reaches the same tool, transcribed in Devanagari |
+| `keypad` | `1` acknowledges, `5` is refused in words, and **nothing is applied** |
+
+Three things this suite does that the browser suite does not:
+
+**It says the number that was actually proposed.** Proposals are numbered per
+incident, so a script hard-coding *"approve fix one"* is a refused approval the
+moment an incident has had an earlier proposal — and a refused approval looks
+exactly like a real bug. The caller's approval line is rendered at the moment it is
+due, from the `fix_id` the agent returned.
+
+**It checks the recording, not just the outcome.** Each call is recorded with the
+caller on one channel and the agent on the other; AssemblyAI transcribes it with
+`dual_channel`, and every consent tool that ran is checked against the caller's
+channel. The report prints it:
+
+```
+ok approve_fix from the caller's channel (1x; agent 2x)
+```
+
+The agent's two occurrences are its read-backs. They are in the recording, and they
+are not consent.
+
+**The keypad scenario never speaks the phrase.** The caller presses `1`, says "fix
+it", presses `5`, and then asks whether that did it. Anything applied in that call
+was applied by a keypress, which is the failure being hunted. The agent's answer, in
+a real run: *"A key press cannot approve a change."*

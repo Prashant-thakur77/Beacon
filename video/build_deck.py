@@ -1,6 +1,6 @@
-"""Render the ten pitch slides from the film's own scene engine, then bind them into a PDF.
+"""Render the eleven pitch slides from the film's own scene engine, then bind them into a PDF.
 
-Deck and film are the same design system: eight slides are scenes from `scenes.html`, two are
+Deck and film are the same design system: nine slides are scenes from `scenes.html`, two are
 image slides (`slide.html`) carrying a real screenshot and the architecture drawing. Needs the
 scene server running:  cd ~/beacon-video/scenes && python3 -m http.server 8877
 
@@ -39,11 +39,12 @@ SLIDES: list[tuple[str, str]] = [
         img="arch.png", fit="contain",
         c="The Voice Agent API is the mouth and the ears; every <b>tool.call</b> returns to the browser, "
           "which runs it on our Lambda with the transcript the API produced.")),
-    ("06-why", f"{BASE}/scenes.html?scene=whyai"),
-    ("07-voicetest", f"{BASE}/scenes.html?scene=voicetest"),
-    ("08-market", f"{BASE}/scenes.html?scene=market"),
-    ("09-revenue", f"{BASE}/scenes.html?scene=revenue"),
-    ("10-next", f"{BASE}/scenes.html?scene=next"),
+    ("06-phone", f"{BASE}/scenes.html?scene=call"),
+    ("07-why", f"{BASE}/scenes.html?scene=whyai"),
+    ("08-voicetest", f"{BASE}/scenes.html?scene=voicetest"),
+    ("09-market", f"{BASE}/scenes.html?scene=market"),
+    ("10-revenue", f"{BASE}/scenes.html?scene=revenue"),
+    ("11-next", f"{BASE}/scenes.html?scene=next"),
 ]
 
 

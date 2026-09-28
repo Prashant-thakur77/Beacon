@@ -15,19 +15,27 @@ ROOT = Path.home() / "beacon-video"
 PY = "/home/prashant/.pyenv/versions/3.10.13/bin/python"
 
 # row -> (scene, extra seconds after the narration ends)
+#
+# The film opens at night and turns to the console's own palette at the title, so
+# rows 1, 2 and 22 stay dark and everything from row 3 carries "@light" — the
+# product being judged is a cream-and-ink console, and a film in a different palette
+# is a film of something else.
 PLAN = {
     1: ("phone", 1.6),
-    4: ("telegram", 1.2),
-    5: ("telegram", 1.2),
     2: ("problem-stats", 1.4),
-    3: ("title", 1.6),
-    14: ("who", 1.2),
-    15: ("market", 1.4),
-    16: ("revenue", 1.4),
-    17: ("whyai", 1.2),
-    18: ("safety", 1.0),
-    19: ("next", 1.2),
-    20: ("close", 2.2),
+    22: ("timezones", 1.4),
+    3: ("title@light", 1.6),
+    21: ("archvoice@light", 2.0),
+    23: ("call@light", 2.0),
+    4: ("telegram@light", 1.2),
+    5: ("telegram@light", 1.2),
+    14: ("who@light", 1.2),
+    15: ("market@light", 1.4),
+    16: ("revenue@light", 1.4),
+    17: ("whyai@light", 1.2),
+    18: ("safety@light", 1.0),
+    19: ("next@light", 1.2),
+    20: ("close@light", 2.2),
 }
 
 

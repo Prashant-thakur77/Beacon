@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING
 from beacon.phone import codec
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Callable
 
 # How long the agent must have been talking before an interrupting line cuts in, so
 # the interruption is plainly one and not a collision at the start of a turn.
@@ -44,12 +44,20 @@ _TALKING_WINDOW = 0.25
 
 @dataclass
 class Line:
-    """One thing the caller does: say something, or press a key."""
+    """One thing the caller does: say something, or press a key.
+
+    ``render`` defers the audio to the moment the line is due, which is how a line
+    can name something the agent has not said yet. The fix number is the case that
+    forces it: proposals are numbered per incident, so a script that always says
+    "approve fix one" is wrong the moment an incident has had an earlier proposal --
+    and it fails as a refused approval, which looks exactly like a real bug.
+    """
 
     ulaw: bytes = b""
     label: str = ""
     interrupt: bool = False
     dtmf: str = ""
+    render: Callable[[], bytes] | None = None
 
 
 class ReplayLeg:
@@ -115,8 +123,17 @@ class ReplayLeg:
                     yield b"DTMF:" + line.dtmf.encode()
                     self._spoke_at = time.monotonic()
                 else:
+                    audio = line.ulaw
+                    if line.render is not None:
+                        # Rendering takes a moment; keep the line alive meanwhile,
+                        # because a carrier never stops sending frames.
+                        task = asyncio.create_task(asyncio.to_thread(line.render))
+                        while not task.done():
+                            yield silence
+                            await asyncio.sleep(codec.FRAME_MS / 1000)
+                        audio = task.result()
                     self.spoken.append(line.label or "(audio)")
-                    queued = list(codec.frames(line.ulaw))
+                    queued = list(codec.frames(audio))
                     # The line is not finished until its frames have gone out, so the
                     # clock on the agent's reply starts then, not now.
                     self._spoke_at = time.monotonic() + len(queued) * (

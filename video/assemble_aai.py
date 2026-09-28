@@ -108,15 +108,24 @@ BUILD = {
     18: lambda s: scene_clip(18, s),
     19: lambda s: scene_clip(19, s),
     20: lambda s: scene_clip(20, s),
+    21: lambda s: scene_clip(21, s),          # the 3D voice path
+    22: lambda s: scene_clip(22, s),          # India / New York
+    23: lambda s: scene_clip(23, s),          # the phone call, two channels
 }
+
+# The order the film is cut in, which is not the order the rows were written. The
+# mechanism is explained before the demo shows it, and the phone opens the demo
+# because it is where the engineer actually is at 3 AM.
+ORDER = [1, 2, 22, 3, 21, 23, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+         14, 15, 16, 17, 18, 19, 20]
 # the live-capture rows hold after the narration so the UI is readable
-TAILS = {1: 1.4, 3: 1.4, 20: 2.2,
+TAILS = {1: 1.4, 3: 1.4, 20: 2.2, 21: 1.8, 22: 1.4, 23: 2.0,
          6: 2.4, 7: 2.4, 8: 2.6, 9: 3.0, 10: 2.6, 11: 2.6, 12: 2.8, 13: 2.6}
 
 
 def main() -> None:
     clips: list[Path] = []
-    for n in range(1, 21):
+    for n in ORDER:
         secs = round(dur(vo(n), "a") + 0.4 + TAILS.get(n, 0.8), 2)
         clips.append(with_audio(n, BUILD[n](secs), secs))
         print(f"row {n:2d}  {secs:5.1f}s", flush=True)

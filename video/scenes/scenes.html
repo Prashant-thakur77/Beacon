@@ -80,6 +80,22 @@
   .tg .side .mono2 { font-family:"Geist Mono",monospace; font-size:19px; color:var(--lilac); }
 
   /* tests that speak */
+  /* the phone call: two channels drawn from the real recording */
+  .call { display:flex; flex-direction:column; gap:20px; width:1560px; }
+  .call .lane { display:grid; grid-template-columns: 300px 1fr; align-items:center; gap:26px; }
+  .call .who { text-align:right; }
+  .call .who b { display:block; font-size:25px; font-weight:600; }
+  .call .who span { font-size:18px; color:var(--faint); font-family:"Geist Mono",monospace; }
+  .call canvas { width:100%; height:130px; display:block; }
+  .call .quote { font-size:27px; line-height:1.35; text-align:left; min-height:76px; }
+  .call .quote em { font-style:normal; color:var(--faint); }
+  .call .verdict { display:grid; grid-template-columns: 1fr auto; align-items:center; gap:26px;
+                   border:1px solid var(--line); border-radius:16px; padding:20px 28px;
+                   background:rgba(255,255,255,.02); text-align:left; font-size:24px; }
+  .call .verdict .pass { font-family:"Geist Mono",monospace; font-weight:700; letter-spacing:.1em;
+                         font-size:18px; color:var(--green); }
+  .call .verdict b { font-weight:600; }
+  html[data-theme="light"] .call .verdict { background:#FFFDF2 !important; }
   .vt { display:flex; flex-direction:column; gap:14px; width:1480px; }
   .vt .row3 { display:grid; grid-template-columns: 210px 1fr 260px; align-items:center; gap:24px;
               border:1px solid var(--line); border-radius:16px; padding:18px 26px; background:rgba(255,255,255,.02); }
@@ -404,8 +420,32 @@ ranked: destructive verbs first · Beacon's own writes tagged</pre></div>
       <div class="row3 fade" style="animation-delay:1.19s"><span class="nm">hinglish</span><span class="ds"><b>“isko fix kar do”</b> reaches the same tool as “fix it”</span><span class="ok">propose_fix</span></div>
       <div class="row3 fade" style="animation-delay:1.47s"><span class="nm">contract</span><span class="ds">a Sleep Contract needs the read-back <b>and then</b> the phrase</span><span class="ok">grant ×2</span></div>
       <div class="row3 fade" style="animation-delay:1.75s"><span class="nm">undo</span><span class="ds">an applied fix can be reversed by phrase</span><span class="ok">undo_fix</span></div>
+      <div class="row3 fade" style="animation-delay:2.03s"><span class="nm">keypad</span><span class="ds">on a phone, <b>a keypress</b> may acknowledge — it may never approve</span><span class="ok">no consent tool</span></div>
     </div>
-    <div class="assume fade" style="animation-delay:2.4s">make voice-test · each scenario speaks, then asserts on what was heard, which tools ran and how the incident ended · the right column is what must happen</div>
+    <div class="assume fade" style="animation-delay:2.6s">make voice-test · make phone-test · each scenario speaks, then asserts on what was heard, which tools ran and how the incident ended · the right column is what must happen</div>
+  </div>
+</section>
+
+<section class="scene" id="call">
+  <div class="center" style="gap:26px">
+    <div class="kicker fade d1">The phone call</div>
+    <h2 class="display fade d1" style="font-size:52px;margin-bottom:2px">No laptop. It rings, and you answer it.</h2>
+    <div class="call">
+      <div class="lane fade" style="animation-delay:0.35s">
+        <div class="who"><b>Channel 1 — you</b><span>8 kHz · G.711 µ-law</span></div>
+        <canvas id="c-caller" width="2400" height="260"></canvas>
+      </div>
+      <div class="lane fade" style="animation-delay:0.6s">
+        <div class="who"><b>Channel 2 — Beacon</b><span>AssemblyAI · nine tools</span></div>
+        <canvas id="c-agent" width="2400" height="260"></canvas>
+      </div>
+      <div class="quote fade" style="animation-delay:0.9s" id="c-quote"></div>
+      <div class="verdict fade" style="animation-delay:1.1s">
+        <div><b>approve_fix</b> — the phrase is on <b>your</b> channel. Beacon read it back twice; a read-back is not consent.</div>
+        <div class="pass" id="c-verdict">CHECKED</div>
+      </div>
+    </div>
+    <div class="assume fade" style="animation-delay:1.4s" id="c-foot"></div>
   </div>
 </section>
 
@@ -474,6 +514,44 @@ stagger('learn-list', [
 ], 0.8);
 
 /* ---------- three.js architecture ---------- */
+if (scene === 'call') {
+  // Drawn from the real recording of a real call: video/scenes/call.json is
+  // generated from the WAV the phone suite writes, so the shape of the speech on
+  // screen is the shape of the speech that happened.
+  fetch('call.json').then(r => r.json()).then(d => {
+    const ink = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim();
+    const lilac = getComputedStyle(document.documentElement).getPropertyValue('--lilac').trim();
+    const green = getComputedStyle(document.documentElement).getPropertyValue('--green').trim();
+    const faint = getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
+    document.getElementById('c-foot').textContent =
+      `${d.seconds} s · ` + d.tools.join(' → ') + ' · the recording is two channels, so who approved what is a fact about the file';
+    const draw = (id, env, colour, upto) => {
+      const cv = document.getElementById(id), g = cv.getContext('2d');
+      const w = cv.width, h = cv.height, mid = h / 2, bar = w / env.length;
+      g.clearRect(0, 0, w, h);
+      g.strokeStyle = faint; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(0, mid); g.lineTo(w, mid); g.stroke();
+      g.fillStyle = colour;
+      env.forEach((v, i) => {
+        if (i / env.length > upto) return;
+        const a = Math.max(v * (mid - 8), 1.5);
+        g.fillRect(i * bar, mid - a, Math.max(bar - 1.5, 1), a * 2);
+      });
+    };
+    const lines = d.caller_said.map((t, i) => ({ who: 'you', text: t, at: 0.22 + i * 0.19 }));
+    const t0 = performance.now();
+    (function tick() {
+      const k = Math.min((performance.now() - t0) / 1000 / 7.5, 1);
+      draw('c-caller', d.caller, lilac, k);
+      draw('c-agent', d.agent, green, k);
+      const said = lines.filter(l => k >= l.at).slice(-1)[0];
+      document.getElementById('c-quote').innerHTML = said
+        ? `<em>you said</em> “${said.text}”` : '<em>the line opens</em>';
+      if (k < 1) requestAnimationFrame(tick);
+    })();
+  });
+}
+
 if (scene === 'arch1' || scene === 'arch2' || scene === 'archvoice') {
   const canvas = document.getElementById('three');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -502,14 +580,16 @@ if (scene === 'arch1' || scene === 'arch2' || scene === 'archvoice') {
 
   // the voice path: speech in, a phrase checked in code, one verified change
   const VOICE_LAYOUT = [
-    ['you', -11.5, 5, 0x2a2540], ['phone', -11.5, -6, 0x2a2540],
-    ['socket', -6.5, 5, 0x2a2540], ['prerec', -6.5, -6, 0x2a2540],
+    ['you', -11.5, 5, 0x2a2540], ['call', -11.5, -0.5, 0x3b2a1a], ['telegram', -11.5, -6, 0x2a2540],
+    ['socket', -6.5, 5, 0x2a2540], ['bridge', -6.5, -0.5, 0x3b2a1a], ['prerec', -6.5, -6, 0x2a2540],
     ['tools', 0, -0.5, 0x1f2b26], ['consent', 0, -9.5, 0x3b2a1a],
     ['ddb', 6.5, -9.5, 0x1f1f25], ['sfn', 6.5, -0.5, 0x2a2540],
     ['aws', 11.5, -0.5, 0x3b2a1a], ['github', 11.5, -9.5, 0x1f1f25],
   ];
   const VOICE_LINKS = [
-    ['you','socket'], ['socket','tools'], ['phone','prerec'], ['prerec','tools'],
+    ['you','socket'], ['socket','tools'],
+    ['call','bridge'], ['bridge','socket'], ['bridge','tools'],
+    ['telegram','prerec'], ['prerec','tools'],
     ['tools','consent'], ['consent','sfn'], ['sfn','aws'], ['consent','ddb'], ['tools','github'],
   ];
   const layout = scene === 'archvoice' ? VOICE_LAYOUT : scene === 'arch1' ? [
@@ -535,7 +615,9 @@ if (scene === 'arch1' || scene === 'arch2' || scene === 'archvoice') {
   };
   Object.assign(labels, {
     you: ['You, 3 AM', 'a microphone'],
-    phone: ['Telegram', 'a voice note'],
+    call: ['A phone call', 'it rings'],
+    bridge: ['Phone bridge', '8 kHz ⇄ 24 kHz'],
+    telegram: ['Telegram', 'a voice note'],
     socket: ['AssemblyAI', 'Voice Agent API'],
     prerec: ['AssemblyAI', 'word confidence'],
     tools: ['voice Lambda', 'nine tools'],
@@ -550,11 +632,11 @@ if (scene === 'arch1' || scene === 'arch2' || scene === 'archvoice') {
   Object.keys(nodes).forEach(n => { const e = document.createElement('div'); e.className = 'arch-label'; e.innerHTML = `<b>${labels[n][0]}</b>${labels[n][1]}`; lab.appendChild(e); labelEls[n] = e; });
   if (scene === 'archvoice') {
     document.querySelector('.arch-title .kicker').textContent = 'Where the words go';
-    document.getElementById('arch-h2').textContent = 'Speech in · a phrase checked in code · one verified change';
+    document.getElementById('arch-h2').textContent = 'Three channels, one socket · a phrase checked in code · one verified change';
   }
   if (scene === 'arch2') { document.querySelector('.arch-title .kicker').textContent = 'Built on AWS, end to end'; document.getElementById('arch-h2').textContent = 'Every box is a service in the account'; }
   // lit sequence for arch2 as narrated
-  const litSeq = scene === 'archvoice' ? ['you','socket','tools','consent','ddb','sfn','aws','phone','prerec','github'] : scene === 'arch2' ? ['bedrock','voice','lambda','sfn','cloudwatch','ddb','cloudtrail','sns','console','patient'] : ['alarm','lambda','bedrock','ddb','board','you'];
+  const litSeq = scene === 'archvoice' ? ['you','socket','tools','consent','ddb','sfn','aws','call','bridge','telegram','prerec','github'] : scene === 'arch2' ? ['bedrock','voice','lambda','sfn','cloudwatch','ddb','cloudtrail','sns','console','patient'] : ['alarm','lambda','bedrock','ddb','board','you'];
   const t0 = performance.now();
   const v = new THREE.Vector3();
   function frame() {

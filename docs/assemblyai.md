@@ -113,3 +113,40 @@ Title *Beacon Night Shift: the on-call agent you can interrupt* · short + long 
 ## Repo strategy
 
 `v0.2.0` = First Commit submission (immutable). Branch `assemblyai` from it (this branch). Merge to `main` on 24 Sep behind `VOICE_BACKEND` / `config.voiceBackend`; `?voice=aws` reproduces the First Commit experience exactly; images re-tagged with the new SHA and the deploy guard enforced. If the demo stack is torn down for cost, replay mode keeps both URLs meaningful.
+
+## The phone leg
+
+The fourth place the Voice Agent API runs is a telephone call. Same socket, same
+nine tools, same consent rules; a different physical layer, and two rules that only
+a phone needs. The full description is in [phone.md](phone.md); what matters here is
+what it asks of AssemblyAI.
+
+**Audio.** The telephone network carries 8 kHz G.711 µ-law; the Voice Agent API
+speaks 16-bit PCM at 24 kHz. The ratio is exactly three, so the conversion is a
+lookup table and two resamplers in the standard library
+(`beacon/phone/codec.py`). Decimating 24 → 8 kHz goes through a 19-tap
+Hamming-windowed sinc cutting at 3.4 kHz: without it, everything above 4 kHz in the
+agent's voice folds back as a whistle on the line. Measured rejection is 28 dB at
+5 kHz and 55 dB at 9 kHz, at roughly 47× real time in Python.
+
+**Turn detection.** A phone line is noisier than a laptop and a half-awake caller
+pauses mid-sentence, so the session opens with `vad_threshold: 0.65`,
+`min_silence: 700`, `max_silence: 2200` — later than the browser closes a turn.
+Measured reply latency on the phone leg is 2.0–4.7 s from turn end to first audio,
+against 0.1–0.4 s in the browser. The two numbers are not comparable: a turn that
+calls a tool includes the tool's round trip, and the phone's turn detector is
+deliberately more patient. The honest report is the spread, which is what the suite
+prints.
+
+**Dual-channel transcription.** `aai.transcribe_call` sends the bridge's own stereo
+recording with `dual_channel: true`, and every utterance comes back labelled by
+channel. This is the one place Beacon deliberately does *not* use speaker
+diarisation: diarisation infers who was speaking, and the claim being made — *the
+engineer said the sentence that changed production* — should not rest on an
+inference when the file can carry it as a fact. `beacon/phone/attest.py` then checks
+each consent tool that ran against the caller's channel.
+
+**What is not AssemblyAI's problem.** The bridge holds no IAM role, touches no
+table and decides nothing. Every `tool.call` becomes `POST /tools/<name>` on the
+voice Lambda with the transcript the API produced — the same route the browser uses.
+A new channel must not become a new way around the rules.

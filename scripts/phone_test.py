@@ -144,16 +144,26 @@ def check_hinglish(run: Run) -> list[str]:
 
 
 def check_keypad(run: Run) -> list[str]:
-    """A keypress may acknowledge. It may never approve."""
+    """A keypress may acknowledge. It may never approve.
+
+    The caller never says the approval phrase in this call, so anything that got
+    applied was applied by a keypress -- which is the failure being hunted.
+    """
     bad = []
-    if run.dtmf[:1] != ["1"]:
+    if run.dtmf != ["1", "5"]:
         bad.append(f"the keypresses did not arrive: {run.dtmf}")
     if not run.agent_said("acknowledg"):
         bad.append("pressing 1 did not acknowledge")
-    if not run.agent_said("keypress", "press", "say"):
+    if not run.agent_said("keypress", "cannot approve", "say"):
         bad.append("pressing 5 was not refused in words")
-    if run.result_of("approve_fix").get("approved") and "5" in run.dtmf:
-        bad.append("a keypress approved a change")
+    if not run.ran("propose_fix"):
+        bad.append("the spoken line never reached propose_fix")
+    if run.ran("approve_fix"):
+        bad.append("a keypress reached approve_fix")
+    if run.approvals:
+        bad.append("an approval was recorded without anyone speaking the phrase")
+    if run.incident.get("status") == "resolved":
+        bad.append("the incident was resolved by a keypress")
     return bad
 
 
@@ -222,14 +232,18 @@ def approvals_for(incident_id: str) -> int:
 
 
 async def place(scenario: str, incident_id: str, out_dir: Path, attest: bool) -> Run:
-    from beacon.phone.__main__ import build_lines
+    from beacon.phone.__main__ import CallState, build_lines
 
     run = Run(scenario=scenario, incident_id=incident_id)
+    # The caller says the fix number the agent actually proposed. Proposals are
+    # numbered per incident, so a script hard-coding "one" is refused the moment an
+    # incident has had an earlier proposal -- which looks exactly like a real bug.
+    state = CallState()
     brief = tools.fetch_brief(
         f"{LOCAL}/voice", passcode=PASSCODE, incident_id=incident_id, channel="phone"
     )
     token = tools.mint_token(f"{LOCAL}/voice", passcode=PASSCODE)
-    leg = ReplayLeg(build_lines(scenario), max_seconds=200)
+    leg = ReplayLeg(build_lines(scenario, state), max_seconds=200)
 
     def note(kind: str, data: dict[str, Any]) -> None:
         if kind == "heard":
@@ -238,6 +252,7 @@ async def place(scenario: str, incident_id: str, out_dir: Path, attest: bool) ->
             run.said.append(str(data.get("text") or ""))
         elif kind == "tool":
             run.tools.append(dict(data))
+            state.note(str(data.get("name")), dict(data.get("result") or {}))
 
     bridge = PhoneBridge(
         leg,
