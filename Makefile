@@ -1,4 +1,4 @@
-.PHONY: judge subtitles voice-test phone-call phone-test phone-serve deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
+.PHONY: bench judge subtitles voice-test phone-call phone-test phone-serve deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
        test lint check-image-tags smoke-strands export-tools deploy-remediation teardown-remediation \
        snapshot-sg tag-remediable dry-run changes incidents lint-templates remediable-ecs break-demo-deploy fix-demo-deploy \
@@ -824,6 +824,12 @@ phone-call:
 phone-test:
 	$(call check_param,ASSEMBLYAI_API_KEY)
 	$(PYTHON) scripts/phone_test.py --out $(PHONE_OUT) --json docs/assets/phone-test-report.json
+
+# Regenerate docs/assets/benchmark.md from the reports the suites wrote. Reads
+# real calls; asserts nothing. Run `make phone-test` first, or after any change
+# that could move latency.
+bench:
+	$(PYTHON) scripts/bench.py $(REPORTS)
 
 # Answer real calls. Needs TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM_NUMBER
 # and a public https URL that reaches PORT (Twilio requires wss://).

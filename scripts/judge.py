@@ -50,6 +50,10 @@ def _req(method: str, path: str, body: Any = None) -> Any:
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as exc:
         return {"error": f"{exc.code}: {exc.read().decode()[:200]}"}
+    except (urllib.error.URLError, OSError) as exc:
+        # Nothing listening. The caller prints the one line that helps; a judge
+        # who runs this before `make local` was getting a bare traceback.
+        return {"error": f"cannot reach {BASE}: {exc}"}
 
 
 def tool(name: str, incident: str, said: str, **args: Any) -> dict[str, Any]:

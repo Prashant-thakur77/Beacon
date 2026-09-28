@@ -284,7 +284,8 @@ def test_typed_words_are_never_described_as_heard() -> None:
     assert conf["gated_the_change"] is False
     assert conf["typed"] is True
     md = certificate.to_markdown(cert)
-    assert "**Typed** via `typed`" in md, "'Said' is a claim about speech"
-    assert "no audio to score" in md
+    assert "**Typed** into the console" in md, "'Said' is a claim about speech"
+    assert "not spoken, so there is no audio to score" in md
+    assert "transcribed by" not in md, "typed words had no transcriber"
     assert "%" not in md.split("Typed")[1].split("\n")[0]
     assert "attest" not in md, "there is no recording to appeal to"

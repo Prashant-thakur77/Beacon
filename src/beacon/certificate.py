@@ -244,13 +244,24 @@ def to_markdown(cert: dict[str, Any]) -> str:
         )
         heard = f"heard at **{pct}** ({when}{weakest})"
 
+    # A typed line has no channel worth naming and no transcriber at all, and
+    # "Typed via `typed`, transcribed by `typed`, typed, not spoken" is what
+    # filling the spoken template produced.
+    said = (
+        f"- **Typed** into the console at {consent['spoken_at']}Z — not spoken, "
+        "so there is no audio to score."
+        if typed
+        else (
+            f"- **{verb}** via `{consent['channel']}` at {consent['spoken_at']}Z, "
+            f"transcribed by `{consent['transcriber']}`, {heard}."
+        )
+    )
     lines = [
         "### Consent certificate",
         "",
         f"> “{consent['phrase']}”",
         "",
-        f"- **{verb}** via `{consent['channel']}` at {consent['spoken_at']}Z, "
-        f"transcribed by `{consent['transcriber']}`, {heard}.",
+        said,
         f"- **Authorised** `{change['action']}` with "
         f"`{json.dumps(change['params'], sort_keys=True)}` — dry run "
         f"`{change['dry_run']}` before anything ran.",

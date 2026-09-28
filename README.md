@@ -20,10 +20,11 @@ Beacon finds the CloudTrail change behind the alarm, proves it against a golden 
 >
 > 1. **With a microphone** — open the [live console](https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/), enter the passcode from the submission, press **Connect** and say *"what happened"*, then *"fix it"*. **Interrupt the read-back while it speaks** — the fix is withdrawn and the approval phrase stops working. Say *"fix it"* again, then *"approve fix two"*, and watch the verify loop.
 > 2. **Without a microphone** — press **▶ Run the night** on the board, or open `?night=1`. The whole night plays unattended.
-> 2b. **In a terminal, if you would rather read than click** — `make setup && make local`, then `make judge` in another shell. It drives the real tools with the real consent rules and prints the night: the cause, the change behind it, the proposal, *"yes, do it"* being **refused**, the exact phrase working, CloudWatch agreeing, and the consent certificate that justifies the change. The only thing simulated is AWS.
-> 3. **The thirty seconds that matter** — in the film at **1:50**: an approval heard at 75 % is refused, heard again at 74 % and refused again, and typed instead. Nothing reached production until the words were certain. That was not staged.
-> 3. **Without an AWS account** — `make setup && make local`, same thing on your laptop against in-process moto.
-> 4. **The proof** — the *Audit* page plays back the **session recording** behind every approval; [PR #2](https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2) is a pull request Beacon opened by voice.
+> 3. **In a terminal, if you would rather read than click** — `make setup && make local`, then `make judge` in another shell. It drives the real tools with the real consent rules and prints the night: the cause, the change behind it, the proposal, *"yes, do it"* being **refused**, the exact phrase working, CloudWatch agreeing, and the consent certificate that justifies the change. No AWS account; the only thing simulated is AWS.
+> 4. **The proof, on the *Audit* page** — **▶ Listen** plays the AssemblyAI session recording behind any approval. **◎ How clearly was it heard?** re-transcribes that recording *per channel* and scores the phrase by its **weakest word** — on a live phone approval: **95 %**, weakest word `fix`, found at 40.1 s **on the caller's channel**, because the agent reads the phrase back too and its own voice is not consent. And [PR #2](https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2) is a pull request Beacon opened by voice.
+> 5. **The thirty seconds that matter** — in the film at **1:50**: an approval heard at 75 % is refused, heard again at 74 % and refused again, and typed instead. Nothing reached production until the words were certain. That was not staged.
+>
+> Latency, measured from the calls the suite actually placed rather than asserted: [docs/assets/benchmark.md](docs/assets/benchmark.md) (`make bench` regenerates it).
 
 <table><tr>
 <td width="52%"><img src="docs/assets/bargein.gif" alt="Speaking over the read-back withdraws the proposed fix" /></td>
@@ -202,6 +203,28 @@ Details: [`docs/safety.md`](docs/safety.md).
 Industry MTTR is **53 minutes** and has improved 12 % in five years against a tripling of monitoring spend; **74 %** of DevOps engineers report burnout, with on-call load the leading indicator. On the live account a real alarm reaches a **verified** recovery in **2.4–5.5 minutes** without a laptop being opened — and under a Sleep Contract the repeat fault is fixed with **nobody woken**.
 
 **What it is worth, bottom up.** $29 per responder per month; **$2 per verified remediation**, charged only when a fix was applied *and* CloudWatch agreed, so noisy alerts earn us nothing; $15k/year self-hosted inside the customer's own account. TAM $4.8 B incident management → $12.99 B by 2035; SOM ≈ $125 M/yr on ~120k small AWS teams. Sources and assumptions: [docs/business-case.md](docs/business-case.md).
+
+### What else is in this space, and where it stops
+
+Everything that reaches a 3 AM AWS alarm today sits on one side of a line: it either **asks without acting**, or it **acts without asking**.
+
+| | When the alarm fires it… | Who decides the change | Write access to production |
+|---|---|---|---|
+| PagerDuty | routes the page to a human | the human, once awake | none |
+| incident.io / FireHydrant | opens a channel and coordinates humans | the human, once awake | none |
+| AWS SSM runbooks, EventBridge auto-remediation | runs a pre-written runbook | nobody — decided weeks ago | yes, and it does not ask |
+| Voice assistants and note-takers pointed at on-call | transcribe and summarise the incident | the human | none |
+| **Beacon** | finds the cause, proposes **one** allowlisted fix, dry-runs it, and **asks** | **the engineer, out loud, at 3 AM** | yes — one sentence at a time |
+
+The tools that ask cannot act, so the minutes that matter still contain *"engineer finds laptop"*. The tool that acts does not ask, so it will cheerfully restore a rule somebody removed on purpose. Beacon is the only one of these that does both, and the asking is what makes the acting defensible: the sentence that unlocked the change is kept, scored, attributed to a channel and replayable.
+
+**Where each of them would get this incident wrong.** A CloudWatch alarm fires because a security-group rule is missing.
+
+- **An SSM runbook** matches the condition and restores the rule — including when the rule was removed deliberately an hour ago, because a runbook sees a condition and never a cause. Beacon reads CloudTrail first, names the actor, and when nothing explains the alarm it says so and offers a restart *as a restart*, never as a root cause.
+- **PagerDuty and incident.io** are correct and unhelpful: they tell the right person, and the fix still waits for a laptop, a VPN and a console login.
+- **A voice agent that only listens** produces a transcript nobody is bound by. Here the transcript *is* the authorisation — remove AssemblyAI and Beacon does not lose its voice interface, it loses the right to hold the credential at all.
+
+The uncomfortable one: **nothing in this table is wrong about its own job.** Beacon's claim is narrower than "better incident management" — it is that a small team with no second shift needs the one capability none of them offers, which is a change to production that a sleepy human authorised in words, and that can be justified to someone who was not in the room six weeks later.
 
 ### Why this could not have been built two years ago
 
