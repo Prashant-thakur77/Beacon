@@ -129,6 +129,8 @@ Beacon is not a voice interface bolted onto a tool. **The words are the artifact
 
 Take AssemblyAI out and you do not lose the voice interface. You lose the audit — and the audit is the reason this can hold a credential at all.
 
+Every applied change therefore ships with a **consent certificate** (`src/beacon/certificate.py`): the phrase, how clearly it was heard and *whether that number gated the change or only reviewed it*, the one allowlisted action and the parameters that passed a dry run, the CloudWatch checks that had to agree, the CloudTrail entry that caused the fault, and a link to play the words back. It is printed into the pull request Beacon opens, because that is where somebody reads it six weeks later. It carries a digest so an edited certificate is detectable — **not** a signature, and never described as one.
+
 The clearest demonstration is in the film, and nobody scripted it: an approval came back at **75 %** and was refused, came back again at **74 %** and was refused again, and the engineer typed it instead. Nothing reached production until the words were certain. The thing that stopped a change to a live AWS account was a confidence number from a transcription model.
 
 The console's default voice path is the Voice Agent API; the AWS cascade (Transcribe → Nova → Polly) stays one toggle away for the side-by-side. Each AssemblyAI API is used where it fits, not everywhere:

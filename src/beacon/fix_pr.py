@@ -34,7 +34,7 @@ import urllib.request
 from datetime import UTC, datetime
 from typing import Any
 
-from beacon import aws
+from beacon import aws, certificate
 
 logger = logging.getLogger(__name__)
 
@@ -357,6 +357,13 @@ def pr_body(
     else:
         lines.append(f"- No template change: {plan.get('reason')}.")
     lines.append("- Adds the postmortem under `docs/incidents/`.")
+
+    # The certificate first: a reviewer reading this in six weeks wants to know why
+    # the change was allowed before they want to know what it did.
+    if approval:
+        cert = certificate.build(incident, approval)
+        lines += ["", certificate.to_markdown(cert)]
+
     lines += ["", "### The approval that applied the runtime fix"]
     if approval:
         lines.append(

@@ -37,3 +37,31 @@ An LLM-driven agent with write access can fail in four ways: it acts without con
 - `make dry-run` on a healthy stack returns `InvalidPermission.Duplicate`, which counts as PASSED: the permission check runs before the duplicate check.
 - If the remediator gets `UnauthorizedOperation` naming a `security-group-rule` ARN, the second IAM statement is missing; if it names the `security-group`, the tag is missing (`make tag-remediable`).
 - The Connect/Lex phone path is read-only and not part of the remediation model.
+
+
+## The consent certificate
+
+A voice agent that can change infrastructure has a problem no chatbot has: six weeks
+later somebody asks *who told it to do that*, and "the model decided to" is not an
+answer anybody accepts. The answer has to be an artifact a person who was not there,
+and does not trust you, can check.
+
+`src/beacon/certificate.py` assembles one per applied change, out of records that
+already exist:
+
+| Field | Where it comes from |
+|---|---|
+| the phrase that unlocked it | the transcript, never the model's argument |
+| how clearly it was heard, and its weakest word | AssemblyAI word-level confidence |
+| **whether that number gated the change or only reviewed it** | a voice note is scored before anything runs; a live turn has no confidence and is scored afterwards against the recording |
+| the channel, and on a phone which side of the recording | the approval row; `dual_channel` |
+| the action and the parameters that passed a dry run | the allowlist and the proposal |
+| the checks CloudWatch had to agree to | the verify loop |
+| what caused the fault | the CloudTrail change ledger |
+| the recording | the AssemblyAI session artifact |
+
+Two things it deliberately does not do. It does not compute anything new — inventing
+a number at certificate time would be the one place you must not. And its digest is
+**not a signature**: it detects a certificate edited after issue, which is all it is
+for. Signing needs a key somebody has agreed to manage, and a fake signature is worse
+than none.
