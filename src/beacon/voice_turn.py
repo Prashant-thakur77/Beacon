@@ -507,9 +507,15 @@ def _transcriber(channel: str, session_id: str) -> str:
     channel, and a turn whose session id is the console's local fallback rather
     than an AssemblyAI ``sess_`` id has no recording to appeal to either.
     """
-    if channel != "assemblyai":
-        return channel
-    return "assemblyai-voice-agent" if session_id.startswith("sess_") else "assemblyai"
+    if channel == "typed":
+        return "typed"
+    # A sess_ id means a live AssemblyAI session did the transcribing, whatever the
+    # transport was: the phone bridge's leg is the same Voice Agent API as the
+    # browser's, and a certificate that said "transcribed by phone" credited the
+    # carrier for work AssemblyAI did. The transport is recorded separately, as the
+    # channel, so the certificate reads "Said via phone, transcribed by
+    # assemblyai-voice-agent".
+    return "assemblyai-voice-agent" if session_id.startswith("sess_") else channel
 
 
 @app.post("/tools/<name>")

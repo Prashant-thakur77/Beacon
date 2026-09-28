@@ -264,6 +264,11 @@ def test_the_voice_agent_is_only_credited_when_a_recording_could_prove_it() -> N
     assert _transcriber("assemblyai", "d-izo4r0qs") == "assemblyai"
     assert _transcriber("typed", sess) == "typed"
     assert _transcriber("telegram", "") == "telegram"
+    # The phone leg is the same Voice Agent API; the transport is the channel, not
+    # the transcriber. A certificate reading "transcribed by phone" credited the
+    # carrier for AssemblyAI's work.
+    assert _transcriber("phone", sess) == "assemblyai-voice-agent"
+    assert _transcriber("phone", "") == "phone"
 
 
 def test_a_typed_phrase_is_not_reported_as_a_mishearing(monkeypatch: Any) -> None:
