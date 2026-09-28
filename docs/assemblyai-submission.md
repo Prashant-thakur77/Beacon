@@ -99,28 +99,30 @@ video/script-assemblyai.md; the pipeline is in the repo.
 - Live console (passcode in the form): https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/
 - Repository (MIT, branch `assemblyai`): https://github.com/Prashant-thakur77/Beacon/tree/assemblyai
 - The pull request Beacon opened by voice: https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2
-- Film (3:26): *(YouTube link — upload `Beacon-AssemblyAI.mp4` from the release)* · direct download: https://github.com/Prashant-thakur77/Beacon/releases/download/v0.3.0/Beacon-AssemblyAI.mp4
-- Deck (10 slides): https://github.com/Prashant-thakur77/Beacon/releases/download/v0.3.0/Beacon-deck.pdf
-- Release with every artefact: https://github.com/Prashant-thakur77/Beacon/releases/tag/v0.3.0
+- Film (4:21): *(YouTube link — upload `Beacon-AssemblyAI.mp4` from the release)* · direct download: https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4
+- Deck (11 slides): https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-deck.pdf
+- Release with every artefact: https://github.com/Prashant-thakur77/Beacon/releases/tag/v0.6.0
 - Telegram bot: https://t.me/GoodNightShiftbot (allowlisted to the author; the film shows it)
 
 ## Tags
 
-Voice Agent API · Universal-3 Pro · pre-recorded transcription · tool calling · barge-in · Hinglish · AWS · Step Functions · Telegram · GitHub · on-call · SRE
+Voice Agent API · Universal-3 Pro · pre-recorded transcription · dual-channel · tool calling · barge-in · telephony · G.711 · Hinglish · AWS · Step Functions · Telegram · GitHub · on-call · SRE
 
 ## The video (4–5 min, per lablab's structure)
 
 | Time | Content |
 |---|---|
 | 0:00–0:30 | The problem: 03:12, one-person rotation, the numbers |
-| 0:30–2:30 | Live demo: page → Telegram voice note → read-back → barge-in withdraws the fix → *approve fix one* → verified → contract → *open the pull request* → the recording in the audit |
-| 2:30–4:00 | Business case: who it is for, market, revenue model, why it needed this generation of AI |
-| 4:00–4:45 | Built solo in ten days; what is next; the live URL and passcode |
+| 0:30–1:00 | Where the words go: three channels on one socket, and the phone call — two channels, the approval attributable to the human |
+| 1:00–2:45 | Live demo: page → Telegram voice note → read-back → barge-in withdraws the fix → *approve fix one* → verified → contract → *open the pull request* → the recording in the audit |
+| 2:45–4:00 | Business case: who it is for, market, revenue model, why it needed this generation of AI |
+| 4:00–4:21 | Built solo in ten days; what is next; the live URL and passcode |
 
 ## Judge's 90 seconds
 
 1. Open the live URL, enter the passcode, press the mic. Say *"what happened"*, then *"fix it"*. Interrupt the read-back: the fix is withdrawn. Say *"fix it"* again, then *"approve fix two"*.
 2. Watch the loop verify (Night Board timeline). Say *"open the pull request"* once it is resolved; the PR appears on GitHub within 30 s.
 3. Open *Audit*: **▶ Listen** plays the recording behind the approval.
+4. For the phone leg with no phone: `make local` in one shell, then `make phone-test` — five scripted calls at telephone quality through the real Voice Agent API, each leaving a two-channel WAV and a verdict on which channel the approval came from.
 
 No account, no mic: `make setup && make local`, then `?night=1` plays the whole night unattended.
