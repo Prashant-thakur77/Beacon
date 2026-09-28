@@ -48,6 +48,14 @@ def _words_of(phrase: str) -> list[str]:
     return [w for w in re.sub(r"[^\w\s]", " ", phrase.lower()).split() if w]
 
 
+def caller_words(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Only the words on the engineer's channel, when the recording has channels."""
+    channelled = [w for w in words if str(w.get("channel") or "")]
+    if not channelled:
+        return words
+    return [w for w in channelled if str(w.get("channel")) == CALLER_CHANNEL]
+
+
 def phrase_confidence(
     words: list[dict[str, Any]], phrase: str
 ) -> dict[str, Any] | None:
@@ -227,6 +235,12 @@ def verify_confidence(
     Nothing is undone by a poor score -- the fix has been applied and verified by
     then. It is *flagged*, which is what an audit is for.
     """
+    # Score the engineer's channel only. The agent says the phrase too -- it reads
+    # the fix number back and asks for it -- and a mono transcript cannot tell whose
+    # mouth it came from, so scoring everything would let the agent's own read-back
+    # stand in for consent. Words without a channel are from a single-channel
+    # recording and are all kept.
+    words = caller_words(words)
     checks: list[dict[str, Any]] = []
     problems: list[str] = []
     for approval in approvals:

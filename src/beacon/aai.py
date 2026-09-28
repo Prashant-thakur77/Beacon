@@ -253,8 +253,16 @@ def audit_session(
     url = audio_url(session_id)
     if not url:
         raise LookupError(f"no recording for session {session_id}")
+    # A session recording is two channels -- the engineer on 1, the agent on 2 --
+    # and a mono transcription downmixes them. The agent's synthesised voice is the
+    # louder of the two, so the engineer's words were being buried: a live phone
+    # approval whose recording clearly contains "Approve fix 2." at 40 s came back
+    # reported as not in the recording at all. Transcribing per channel also keeps
+    # the agent's own read-back of the phrase from being scored as the engineer's
+    # consent, which a mono transcript cannot tell apart.
     body: dict[str, Any] = {
         "audio_url": url,
+        "dual_channel": True,
         "punctuate": True,
         "format_text": True,
         "language_code": "en",
@@ -273,6 +281,7 @@ def audit_session(
                         "text": str(w.get("text") or ""),
                         "confidence": w.get("confidence"),
                         "start": w.get("start"),
+                        "channel": str(w.get("channel") or ""),
                     }
                     for w in got.get("words") or []
                 ],
