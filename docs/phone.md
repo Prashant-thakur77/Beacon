@@ -184,9 +184,28 @@ python -m beacon.phone dial --to +91XXXXXXXXXX \
 Inbound works with no extra code: point the number's voice webhook at the same
 `/twiml` URL and call Beacon back.
 
-**One thing to know before filming.** A trial account plays *"You have a trial
-account…"* before connecting every call. Upgrading with any payment removes it;
-until then the recording opens with Twilio's voice rather than Beacon's.
+### What a Twilio trial will not do
+
+A trial account is not a smaller version of a paid one; several things are switched
+off, and they fail in ways that look like bugs in your own code. Measured on a trial
+on 28 Sep 2026:
+
+| What | What happens |
+|---|---|
+| `Method=GET` on the call | refused — *"trial accounts have limited parameter access"* |
+| Inline `Twiml=…` instead of a URL | refused, same message |
+| The preamble | *"You have a trial account. This is a test call from Twilio."* plays first |
+| `<Connect><Stream>` | the TwiML runs — a `<Say>` before it is heard — and then the call ends without the WebSocket ever being opened |
+
+The last one is the one that matters, and it took a spoken line inside the TwiML to
+see it at all: without that you cannot tell "Twilio never ran our document" from
+"Twilio ran it and would not open the stream", because neither reaches your log. The
+same socket, on the same tunnel, accepts a connection from `twilio_probe.py` in the
+same minute — so the stream is not the problem, the account is.
+
+**Upgrading (any payment method) removes the preamble and the parameter
+restrictions.** Budget for it before filming: until then the recording opens in
+Twilio's voice rather than Beacon's, and the media stream does not connect at all.
 
 ### Proving the carrier side without a carrier
 
