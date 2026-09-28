@@ -56,6 +56,7 @@ class Run:
     interruptions: int = 0
     cleared: int = 0
     ttfa_ms: list[float] = field(default_factory=list)
+    events: list[dict[str, Any]] = field(default_factory=list)
     incident: dict[str, Any] = field(default_factory=dict)
     approvals: int = 0
     attestation: dict[str, Any] = field(default_factory=dict)
@@ -243,9 +244,21 @@ async def place(scenario: str, incident_id: str, out_dir: Path, attest: bool) ->
         f"{LOCAL}/voice", passcode=PASSCODE, incident_id=incident_id, channel="phone"
     )
     token = tools.mint_token(f"{LOCAL}/voice", passcode=PASSCODE)
-    leg = ReplayLeg(build_lines(scenario, state), max_seconds=200)
+    # A person waits a beat longer than 900 ms after a long read-back before saying
+    # the phrase that applies a change. The shorter gap put the approval on top of a
+    # turn the agent had not finished, and the agent answered neither it nor the
+    # line after it — visible in the recording, where the caller says four things
+    # and the agent replies three times.
+    leg = ReplayLeg(
+        build_lines(scenario, state), quiet_ms=1600, tail_s=2.5, max_seconds=220
+    )
 
     def note(kind: str, data: dict[str, Any]) -> None:
+        # Keep the whole stream: when a scenario fails it is almost always the
+        # order of events that explains it, and nothing else recovers that later.
+        run.events.append(
+            {"kind": kind, **{k: v for k, v in data.items() if k != "result"}}
+        )
         if kind == "heard":
             run.heard.append(str(data.get("text") or ""))
         elif kind == "said":
@@ -357,6 +370,7 @@ async def main() -> int:
                 "carrier_clears": run.cleared,
                 "ttfa_ms": run.ttfa_ms,
                 "seconds": run.seconds,
+                "events": run.events,
                 "recording": str(run.wav) if run.wav else None,
                 "attestation": run.attestation,
             }
