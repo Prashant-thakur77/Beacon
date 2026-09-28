@@ -27,8 +27,6 @@ PLAN = {
     3: ("title@light", 1.6),
     21: ("archvoice@light", 2.0),
     23: ("call@light", 2.0),
-    4: ("telegram@light", 1.2),
-    5: ("telegram@light", 1.2),
     14: ("who@light", 1.2),
     15: ("market@light", 1.4),
     16: ("revenue@light", 1.4),

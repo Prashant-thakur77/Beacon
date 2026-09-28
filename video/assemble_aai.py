@@ -22,6 +22,10 @@ A = ROOT / "assets"
 NIGHT = A / "aai-night-full.webm"      # the whole night: brief → barge-in → approve → PR
 CONTRACT = A / "aai-contract2.webm"    # the two-phrase Sleep Contract grant
 AUDIT = A / "audit.webm"               # the recording played back in the audit
+# A real phone, filmed: the page landing, the voice note heard at 98%, and the
+# approval refused at 75% and again at 74% until it was typed. Framed and trimmed by
+# video/telegram_cut.sh.
+PHONE = ROOT / "telegram" / "telegram-full.mp4"
 
 
 def run(args: list[str]) -> None:
@@ -91,8 +95,8 @@ BUILD = {
     1:  lambda s: scene_clip(1, s),
     2:  lambda s: scene_clip(2, s),
     3:  lambda s: scene_clip(3, s),
-    4:  lambda s: scene_clip(4, s),
-    5:  lambda s: scene_clip(5, s),
+    4:  lambda s: shot(4, PHONE, 1.5, s),             # the page lands
+    5:  lambda s: shot(5, PHONE, 55.0, s),            # heard at 98%, then the change
     6:  lambda s: shot(6, NIGHT, 30.0, s),            # the board and the brief
     7:  lambda s: shot(7, NIGHT, 12.0, s),            # connect, latency strip
     8:  lambda s: shot(8, NIGHT, 45.0, s),            # "fix it" → propose_fix → dry run
@@ -111,15 +115,17 @@ BUILD = {
     21: lambda s: scene_clip(21, s),          # the 3D voice path
     22: lambda s: scene_clip(22, s),          # India / New York
     23: lambda s: scene_clip(23, s),          # the phone call, two channels
+    24: lambda s: shot(24, PHONE, 126.5, s),  # 75%, 74%, refused, then typed
 }
 
 # The order the film is cut in, which is not the order the rows were written. The
 # mechanism is explained before the demo shows it, and the phone opens the demo
 # because it is where the engineer actually is at 3 AM.
-ORDER = [1, 2, 22, 3, 21, 23, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+ORDER = [1, 2, 22, 3, 21, 23, 4, 5, 24, 6, 7, 8, 9, 10, 11, 12, 13,
          14, 15, 16, 17, 18, 19, 20]
 # the live-capture rows hold after the narration so the UI is readable
 TAILS = {1: 1.4, 3: 1.4, 20: 2.2, 21: 1.8, 22: 1.4, 23: 2.0,
+         4: 1.8, 5: 2.0, 24: 2.6,
          6: 2.4, 7: 2.4, 8: 2.6, 9: 3.0, 10: 2.6, 11: 2.6, 12: 2.8, 13: 2.6}
 
 

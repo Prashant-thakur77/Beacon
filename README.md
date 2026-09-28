@@ -272,7 +272,7 @@ template.yaml           base stack (triage)          remediation-template.yaml  
 demo/                   the patient: VPC + RDS + Fargate app + alarm, and the sticky-wedge failure mode
 requirements/           pinned image dependencies (triage.txt, agent.txt)
 scripts/                gate.sh · commit.sh · local_server.py (make local) · dev/assemblyai_loop.py + dev/assemblyai_audio.py (voice harnesses) · capture, replay builders
-tests/                  350 tests: moto for AWS, FakeAgent for the model, fake Telegram/GitHub/AssemblyAI, template safety + ops, local mode
+tests/                  371 tests: moto for AWS, FakeAgent for the model, fake Telegram/GitHub/AssemblyAI, template safety + ops, local mode
 docs/                   architecture.md (Mermaid) · safety.md · assemblyai.md · telegram.md · fix-at-source.md · human-runbook.md · submission.md · blog.md
 video/                  how the demo film is generated (Chatterbox narration, three.js scenes, Playwright captures, ffmpeg)
 .github/                CI (gate + console build), manual Deploy workflow, issue/PR templates
