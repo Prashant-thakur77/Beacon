@@ -78,7 +78,7 @@ Done when: "open the pull request" in a voice turn produces a green-CI PR on Git
 ## 5. Stage 5 — Presentation (Sun 28 → Mon 29)
 
 - **Film (3 min)**: same pipeline as the first film, new scenes: the Telegram voice note, barge-in withdrawing a fix, the PR appearing on GitHub, the recording link in the audit. Narration by Chatterbox again; product shots from a real headed browser session with a real mic (the human records that one take).
-- **Deck (10 slides)** from `assemblyai-deck.md`, updated with Telegram, the PR, and the latency numbers.
+- **Deck (11 slides)** from `assemblyai-deck.md`, updated with Telegram, the PR, and the latency numbers.
 - **Cover image** from the Night Board mid-approval; **README** section "Built on AssemblyAI" listing exactly which API does what (Voice Agent API for the live console, pre-recorded STT for Telegram voice notes, session recordings and webhooks for the audit, Bluejay for tests).
 - **Submit Mon 29 evening**; Tue 30 is buffer only.
 

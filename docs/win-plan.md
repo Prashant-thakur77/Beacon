@@ -6,7 +6,7 @@ Deadline **Tue 30 Sep, 20:30 IST**. The build is done and deployed; what is left
 |---|---|---|
 | **Presentation** | *"Judges reward clarity over production value. A 4-minute video that explains the problem, shows the solution working, and articulates the business case."* | **Gap.** The only film is the First Commit cut (2:49), AWS-flavoured, no AssemblyAI, no business case. Script for the new cut is written; narration, capture and assembly are not done. |
 | **Business value** | A specific target user, a TAM figure, a revenue model, why it needs AI | **Done on paper** (`business-case.md`), not yet in the film, the deck or the repo front page. |
-| **Application of technology** | Deployed URL, repo with real commits across the window, AI doing something genuinely novel | **Strong.** Live console on AWS, 121 commits 18–27 Sep, nine tools on the Voice Agent API. Needs: the live site to be judge-proof at any hour. |
+| **Application of technology** | Deployed URL, repo with real commits across the window, AI doing something genuinely novel | **Strong.** Live console on AWS, 156 commits 18–27 Sep, nine tools on the Voice Agent API. Needs: the live site to be judge-proof at any hour. |
 | **Originality** | *"Does this solve the problem in a way that only became possible with this generation of models?"* | **Strong but under-stated.** Barge-in withdrawing a fix, consent from the transcript, the PR as the end of the incident — none of it is on the repo's front page. |
 
 So: **the code is not the bottleneck; the artefacts are.** Everything below is ordered by score-per-hour.
@@ -17,7 +17,7 @@ So: **the code is not the bottleneck; the artefacts are.** Everything below is o
 
 The sandbox was reset twice; AWS was never touched.
 
-1. `git checkout assemblyai` (121 commits, v0.3.0) ✔
+1. `git checkout assemblyai` (156 commits, v0.6.0) ✔
 2. Rewrite `.beacon.env` with the sixteen deploy flags ✔
 3. `make setup` — uv venv, CPU torch, cordon, `npm ci` (running)
 4. Re-vendor the film assets the repo does not carry: Geist woff2 + `three.module.js` into `video/scenes/` — and **commit them this time**, so the next reset costs nothing
@@ -69,7 +69,7 @@ This is where "Application of Technology" is actually judged, because it is what
 1. **README rebuilt for a stranger with four minutes**: hero line, the 90-second judge path, live URL + passcode, one GIF of the barge-in, the *Built on AssemblyAI* table, architecture diagram, the business case in three lines, how to run it locally with no AWS account.
 2. **Architecture diagram** — one authored SVG (not just Mermaid) showing the three planes: the voice socket, the safety path, the remediation loop. Rendered to PNG for the README and reused as a deck slide.
 3. **GIFs** — barge-in withdrawing the fix; the Telegram voice note; **▶ Listen** playing a recording. Small, looping, under the fold.
-4. **Repo furniture** — description, topics (`voice-agents`, `assemblyai`, `aws`, `sre`, `incident-response`), social preview image, pinned release **v0.3.0** carrying the film, the deck PDF and the postmortem sample.
+4. **Repo furniture** — description, topics (`voice-agents`, `assemblyai`, `aws`, `sre`, `incident-response`), social preview image, pinned release **v0.6.0** carrying the film, the deck PDF and the postmortem sample.
 5. **Docs index** — one page that routes: judges → `assemblyai-submission.md`; engineers → `architecture.md`, `safety.md`; the curious → `telegram.md`, `fix-at-source.md`, `business-case.md`.
 6. **Versions and deployments, visible** — CHANGELOG entries for v0.1/0.2/0.3, the deploy workflow, and a table of what is deployed where (console, voice, dashboard, Telegram webhook) with its URL and version.
 

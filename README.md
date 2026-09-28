@@ -2,13 +2,15 @@
 
 **The on-call agent that fixes the 3 AM page with your voice — and the second time it happens, does not wake you at all.**
 
+*It holds write access to production, and the only thing that unlocks it is a sentence AssemblyAI heard you say.*
+
 [![CI](https://github.com/Prashant-thakur77/Beacon/actions/workflows/build.yaml/badge.svg)](https://github.com/Prashant-thakur77/Beacon/actions/workflows/build.yaml)
 [![Release](https://img.shields.io/github/v/release/Prashant-thakur77/Beacon?label=release)](https://github.com/Prashant-thakur77/Beacon/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-3776ab)](pyproject.toml)
 [![Built on AWS](https://img.shields.io/badge/built%20on-AWS-ff9900)](docs/architecture.md)
 
-**Live console:** https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/ · **Film (4:44):** [download](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4) · **Deck:** [PDF](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-deck.pdf) · **Architecture:** [the voice path](#architecture) · **Business case:** [docs/business-case.md](docs/business-case.md) · **Built on AssemblyAI:** [what runs where](#built-on-assemblyai-the-voice-you-can-interrupt) · **Try it locally, no AWS:** `make setup && make local`
+**Live console:** https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/ · **Film (4:44):** [download](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4) · **Deck:** [PDF](https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-deck.pdf) · **Architecture:** [the voice path](#architecture) · **Business case:** [docs/business-case.md](docs/business-case.md) · **Built on AssemblyAI:** [the transcript is the authorisation](#built-on-assemblyai--the-transcript-is-the-authorisation) · **Try it locally, no AWS:** `make setup && make local`
 
 It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. You need four answers — *is it real, what changed, what do I do, can I go back to sleep* — and today's tools answer, at most, the first one.
 
@@ -18,6 +20,7 @@ Beacon finds the CloudTrail change behind the alarm, proves it against a golden 
 >
 > 1. **With a microphone** — open the [live console](https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/), enter the passcode from the submission, press **Connect** and say *"what happened"*, then *"fix it"*. **Interrupt the read-back while it speaks** — the fix is withdrawn and the approval phrase stops working. Say *"fix it"* again, then *"approve fix two"*, and watch the verify loop.
 > 2. **Without a microphone** — press **▶ Run the night** on the board, or open `?night=1`. The whole night plays unattended.
+> 3. **The thirty seconds that matter** — in the film at **1:50**: an approval heard at 75 % is refused, heard again at 74 % and refused again, and typed instead. Nothing reached production until the words were certain. That was not staged.
 > 3. **Without an AWS account** — `make setup && make local`, same thing on your laptop against in-process moto.
 > 4. **The proof** — the *Audit* page plays back the **session recording** behind every approval; [PR #2](https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2) is a pull request Beacon opened by voice.
 
@@ -115,19 +118,31 @@ Three planes, and the middle one is the product: **the model decides whether to 
 | **Amazon EC2 / ECS / RDS** | the patient: a real Fargate app behind a security group | `demo/` |
 | **AWS IAM** | two roles, one direction (see Safety) | all three templates |
 
-## Built on AssemblyAI (the voice you can interrupt)
+## Built on AssemblyAI — the transcript *is* the authorisation
 
-The console's default voice path is the **AssemblyAI Voice Agent API**; the AWS cascade (Transcribe → Nova → Polly) stays one toggle away for the side-by-side. Each AssemblyAI API is used where it fits, not everywhere:
+Beacon is not a voice interface bolted onto a tool. **The words are the artifact a change to production is justified by**, afterwards, to somebody who was not in the room — and every property of that artifact comes from AssemblyAI:
+
+- **what unlocked the change** — the exact phrase, checked against the transcript and never against the model's argument;
+- **how clearly it was heard** — per-word confidence, and a change approved below 85 % is refused or flagged;
+- **who said it** — the caller's own channel on a phone call, not an inference about speakers;
+- **and the recording**, so anybody can play the words back a week later.
+
+Take AssemblyAI out and you do not lose the voice interface. You lose the audit — and the audit is the reason this can hold a credential at all.
+
+The clearest demonstration is in the film, and nobody scripted it: an approval came back at **75 %** and was refused, came back again at **74 %** and was refused again, and the engineer typed it instead. Nothing reached production until the words were certain. The thing that stopped a change to a live AWS account was a confidence number from a transcription model.
+
+The console's default voice path is the Voice Agent API; the AWS cascade (Transcribe → Nova → Polly) stays one toggle away for the side-by-side. Each AssemblyAI API is used where it fits, not everywhere:
 
 | AssemblyAI API | What it does here | Where |
 |---|---|---|
 | **Voice Agent API** (`wss://agents.assemblyai.com/v1/ws`) | Full duplex in the browser: Universal-3 Pro STT, turn detection, barge-in, the managed LLM, TTS, and the nine Beacon tools declared as client-side functions — every `tool.call` comes back to the browser, which runs it on the voice Lambda with the transcript the API produced. English and Hinglish in and out. | `web/src/voice/assemblyai.ts`, `voice_turn.py` (`POST /tools/<name>`) |
-| **Voice Agent API, on a telephone line** | The same socket, the same nine tools, with a phone call on the other side instead of a laptop: audio is transcoded 8 kHz G.711 µ-law ↔ 24 kHz PCM, turn detection is loosened for a noisy line, and the agent is told there is no screen. An engineer in bed reaches the same agent, under the same consent rules. | `beacon/phone/` ([docs/phone.md](docs/phone.md)) |
+| **Voice Agent API, on a telephone line** (`audio/pcmu`) | The same socket, the same nine tools, with a phone call on the other side instead of a laptop. The API takes **G.711 µ-law natively**, and a phone line is µ-law already, so the carrier's frames are forwarded **untouched in both directions** — no resampling, no transcoding. Turn detection is loosened for a noisy line and the agent is told there is no screen. An engineer in bed reaches the same agent, under the same consent rules. | `beacon/phone/` ([docs/phone.md](docs/phone.md)) |
 | **Pre-recorded transcription** (`/v2/transcript`, language detection, `keyterms_prompt`) | Telegram voice notes: the file is uploaded from the Lambda, transcribed with **word-level confidence**, and a mumbled "approve fix one" is refused with the confidence it was heard at. | `telegram.py`, `telegram_bot.py` |
 | **Dual-channel transcription** (`dual_channel`) | The agent reads the approval phrase back, so it is in the recording twice — once from each party. A phone call is recorded with the caller on one channel and the agent on the other, and every utterance is labelled by channel, so **the sentence that changed production is attributable to the human** without inferring speakers. A change whose phrase appears only on the agent's channel fails the check. | `aai.py` (`transcribe_call`), `beacon/phone/attest.py` |
 | **Session recordings** (`GET /v1/sessions/{id}`) | Every approval and contract made in a live session stores the session id; the audit page plays the recording behind the quote (**▶ Listen**), and the postmortem cites it. | `voice_turn.py` (`GET /recordings/<id>`), `web/src/components/Reports.tsx` |
 | **Summarization** (`summary_model: conversational`) | *"Summarise the session"* on an audit row: AssemblyAI transcribes its own recording of the conversation and summarises it, redacted; the result is kept on the incident and printed in the postmortem as **the night in the engineer's words**. | `aai.py`, `voice_turn.py` (`POST /sessions/<id>/summary`) |
 | **PII redaction** (`redact_pii`, hashed) | A voice note at 3 AM can carry a colleague's name or a customer's number. Consent is checked against the words as heard, in memory; what is *written* to the approval row, the audit and the pull request is the redacted text. | `telegram.py`, `voice_tools.py` (`_quote`) |
+| **Word-level confidence on every channel** (`/v2/transcript`, `words[].confidence`) | A live turn carries **no** confidence — `transcript.user` has text and no number — so a browser or phone approval was applied without one, while the same words on Telegram had to clear 85 %. AssemblyAI now re-transcribes **its own recording of the session** afterwards, and each phrase that unlocked a change is scored by its **weakest word**; a poor score is flagged in the audit. One standard, whichever channel carried the words. | `aai.py` (`audit_session`), `phone/attest.py`, `voice_turn.py` (`POST /sessions/<id>/attest`) |
 | Temporary tokens (`GET /v1/token`) | The browser never sees the API key; the Lambda mints a 10-minute token per session. | `voice_turn.py` (`POST /assemblyai/token`) |
 
 Three behaviours the socket makes possible, each with a test or a harness run behind it: **barge-in withdraws the fix** (`cancel_proposal`, the interrupted read-back cannot be approved), **drop-safety** (an approval spoken before the socket dies never executes — execution is a Lambda call after `tool.call`, never socket state), and **the night ends with a pull request** (`open the pull request` → `open_fix_pr` restores the rule in the CloudFormation template and files the postmortem; nothing is merged). Details and measured latencies: [docs/assemblyai.md](docs/assemblyai.md); the plan: [docs/assemblyai-roadmap.md](docs/assemblyai-roadmap.md); Telegram: [docs/telegram.md](docs/telegram.md); the PR: [docs/fix-at-source.md](docs/fix-at-source.md).

@@ -93,7 +93,7 @@ Backend switch: the Talk panel has an *AssemblyAI · full duplex / AWS cascade �
 | **Tue 22** | Wire `AssemblyAITransport` into `Talk.tsx` behind `config.voiceBackend`; mic → 24 kHz PCM via the worklet; playback ring buffer with flush on `interrupted`; `AwsCascadeTransport` wrapper for parity. Per-incident **keyterms** from `rca_json` + diagnostics (`sg-…`, alarm name, `approve fix one`, `grant contract for seven days`) sent in `session.update`. | Full loop (brief → evidence → propose → approve → resolved → contract) on the AssemblyAI path against the live AWS backend. |
 | **Wed 23** | Behaviours: **barge-in during the read-back** → `interrupt()` + a `cancel_proposal` tool + UI marker; **confidence gate** on approvals (already server-side) with the "repeat the phrase" line; **Hinglish** affirmatives for the read-back and the code-switched grant phrase (`saat din ke liye contract do`); **agent-initiated turn** when the watcher sees `resolved` (context injection if supported, else a Polly one-liner + chime); `grant_sleep_contract(until: "till Monday")` natural-duration parsing (still behind the read-back); **drop-safety** test: close the socket mid-approval, assert nothing executed. | Each behaviour has a test and a rehearsed script line. |
 | **Thu 24** | Latency overlay (measured per turn: cascade vs Voice Agent); replay mode for the AssemblyAI path; three end-to-end runs; merge `assemblyai` → `main` behind the flag; redeploy. | `?voice=assemblyai` and `?voice=aws` both work on the same CloudFront URL. |
-| **Fri 25** | Record raw footage: interruption, Hinglish approval, mumbled approval refused then clear approval executes, contract "till Monday", drop-safety, agent-initiated recovery line, latency overlay. Slide deck (10 slides) and cover image. | Raw clips + deck v1 + cover. |
+| **Fri 25** | Record raw footage: interruption, Hinglish approval, mumbled approval refused then clear approval executes, contract "till Monday", drop-safety, agent-initiated recovery line, latency overlay. Slide deck (11 slides) and cover image. | Raw clips + deck v1 + cover. |
 | **Sat 26** | Edit the 3-minute video; descriptions and tags; deck polish. | Video uploaded (unlisted). |
 | **Sun 27** | Submit v1 early; ask a mentor in Discord for feedback. | Submission confirmed. |
 | **Mon 28 – Tue 29** | Fixes, re-cut, final submit by Tue 29 evening (deadline Wed 30 20:30 IST). | Final. |
@@ -121,13 +121,19 @@ nine tools, same consent rules; a different physical layer, and two rules that o
 a phone needs. The full description is in [phone.md](phone.md); what matters here is
 what it asks of AssemblyAI.
 
-**Audio.** The telephone network carries 8 kHz G.711 µ-law; the Voice Agent API
-speaks 16-bit PCM at 24 kHz. The ratio is exactly three, so the conversion is a
-lookup table and two resamplers in the standard library
-(`beacon/phone/codec.py`). Decimating 24 → 8 kHz goes through a 19-tap
-Hamming-windowed sinc cutting at 3.4 kHz: without it, everything above 4 kHz in the
-agent's voice folds back as a whistle on the line. Measured rejection is 28 dB at
-5 kHz and 55 dB at 9 kHz, at roughly 47× real time in Python.
+**Audio — none.** The Voice Agent API offers `audio/pcm`, `audio/pcma` and
+`audio/pcmu`, and a telephone line is G.711 µ-law already, so the carrier's frames go
+to AssemblyAI untouched and its reply comes back untouched. No resampling, no
+transcoding, and none of the quality a trip through 24 kHz and back would cost. This
+is what AssemblyAI's own Twilio example does.
+
+The first version *did* transcode, because the browser path sends 24 kHz PCM and it
+was not obvious the same socket would take µ-law. Rather than assume, I asked it:
+`audio/pcmu` is accepted, and `pcm_mulaw` — the string the *streaming STT* API uses —
+is refused with an error naming the three that are not. `beacon/phone/codec.py`
+therefore serves the parts either side of the call (rendering the scripted caller's
+lines from Polly's 8 kHz PCM, and turning µ-law back into PCM for the two-channel
+recording) rather than the call itself.
 
 **Turn detection.** A phone line is noisier than a laptop and a half-awake caller
 pauses mid-sentence, so the session opens with `vad_threshold: 0.65`,
