@@ -121,7 +121,18 @@ def build(
         ),
         empty,
     )
-    last = (incident.get("verification") or {}).get("last") or {}
+    # Verification lives in the timeline as `verify_attempt`; some callers also
+    # carry a rolled-up `verification.last`. Reading only the latter meant a real
+    # incident produced a certificate with no checks on it at all — the field that
+    # says CloudWatch agreed, silently empty.
+    last: dict[str, Any] = (incident.get("verification") or {}).get("last") or {}
+    if not last:
+        attempts = [
+            dict(e.get("detail") or {})
+            for e in incident.get("timeline") or []
+            if isinstance(e, dict) and e.get("event") == "verify_attempt"
+        ]
+        last = attempts[-1] if attempts else {}
     checks = last.get("checks") or []
     change = (incident.get("changes") or [{}])[0]
 

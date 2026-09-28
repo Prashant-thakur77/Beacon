@@ -1,4 +1,4 @@
-.PHONY: voice-test phone-call phone-test phone-serve deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
+.PHONY: judge voice-test phone-call phone-test phone-serve deploy deploy-voice deploy-all teardown teardown-voice teardown-all \
        setup-image setup-agent-image deploy-demo teardown-demo break-demo fix-demo \
        test lint check-image-tags smoke-strands export-tools deploy-remediation teardown-remediation \
        snapshot-sg tag-remediable dry-run changes incidents lint-templates remediable-ecs break-demo-deploy fix-demo-deploy \
@@ -780,6 +780,12 @@ test:
 voice-test:
 	$(call check_param,ASSEMBLYAI_API_KEY)
 	$(PYTHON) scripts/voice_test.py $(if $(ONLY),--only $(ONLY),) --json docs/assets/voice-test-report.json
+
+# The whole night in a terminal, against `make local`: no microphone, no AWS
+# account, the real tools and the real consent rules. For anyone judging this who
+# would rather read than click.
+judge:
+	$(PYTHON) scripts/judge.py
 
 # ---------------------------------------------------------------------------
 # The phone channel (docs/phone.md)

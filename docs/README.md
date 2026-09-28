@@ -12,6 +12,7 @@ README against the code.
 | Read this when | File |
 |---|---|
 | You want the whole picture in five minutes | [`../README.md`](../README.md) |
+| You would rather read the demo than click it | `make local`, then `make judge` |
 | **Where AssemblyAI sits**, every API used, and what each one is load-bearing for | [`assemblyai.md`](assemblyai.md) |
 | The phone channel: why it exists, why Amazon Connect cannot carry the media, and what a Twilio trial will not do | [`phone.md`](phone.md) |
 | Testing a voice agent by speaking to it — in the browser and down a phone line | [`voice-testing.md`](voice-testing.md) |

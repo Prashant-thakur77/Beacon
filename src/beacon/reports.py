@@ -14,6 +14,8 @@ import statistics
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from beacon import certificate
+
 _IST = timedelta(hours=5, minutes=30)
 
 
@@ -200,6 +202,15 @@ def postmortem(
             f"Run under Sleep Contract `{used_contract.get('contract_id')}` "
             f'("{used_contract.get("transcript_quote", "")}"); nobody was woken.'
         )
+    # The certificate goes here, after what was done and before whether it worked:
+    # a postmortem is read to answer "why was this allowed", and that question comes
+    # before "did it help". Every field in it is a record that already exists.
+    for a in mine_approvals:
+        if not a.get("transcript_quote"):
+            continue
+        out.append("")
+        out.append(certificate.to_markdown(certificate.build(incident, a)))
+
     out.append("")
     out.append("## Verification")
     out.append("")

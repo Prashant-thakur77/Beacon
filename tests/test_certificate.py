@@ -214,3 +214,51 @@ def test_a_browser_session_says_nothing_rather_than_guessing() -> None:
     cert = certificate.build(_attested(None), LIVE_TURN)
     assert cert["consent"]["one_voice"] is None
     assert "One voice" not in certificate.to_markdown(cert)
+
+
+def test_the_verification_is_read_from_the_timeline_when_that_is_where_it_lives() -> (
+    None
+):
+    """Incidents keep verify_attempt in the timeline; only some carry a rolled-up key.
+
+    Reading only the rolled-up one produced a certificate whose "CloudWatch agreed"
+    field was silently empty on a real incident.
+    """
+    from_timeline = {
+        "incident_id": "inc-1",
+        "alarm_name": "payments-errors",
+        "proposals": INCIDENT["proposals"],
+        "timeline": [
+            {
+                "event": "verify_attempt",
+                "detail": {
+                    "attempt": 1,
+                    "checks": [
+                        {
+                            "name": "alarm_ok_after_fix",
+                            "ok": False,
+                            "detail": "not yet",
+                        },
+                    ],
+                },
+            },
+            {
+                "event": "verify_attempt",
+                "detail": {
+                    "attempt": 2,
+                    "checks": [
+                        {
+                            "name": "alarm_ok_after_fix",
+                            "ok": True,
+                            "detail": "OK since 03:19",
+                        },
+                        {"name": "metric_zero", "ok": True, "detail": "no datapoints"},
+                    ],
+                },
+            },
+        ],
+    }
+    cert = certificate.build(from_timeline, VOICE_NOTE)
+    assert cert["verification"]["attempt"] == 2, "the latest attempt, not the first"
+    assert cert["verification"]["passed"] == 2
+    assert "2/2 checks on attempt 2" in certificate.to_markdown(cert)
