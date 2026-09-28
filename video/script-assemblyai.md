@@ -6,6 +6,8 @@ Palette and type follow the console (near-black, one lilac accent, amber for "ne
 
 `scene:` = rendered from `scenes/scenes.html?scene=…` · `CAPTURE` = recorded from the live console, Telegram or GitHub · `AGENT AUDIO` = the AssemblyAI agent's own voice, used raw.
 
+**Rows 4, 5 and 24 carry no narration.** They are a real phone with a real person on it, and talking over somebody's voice note is talking over the person the film is about. Those beats keep their own sound — levelled to match the narration, since a phone records about 12 dB quieter — and the explanation sits on the right of the frame instead.
+
 | # | Section | On screen | Narration | Secs |
 |---|---|---|---|---|
 | 1 | problem | Black, then a phone lighting up in the dark: **03:12 · CloudWatch ALARM · payments-errors**. (scene: `phone`) | It is three in the morning, payments are failing, and the only person awake is you. | 7 |

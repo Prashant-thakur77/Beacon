@@ -81,6 +81,34 @@ def shot(n: int, src: Path, start: float, secs: float, zoom: float = 1.0) -> Pat
     return p
 
 
+# The Telegram beats keep their own sound. Narrating over somebody's voice note is
+# talking over the person the film is about — and the recording already says what is
+# happening, out loud, in their voice. The explanation goes on the right instead.
+CAPS = ROOT / "caps"
+PHONE_BEATS = {
+    4:  (1.5,   9.5,  "f04"),   # the page lands
+    5:  (54.0,  72.0, "f05"),   # heard at 98%, then the change that caused it
+    24: (126.0, 143.0, "f24"),  # 75%, 74%, refused — then typed
+}
+
+
+def phone_beat(n: int, start: float, end: float, cap: str) -> Path:
+    """A segment of the real phone recording: phone left, caption right, own audio."""
+    p = TMP / f"c{n:02d}.mp4"
+    run(["-ss", str(start), "-to", str(end), "-i", str(PHONE),
+         "-i", str(CAPS / f"{cap}.png"),
+         "-filter_complex",
+         f"[0:v]crop=560:{H}:680:0,pad={W}:{H}:120:0:color=0xFFFFEB[v];"
+         f"[v][1:v]overlay=820:0,fps={FPS},format=yuv420p[out]",
+         # A phone's own recording sits about 12 dB below the narration; left alone
+         # the voice this beat exists for would be the quietest thing in the film.
+         "-af", "loudnorm=I=-17.8:LRA=11:TP=-1.5",
+         "-map", "[out]", "-map", "0:a?",
+         "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+         "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", str(p)])
+    return p
+
+
 def with_audio(n: int, video: Path, secs: float) -> Path:
     p = TMP / f"a{n:02d}.mp4"
     run(["-i", str(video), "-i", str(vo(n)), "-filter_complex",
@@ -132,6 +160,11 @@ TAILS = {1: 1.4, 3: 1.4, 20: 2.2, 21: 1.8, 22: 1.4, 23: 2.0,
 def main() -> None:
     clips: list[Path] = []
     for n in ORDER:
+        if n in PHONE_BEATS:
+            clip = phone_beat(n, *PHONE_BEATS[n])
+            clips.append(clip)
+            print(f"row {n:2d}  {dur(clip):5.1f}s  (their own voice)", flush=True)
+            continue
         secs = round(dur(vo(n), "a") + 0.4 + TAILS.get(n, 0.8), 2)
         clips.append(with_audio(n, BUILD[n](secs), secs))
         print(f"row {n:2d}  {secs:5.1f}s", flush=True)
