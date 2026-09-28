@@ -355,6 +355,14 @@ def route(text: str) -> tuple[str, dict[str, Any]] | None:
         return "open_fix_pr", {"confirmation_phrase": text}
     if re.search(r"\b(contract|next time|handle it yourself|khud sambhal)\b", t):
         return "grant_sleep_contract", {"days": 7, "max_uses": 3}
+    # "what are my options" is how people actually ask at 3 AM, and it means the
+    # same thing as "fix it" — propose, read back, change nothing yet.
+    if re.search(
+        r"\b(options?|countermeasures?|what can (you|we) do|what do you suggest"
+        r"|suggestions?|recommend|kya kar sakte ho|kya karna chahiye)\b",
+        t,
+    ):
+        return "propose_fix", {}
     if re.search(r"\b(fix|repair|restore|propose|theek|thik)\b", t):
         return "propose_fix", {}
     if re.search(r"\b(changed|change|why|kyun|kyu|deploy|who)\b", t):
@@ -373,7 +381,7 @@ def route(text: str) -> tuple[str, dict[str, Any]] | None:
 HELP = (
     "I understand plain phrases, typed or as a voice note:\n"
     "• what happened / kya hua\n"
-    "• what changed\n"
+    "• what changed / what are my options\n"
     "• fix it / isko fix kar do\n"
     "• approve fix 1  (the exact phrase applies it)\n"
     "• undo fix 1\n"

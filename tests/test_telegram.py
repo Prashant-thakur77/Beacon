@@ -280,3 +280,20 @@ def test_voice_note_transcript_is_redacted_before_it_is_stored(tg: Any) -> None:
     row = _approvals(tg["incident_id"])[0]
     assert row["transcript_quote"] == "approve fix one, thanks ####"
     assert row["attestation"]["redacted_quote"] == "approve fix one, thanks ####"
+
+
+def test_asking_for_options_proposes_a_fix_without_applying_it(tg: Any) -> None:
+    """ "What are my options" is how people ask at 3 AM; it must reach propose_fix."""
+    for phrase in (
+        "what are my options",
+        "what can you do",
+        "any countermeasures?",
+        "kya kar sakte ho",
+    ):
+        assert telegram.route(phrase) == ("propose_fix", {}), phrase
+    out = telegram_bot.handle_update(_update("what are my options"))
+    assert out["tool"] == "propose_fix" and out["ok"]
+    assert (
+        "Reply exactly: approve fix 1" in _sent(tg["http"], "sendMessage")[-1]["text"]
+    )
+    tg["sfn"].assert_not_called()

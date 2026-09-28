@@ -5,7 +5,10 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 scene, secs, out = sys.argv[1], float(sys.argv[2]), sys.argv[3]
 snap = sys.argv[4] if len(sys.argv) > 4 else None
-url = f"http://localhost:8877/scenes.html?scene={scene}" if not scene.startswith("terminal:") else "http://localhost:8877/terminal.html?" + scene.split(":",1)[1]
+theme = "&theme=light" if scene.endswith("@light") else ""
+scene = scene.removesuffix("@light")
+url = (f"http://localhost:8877/scenes.html?scene={scene}{theme}" if not scene.startswith("terminal:")
+       else "http://localhost:8877/terminal.html?" + scene.split(":", 1)[1])
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
