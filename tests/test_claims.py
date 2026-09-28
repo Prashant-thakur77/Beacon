@@ -116,3 +116,41 @@ def test_the_allowlist_size_is_stated_correctly_everywhere_it_is_stated() -> Non
                 f"{where} says '{said} allowlisted' but the registry has "
                 f"{len(registry.REGISTRY)}"
             )
+
+
+def test_every_route_the_docs_name_actually_exists() -> None:
+    """A documented endpoint that 404s is worse than an undocumented one.
+
+    Placeholders are normalised: the prose writes `<id>` where the code writes
+    `<session_id>`, and that difference is a house style, not a mistake. Paths under
+    `/v1/` and `/v2/` are AssemblyAI's own API, not ours, and are not ours to have.
+    """
+    import re
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+
+    def shape(route: str) -> str:
+        return re.sub(r"<[^>]+>", "<>", route.rstrip("/"))
+
+    real = {
+        shape(m.group(2))
+        for p in (root / "src/beacon").rglob("*.py")
+        for m in re.finditer(
+            r'@app\.(get|post|delete)\("([^"]+)"\)', p.read_text(encoding="utf-8")
+        )
+    }
+    assert real, "no routes found in the source"
+
+    pages = [root / "README.md", *(root / "docs").glob("*.md")]
+    missing: list[str] = []
+    for page in pages:
+        for m in re.finditer(
+            r"`(?:GET|POST|DELETE) (/[a-zA-Z0-9/<>_-]+)`",
+            page.read_text(encoding="utf-8"),
+        ):
+            route = m.group(1)
+            if route.startswith(("/v1/", "/v2/")):
+                continue  # AssemblyAI's API, documented where it is used
+            if shape(route) not in real:
+                missing.append(f"{page.name} names {route}")
+    assert not missing, "documented routes that do not exist: " + "; ".join(missing)

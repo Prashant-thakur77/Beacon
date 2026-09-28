@@ -28,6 +28,23 @@ README against the code.
 | The five-stage plan this entry followed | [`assemblyai-roadmap.md`](assemblyai-roadmap.md) |
 | The plan for the last three days | [`win-plan.md`](win-plan.md) |
 
+## The tools in `scripts/`
+
+Everything here is runnable and most of it is wired to a `make` target; these are the
+ones that are not, so they are listed rather than left to be discovered.
+
+| Command | What it does |
+|---|---|
+| `make judge` | the whole night in a terminal against `make local` — no microphone, no AWS |
+| `make voice-test` · `make phone-test` | the spoken regression suites, browser and phone |
+| `make subtitles` | captions the film with AssemblyAI (`video/subtitles.py`) |
+| `scripts/twilio_check.py` | asks Twilio whether an account can actually place the call, and prints the click path for whatever is missing |
+| `scripts/twilio_probe.py` | speaks Twilio's Media Streams protocol at our own server, so the carrier side is testable without a carrier |
+| `scripts/call_scene_data.py` | turns a real call recording into the film's `call` scene data |
+| `scripts/scene_counts.py` | writes the commit and test counts the film quotes, from the repository |
+| `scripts/light_diagram.py` | derives the light architecture drawing from the dark one |
+| `scripts/export_night.py` | exports an archived incident for the console's replay |
+
 ## Kept as a record
 
 These describe the First Commit entry or earlier planning. They are **not
