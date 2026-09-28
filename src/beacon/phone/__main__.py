@@ -124,6 +124,19 @@ SCENARIOS: dict[str, list[dict[str, Any]]] = {
         {"text": "Kya hua hai?", "voice": HINGLISH_VOICE},
         {"text": "Isko fix kar do.", "voice": HINGLISH_VOICE},
     ],
+    # The take for the film: a person on a phone at 3 AM, not a test harness. Same
+    # socket, same tools, same consent rules as every other scenario here — the
+    # lines are just the ones somebody would actually say, with the pauses and the
+    # half-sentences left in.
+    "film": [
+        {"text": "Hello?"},
+        {"text": "Okay, what's going on?"},
+        {"text": "Why? What changed?"},
+        {"text": "Right. What are my options?"},
+        {"text": "Approve fix {fix}."},
+        {"text": "Is it actually fixed?"},
+        {"text": "Good. Handle it yourself next time."},
+    ],
     # A keypress acknowledges; it must never approve. The caller deliberately never
     # says the phrase here, so the only thing that could have approved the fix is the
     # keypress -- and nothing may be applied.

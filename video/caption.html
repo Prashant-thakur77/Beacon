@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/>
+<link rel="stylesheet" href="scenes/fonts/geist.css"/>
+<style>
+  html,body{margin:0;width:660px;height:1080px;background:transparent;
+            font-family:"Geist",system-ui,sans-serif;color:#1A1A1A}
+  .wrap{position:absolute;top:50%;transform:translateY(-50%);width:600px}
+  .k{font-size:21px;letter-spacing:.18em;text-transform:uppercase;
+     color:#8A8A78;font-weight:600;margin-bottom:18px}
+  h2{margin:0 0 20px;font-size:54px;line-height:1.06;letter-spacing:-.025em;font-weight:600}
+  h2 em{font-style:normal;color:#6B4FD8}
+  .b{font-size:26px;line-height:1.4;color:#55554E}
+  .b b{color:#1A1A1A;font-weight:600}
+  .m{font-family:"Geist Mono",ui-monospace,monospace;font-size:22px;color:#03796A}
+</style></head>
+<body><div class="wrap">
+  <div class="k" id="k"></div><h2 id="h"></h2><div class="b" id="b"></div>
+</div>
+<script>
+  const q = new URLSearchParams(location.search);
+  for (const id of ["k","h","b"]) document.getElementById(id).innerHTML = q.get(id) || "";
+</script></body></html>
