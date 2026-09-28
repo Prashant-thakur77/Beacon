@@ -262,3 +262,29 @@ def test_the_verification_is_read_from_the_timeline_when_that_is_where_it_lives(
     assert cert["verification"]["attempt"] == 2, "the latest attempt, not the first"
     assert cert["verification"]["passed"] == 2
     assert "2/2 checks on attempt 2" in certificate.to_markdown(cert)
+
+
+TYPED_TURN: dict[str, Any] = {
+    **VOICE_NOTE,
+    "channel": "typed",
+    "attestation": {"stt": "typed", "session_id": "sess_x"},
+}
+
+
+def test_typed_words_are_never_described_as_heard() -> None:
+    """The console's typed line used to arrive as a voice turn with confidence 1.
+
+    It rode in on channel "assemblyai" and the certificate read "heard at 100%
+    (checked before the change)" — the strongest claim the artifact can make, for
+    words nobody spoke.
+    """
+    cert = certificate.build(INCIDENT, TYPED_TURN)
+    conf = cert["consent"]["confidence"]
+    assert conf["value"] is None
+    assert conf["gated_the_change"] is False
+    assert conf["typed"] is True
+    md = certificate.to_markdown(cert)
+    assert "**Typed** via `typed`" in md, "'Said' is a claim about speech"
+    assert "no audio to score" in md
+    assert "%" not in md.split("Typed")[1].split("\n")[0]
+    assert "attest" not in md, "there is no recording to appeal to"

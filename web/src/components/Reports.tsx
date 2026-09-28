@@ -153,7 +153,7 @@ export function Postmortem({ id, api, fallback, onToast }: { id: string; api: Ap
 type AuditFilter = "all" | "approvals" | "contracts" | "executed";
 
 /** Where the words came from — and, for AssemblyAI sessions, the recording itself. */
-function Attestation({ row, onListen, onSummarise, onAttest }: { row: AuditRow; onListen?: (sessionId: string) => Promise<string | null>; onSummarise?: (sessionId: string, incidentId: string) => Promise<string | null>; onAttest?: (sessionId: string, incidentId: string) => Promise<{ ok: boolean; checks: Array<{ phrase: string; ok: boolean; confidence: number | null; weakest_word?: string | null; why?: string; one_voice?: { ok: boolean | null; voices: string[] } }>; problems: string[]; note?: string } | null> }) {
+function Attestation({ row, onListen, onSummarise, onAttest }: { row: AuditRow; onListen?: (sessionId: string) => Promise<string | null>; onSummarise?: (sessionId: string, incidentId: string) => Promise<string | null>; onAttest?: (sessionId: string, incidentId: string) => Promise<{ ok: boolean; checks: Array<{ phrase: string; ok: boolean; confidence: number | null; weakest_word?: string | null; why?: string; one_voice?: { ok: boolean | null; voices: string[] } }>; problems: string[]; typed?: Array<{ quote?: string; event?: string }>; note?: string } | null> }) {
   const [state, setState] = useState<"idle" | "loading" | "playing" | "gone">("idle");
   const [src, setSrc] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
@@ -163,6 +163,9 @@ function Attestation({ row, onListen, onSummarise, onAttest }: { row: AuditRow; 
   const [checking, setChecking] = useState(false);
   const a = row.attestation ?? {};
   const session = a.session_id && a.session_id.startsWith("sess_") ? a.session_id : null;
+  // A typed line in a voice session is not in the session's audio, so there is
+  // nothing to score. The recording is still worth playing and summarising.
+  const scorable = a.stt !== "typed" ? session : null;
   const bits: string[] = [];
   if (a.stt === "assemblyai-voice-agent") bits.push("AssemblyAI live");
   else if (a.stt === "assemblyai-prerecorded") bits.push("Telegram voice note");
@@ -210,14 +213,14 @@ function Attestation({ row, onListen, onSummarise, onAttest }: { row: AuditRow; 
           {summarising ? "Summarising…" : "✦ Summarise the session"}
         </button>
       ) : null}
-      {session && onAttest && row.incident_id ? (
+      {scorable && onAttest && row.incident_id ? (
         <button
           className="btn ghost small"
           disabled={checking}
           title="A live turn carries no confidence. AssemblyAI re-transcribes its own recording of this session and scores the phrase that unlocked the change by its weakest word."
           onClick={() => {
             setChecking(true);
-            void onAttest(session, row.incident_id!)
+            void onAttest(scorable, row.incident_id!)
               .then(setHeard)
               .finally(() => setChecking(false));
           }}
@@ -263,7 +266,7 @@ function Attestation({ row, onListen, onSummarise, onAttest }: { row: AuditRow; 
   );
 }
 
-export function Audit({ rows, loading, csvUrl, onReplay, replay, onListen, onSummarise, onAttest }: { rows: AuditRow[] | null; loading: boolean; csvUrl?: string; onReplay?: () => void; replay: boolean; onListen?: (sessionId: string) => Promise<string | null>; onSummarise?: (sessionId: string, incidentId: string) => Promise<string | null>; onAttest?: (sessionId: string, incidentId: string) => Promise<{ ok: boolean; checks: Array<{ phrase: string; ok: boolean; confidence: number | null; weakest_word?: string | null; why?: string; one_voice?: { ok: boolean | null; voices: string[] } }>; problems: string[]; note?: string } | null> }) {
+export function Audit({ rows, loading, csvUrl, onReplay, replay, onListen, onSummarise, onAttest }: { rows: AuditRow[] | null; loading: boolean; csvUrl?: string; onReplay?: () => void; replay: boolean; onListen?: (sessionId: string) => Promise<string | null>; onSummarise?: (sessionId: string, incidentId: string) => Promise<string | null>; onAttest?: (sessionId: string, incidentId: string) => Promise<{ ok: boolean; checks: Array<{ phrase: string; ok: boolean; confidence: number | null; weakest_word?: string | null; why?: string; one_voice?: { ok: boolean | null; voices: string[] } }>; problems: string[]; typed?: Array<{ quote?: string; event?: string }>; note?: string } | null> }) {
   const [filter, setFilter] = useState<AuditFilter>("all");
   const list = (rows ?? []).filter((r) => (filter === "all" ? true : filter === "approvals" ? r.kind === "approval" : filter === "contracts" ? r.kind === "contract" : !!r.executed));
   const json = () => download("beacon-audit.json", JSON.stringify({ rows: rows ?? [], count: rows?.length ?? 0 }, null, 2), "application/json");

@@ -29,7 +29,7 @@ export function makeTransport(backend: VoiceBackend, api: Api, config: Config, s
         const resp = await fetch(`${voice}/tools/${name}`, {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify({ incident_id: ctx.incidentId, session_id: ctx.sessionId, args, transcript: ctx.transcript, confidence: ctx.confidence, channel: "assemblyai" }),
+          body: JSON.stringify({ incident_id: ctx.incidentId, session_id: ctx.sessionId, args, transcript: ctx.transcript, confidence: ctx.confidence, channel: ctx.typed ? "typed" : "assemblyai" }),
         });
         return (await resp.json()) as { ok: boolean; result: unknown; tool_events: never[]; evidence: never[] };
       },

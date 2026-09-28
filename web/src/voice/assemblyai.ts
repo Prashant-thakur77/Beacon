@@ -64,7 +64,7 @@ export class AssemblyAITransport implements VoiceTransport {
   private resumes = 0;
   private resuming = false;
   private stopping = false;
-  private lastFinal: { text: string; confidence?: number } = { text: "" };
+  private lastFinal: { text: string; confidence?: number; typed?: boolean } = { text: "" };
   private pendingResults: Array<{ call_id: string; result: string }> = [];
   private replyOpen = false;
 
@@ -73,7 +73,7 @@ export class AssemblyAITransport implements VoiceTransport {
     private readonly runTool: (
       name: string,
       args: Record<string, unknown>,
-      ctx: { incidentId: string; sessionId: string; transcript: string; confidence?: number },
+      ctx: { incidentId: string; sessionId: string; transcript: string; confidence?: number; typed?: boolean },
     ) => Promise<{ ok: boolean; result: unknown; tool_events: never[]; evidence: never[] }>,
   ) {}
 
@@ -183,7 +183,7 @@ export class AssemblyAITransport implements VoiceTransport {
         h.onUserTranscript({ text: String(msg.text ?? ""), final: false });
         return;
       case "transcript.user":
-        this.lastFinal = { text: String(msg.text ?? ""), confidence: typeof msg.confidence === "number" ? msg.confidence : undefined };
+        this.lastFinal = { text: String(msg.text ?? ""), confidence: typeof msg.confidence === "number" ? msg.confidence : undefined, typed: false };
         h.onUserTranscript({ text: this.lastFinal.text, final: true, confidence: this.lastFinal.confidence });
         h.onState("thinking");
         return;
@@ -210,6 +210,7 @@ export class AssemblyAITransport implements VoiceTransport {
           sessionId: this.aaiSessionId ?? s.sessionId,
           transcript: this.lastFinal.text,
           confidence: this.lastFinal.confidence,
+          typed: this.lastFinal.typed,
         });
         h.onToolResult(call.name, call.arguments ?? {}, out.result, out.tool_events, out.evidence);
         // Send only when reply.done is the latest event for the turn that carried the call.
@@ -251,6 +252,7 @@ export class AssemblyAITransport implements VoiceTransport {
       sessionId: this.aaiSessionId ?? s.sessionId,
       transcript: this.lastFinal.text,
       confidence: this.lastFinal.confidence,
+      typed: this.lastFinal.typed,
     });
     this.h?.onToolResult(name, args, out.result, out.tool_events, out.evidence);
     return { ok: out.ok, result: out.result };
@@ -274,7 +276,12 @@ export class AssemblyAITransport implements VoiceTransport {
     // `instructions` is the documented way to make the agent respond to something
     // other than speech, so the typed line rides there. The typed text is also the
     // transcript the server-side consent check sees for consent tools.
-    this.lastFinal = { text, confidence: 1 };
+    // Not `confidence: 1`. Typed words were never heard, and a 1 here reached the
+    // consent certificate as "heard at 100%, before the change was applied" -- the
+    // one claim this project exists to be careful about. `typed` makes the server
+    // record the channel as typed, so attestation does not look for the phrase in
+    // audio that never contained it.
+    this.lastFinal = { text, typed: true };
     this.ws.send(
       JSON.stringify({
         type: "reply.create",

@@ -482,7 +482,7 @@ def _run_tool(
         channel=channel,
         passcode_ok=True,
         attestation={
-            "stt": "assemblyai-voice-agent" if channel == "assemblyai" else channel,
+            "stt": _transcriber(channel, session_id),
             "session_id": session_id,
             **({"confidence": confidence} if confidence is not None else {}),
         },
@@ -495,6 +495,21 @@ def _run_tool(
         "tool_events": ctx.tool_events,
         "evidence": ctx.evidence,
     }
+
+
+def _transcriber(channel: str, session_id: str) -> str:
+    """What to name as having produced these words -- claiming no more than it can show.
+
+    "assemblyai-voice-agent" is a claim that the Voice Agent heard the phrase, and
+    the consent certificate prints it as such. It only holds when the turn came in
+    as audio on a live session, because that is the only case where a recording
+    exists to re-check. A typed line in the same session arrives on the "typed"
+    channel, and a turn whose session id is the console's local fallback rather
+    than an AssemblyAI ``sess_`` id has no recording to appeal to either.
+    """
+    if channel != "assemblyai":
+        return channel
+    return "assemblyai-voice-agent" if session_id.startswith("sess_") else "assemblyai"
 
 
 @app.post("/tools/<name>")
@@ -690,7 +705,13 @@ def consent_phrases(incident: dict[str, Any]) -> list[dict[str, Any]]:
         detail = entry.get("detail") or {}
         quote = str(detail.get("transcript_quote") or detail.get("quote") or "").strip()
         if quote:
-            phrases.append({"quote": quote, "event": str(entry.get("event"))})
+            phrases.append(
+                {
+                    "quote": quote,
+                    "event": str(entry.get("event")),
+                    "channel": str(detail.get("channel") or ""),
+                }
+            )
     return phrases
 
 
@@ -723,14 +744,24 @@ def session_attest(session_id: str) -> Response[str]:
         return _json(404, {"error": f"incident {incident_id} not found"})
 
     phrases = consent_phrases(incident)
-    if not phrases:
+    # Words typed into the console during a voice session are not in its recording,
+    # and hunting for them there would report a missing phrase as a mishearing.
+    typed = [p for p in phrases if p["channel"] == "typed"]
+    spoken = [p for p in phrases if p["channel"] != "typed"]
+    if not spoken:
         return _json(
             200,
             {
                 "ok": True,
                 "checks": [],
                 "problems": [],
-                "note": "no consent phrase was recorded for this incident",
+                "typed": typed,
+                "note": (
+                    "every phrase on this incident was typed, not spoken; "
+                    "there is nothing in the recording to score"
+                    if typed
+                    else "no consent phrase was recorded for this incident"
+                ),
             },
         )
     try:
@@ -742,7 +773,8 @@ def session_attest(session_id: str) -> Response[str]:
         logger.warning("session attestation failed: %s", exc)
         return _json(502, {"error": f"could not re-transcribe the session: {exc}"})
 
-    verdict = attest.verify_confidence(heard["words"], phrases)
+    verdict = attest.verify_confidence(heard["words"], spoken)
+    verdict["typed"] = typed
     verdict["transcript_id"] = heard.get("transcript_id")
     verdict["session_id"] = session_id
     attestations = dict(incident.get("voice_attestation") or {})

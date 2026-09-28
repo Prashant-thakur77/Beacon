@@ -32,6 +32,12 @@ from typing import Any
 SCHEMA = "beacon.consent-certificate/1"
 
 
+def was_typed(approval: dict[str, Any]) -> bool:
+    """Whether these words were typed into the console rather than spoken."""
+    stt = str((approval.get("attestation") or {}).get("stt") or "")
+    return approval.get("channel") == "typed" or stt == "typed"
+
+
 def _confidence_of(
     approval: dict[str, Any], attested: dict[str, Any]
 ) -> dict[str, Any]:
@@ -43,6 +49,18 @@ def _confidence_of(
     recording of the session. Saying which of the two produced the number matters:
     one gated the change, the other reviewed it.
     """
+    if was_typed(approval):
+        return {
+            "value": None,
+            "weakest_word": None,
+            "measured": "not measured",
+            "gated_the_change": False,
+            "typed": True,
+            "note": (
+                "these words were typed into the console, not spoken; "
+                "there is no audio to score"
+            ),
+        }
     attestation = attest_of(approval, attested)
     if attestation is not None:
         return {
@@ -206,7 +224,11 @@ def to_markdown(cert: dict[str, Any]) -> str:
     change = cert["change"]
     verification = cert["verification"]
 
-    if conf.get("value") is None:
+    typed = bool(conf.get("typed"))
+    verb = "Typed" if typed else "Said"
+    if typed:
+        heard = "typed, not spoken — there is no audio to score"
+    elif conf.get("value") is None:
         heard = "confidence not measured"
     else:
         pct = f"{float(conf['value']):.0%}"
@@ -227,7 +249,7 @@ def to_markdown(cert: dict[str, Any]) -> str:
         "",
         f"> “{consent['phrase']}”",
         "",
-        f"- **Said** via `{consent['channel']}` at {consent['spoken_at']}Z, "
+        f"- **{verb}** via `{consent['channel']}` at {consent['spoken_at']}Z, "
         f"transcribed by `{consent['transcriber']}`, {heard}.",
         f"- **Authorised** `{change['action']}` with "
         f"`{json.dumps(change['params'], sort_keys=True)}` — dry run "

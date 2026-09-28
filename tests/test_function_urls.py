@@ -241,7 +241,62 @@ def test_every_consent_tool_puts_its_phrase_where_attestation_looks_for_it() -> 
         phrases = consent_phrases(
             {"timeline": [{"event": event, "detail": {key: "approve fix one"}}]}
         )
-        assert phrases == [{"quote": "approve fix one", "event": event}], (
+        assert [(p["quote"], p["event"]) for p in phrases] == [
+            ("approve fix one", event)
+        ], (
             f"{tool} records its phrase as {event}.detail.{key} "
             "and attestation cannot see it"
         )
+
+
+def test_the_voice_agent_is_only_credited_when_a_recording_could_prove_it() -> None:
+    """ "assemblyai-voice-agent" on a certificate is a claim, not a transport label.
+
+    The console sends channel "assemblyai" for every tool call in that backend, and
+    falls back to its own local session id before AssemblyAI has issued one. Naming
+    the Voice Agent in both cases put a claim on the certificate that no recording
+    could support.
+    """
+    from beacon.voice_turn import _transcriber
+
+    sess = "sess_" + "a" * 32
+    assert _transcriber("assemblyai", sess) == "assemblyai-voice-agent"
+    assert _transcriber("assemblyai", "d-izo4r0qs") == "assemblyai"
+    assert _transcriber("typed", sess) == "typed"
+    assert _transcriber("telegram", "") == "telegram"
+
+
+def test_a_typed_phrase_is_not_reported_as_a_mishearing(monkeypatch: Any) -> None:
+    """Typed words are not in the session's audio, and that is not a bad hearing.
+
+    Before this, the console's typed line rode in as channel "assemblyai" with a
+    confidence of 1, so the certificate read "heard at 100%, before the change was
+    applied" for words nobody ever said.
+    """
+    from beacon import aai, store, voice_turn
+
+    monkeypatch.setenv("PASSCODE", "open-sesame")
+    incident = {
+        "incident_id": "inc-1",
+        "status": "resolved",
+        "timeline": [
+            {
+                "event": "approved",
+                "detail": {"transcript_quote": "approve fix 1", "channel": "typed"},
+            }
+        ],
+    }
+    monkeypatch.setattr(store, "get_incident", lambda *_a, **_k: dict(incident))
+    called = []
+    monkeypatch.setattr(aai, "audit_session", lambda *a, **k: called.append(a) or {})
+    event = url_event(
+        "POST",
+        "/sessions/sess_" + "c" * 32 + "/attest",
+        {"incident_id": "inc-1"},
+        headers={"x-beacon-passcode": "open-sesame"},
+    )
+    body = json.loads(voice_turn.handler(event, None)["body"])
+    assert body["ok"] and body["problems"] == []
+    assert body["typed"][0]["quote"] == "approve fix 1"
+    assert "typed, not spoken" in body["note"]
+    assert not called, "it should not pay for a transcript it cannot use"
