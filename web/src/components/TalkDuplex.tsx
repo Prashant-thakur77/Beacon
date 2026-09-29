@@ -241,16 +241,23 @@ export function TalkDuplex({
         onError: (m) => setError(m),
       },
     );
-    // continuous mic → transport
-    micStream.current = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
-    micCtx.current = new AudioContext();
-    await micCtx.current.audioWorklet.addModule("/pcm-worklet.js");
-    const source = micCtx.current.createMediaStreamSource(micStream.current);
-    const node = new AudioWorkletNode(micCtx.current, "pcm-worklet");
-    node.port.onmessage = (e: MessageEvent<ArrayBuffer>) => transport.current?.sendAudio(new Int16Array(e.data), 16000);
-    const silent = micCtx.current.createGain();
-    silent.gain.value = 0;
-    source.connect(node).connect(silent).connect(micCtx.current.destination);
+    // continuous mic → transport. A refused or absent microphone must not end the
+    // session: the composer says "type instead of speaking", and it was disabled
+    // until setLive ran, which used to sit after this await. Someone reviewing on a
+    // machine with no microphone had no way into the conversation at all.
+    try {
+      micStream.current = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+      micCtx.current = new AudioContext();
+      await micCtx.current.audioWorklet.addModule("/pcm-worklet.js");
+      const source = micCtx.current.createMediaStreamSource(micStream.current);
+      const node = new AudioWorkletNode(micCtx.current, "pcm-worklet");
+      node.port.onmessage = (e: MessageEvent<ArrayBuffer>) => transport.current?.sendAudio(new Int16Array(e.data), 16000);
+      const silent = micCtx.current.createGain();
+      silent.gain.value = 0;
+      source.connect(node).connect(silent).connect(micCtx.current.destination);
+    } catch {
+      setError("No microphone, so nothing is being listened to — type below instead. The consent rules are identical: “yes, do it” is refused, the exact phrase is not.");
+    }
     setLive(true);
   }, [api, backend, config, incident.alarm_name, incident.diagnostics, incident.incident_id, onIncident, passcode, player, sessionId, stt, turnDetection]);
 
