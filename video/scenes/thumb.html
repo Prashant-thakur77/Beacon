@@ -2,26 +2,50 @@
 <html lang="en"><head><meta charset="utf-8"/>
 <link rel="stylesheet" href="fonts/geist.css"/>
 <style>
-  html,body{margin:0;width:1280px;height:720px;background:#0b0b0d;font-family:"Geist",system-ui,sans-serif;overflow:hidden}
-  .shot{position:absolute;inset:0;background:url("thumb-base.jpg") center/cover no-repeat;filter:saturate(.92)}
-  .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,13,.72) 0 12%,rgba(11,11,13,.18) 34%,rgba(11,11,13,.86) 62%,#0b0b0d 88%)}
-  .top{position:absolute;top:0;left:0;right:0;height:76px;background:#034f46;display:flex;align-items:center;padding:0 40px;gap:14px}
-  .top b{font-size:25px;letter-spacing:.02em;color:#fffdeb;font-weight:600}
-  .top span{font-size:21px;color:#9fd8c9;font-family:"Geist Mono",monospace}
-  .wrap{position:absolute;left:52px;right:52px;bottom:44px}
-  h1{margin:0;font-size:92px;line-height:.98;letter-spacing:-.035em;font-weight:600;color:#f5f5f4}
-  h1 em{font-style:normal;color:#b4a7ff}
-  .sub{margin-top:22px;font-size:27px;color:#c9c9cf;letter-spacing:-.01em}
-  .sub b{color:#6ee7a0;font-weight:600}
-  .pill{position:absolute;right:52px;top:110px;background:rgba(255,108,76,.14);border:2px solid #ff6c4c;color:#ff8e74;
-        border-radius:999px;padding:12px 24px;font-size:24px;font-weight:600;font-family:"Geist Mono",monospace}
+  /* The console's own light palette. The first cut of this thumbnail put a dark
+     scrim over the screenshot, which buried the one thing worth showing: the
+     product is a cream-and-ink console and the shot of it is already bright. */
+  :root{--bg:#FFFFEB;--fg:#1A1A1A;--dim:#5b5b57;--faint:#8a8a84;--line:#e2e2cf;
+        --green:#03796A;--lilac:#6B4FD8;--coral:#ff6c4c}
+  html,body{margin:0;width:1280px;height:720px;background:var(--bg);color:var(--fg);
+            font-family:"Geist",system-ui,sans-serif;overflow:hidden}
+
+  .left{position:absolute;left:72px;top:88px;width:600px}
+  .eyebrow{font-family:"Geist Mono",ui-monospace,monospace;font-size:17px;letter-spacing:.14em;
+           text-transform:uppercase;color:var(--faint);font-weight:600}
+  h1{margin:26px 0 0;font-family:"Liberation Serif","Noto Serif",Georgia,serif;
+     font-size:86px;line-height:1.02;letter-spacing:-.02em;font-weight:400}
+  h1 em{font-style:italic;color:var(--green)}
+  .sub{margin-top:30px;font-size:26px;line-height:1.35;color:var(--dim);letter-spacing:-.01em;max-width:520px}
+  .pill{display:inline-block;margin-top:22px;background:rgba(3,121,106,.10);border:2px solid var(--green);
+        color:var(--green);border-radius:10px;padding:9px 18px;font-size:23px;font-weight:600}
+
+  .brand{position:absolute;left:72px;bottom:54px;display:flex;align-items:center;gap:12px;
+         font-size:31px;letter-spacing:-.01em}
+  .brand .dot{width:13px;height:13px;border-radius:50%;background:var(--coral)}
+  .brand b{font-weight:700}
+  .brand span{color:var(--faint);font-family:"Liberation Serif","Noto Serif",Georgia,serif;font-size:34px}
+
+  /* The screenshot leans in from the right, cropped by the frame rather than
+     shrunk to fit — a readable corner of the real console beats a whole
+     illegible one. */
+  .shot{position:absolute;right:-150px;top:96px;width:820px;height:540px;border-radius:16px;
+        border:1px solid var(--line);background:url("thumb-base.jpg") -690px -70px/1560px auto no-repeat;
+        transform:perspective(1500px) rotateY(-15deg) rotate(-1.6deg);
+        box-shadow:0 44px 90px rgba(26,26,26,.20),0 8px 22px rgba(26,26,26,.10)}
+  .tag{position:absolute;right:150px;top:322px;background:var(--bg);border:2px solid var(--coral);color:#c73c1d;
+       border-radius:999px;padding:9px 20px;font-family:"Geist Mono",ui-monospace,monospace;
+       font-size:20px;font-weight:600;letter-spacing:.04em;
+       box-shadow:0 10px 26px rgba(26,26,26,.14)}
 </style></head>
 <body>
-  <div class="shot"></div><div class="scrim"></div>
-  <div class="top"><b>Beacon Night Shift</b><span>· live on AWS</span></div>
-  <div class="pill">INTERRUPTED</div>
-  <div class="wrap">
-    <h1>The on-call agent<br/><em>you can interrupt</em></h1>
-    <div class="sub">AssemblyAI Voice Agent API · speak over the read-back and <b>the fix is withdrawn</b></div>
+  <div class="shot"></div>
+  <div class="tag">INTERRUPTED</div>
+  <div class="left">
+    <div class="eyebrow">AssemblyAI Voice Agent hackathon 2026</div>
+    <h1>It&rsquo;s 3 AM.<br/><em>Approve fix one.</em></h1>
+    <div class="sub">The on-call agent you can interrupt &mdash; and the only thing that unlocks a change is a sentence AssemblyAI heard you say.</div>
+    <div class="pill">AssemblyAI Voice Agent API</div>
   </div>
+  <div class="brand"><span class="dot"></span><b>Beacon</b><span>Night Shift</span></div>
 </body></html>
