@@ -8,7 +8,12 @@ set -euo pipefail
 STACK="${1:?console stack name}"
 REGION="${2:?region}"
 STT_LANGUAGE="${3:-en-IN}"
-VOICE_BACKEND="${4:-aws}"
+# Which voice backend the browser uses is an operator's choice, not a property of
+# the build, so an empty argument means "keep whatever is deployed" rather than
+# "use the default". Re-deploying without naming it once silently moved the live
+# console off the AssemblyAI Voice Agent API and onto the AWS cascade, which is
+# the one thing this console must not do quietly.
+VOICE_BACKEND="${4:-}"
 
 out() {
     aws cloudformation describe-stacks --stack-name "$STACK" --region "$REGION" \
@@ -20,6 +25,15 @@ DASHBOARD_URL="$(out DashboardUrl)"
 BUCKET="$(out BucketName)"
 DIST_ID="$(out DistributionId)"
 CONSOLE_URL="$(out ConsoleUrl)"
+
+if [ -z "$VOICE_BACKEND" ]; then
+    LIVE="$(aws s3 cp "s3://${BUCKET}/config.json" - --region "$REGION" 2>/dev/null \
+        | sed -n 's/.*"voiceBackend"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+    VOICE_BACKEND="${LIVE:-aws}"
+    echo "==> voiceBackend: ${VOICE_BACKEND} (kept from the deployed console)"
+else
+    echo "==> voiceBackend: ${VOICE_BACKEND} (from VOICE_BACKEND)"
+fi
 
 mkdir -p web/dist
 cat > web/dist/config.json <<JSON

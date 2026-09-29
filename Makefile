@@ -176,6 +176,10 @@ POLLY_VOICE_ID  ?= Kajal
 STT_LANGUAGE    ?= en-IN
 VOICE_ENGINE    ?= strands
 VOICE_BACKEND   ?= aws
+# Passed on only when the operator actually named it. Otherwise console_config.sh
+# keeps whatever the deployed console is already using, so a routine deploy cannot
+# move the browser off AssemblyAI without anyone saying so.
+VOICE_BACKEND_ARG = $(if $(filter command line environment,$(origin VOICE_BACKEND)),$(VOICE_BACKEND),)
 ASSEMBLYAI_KEY_PARAM ?=
 
 # Remediation stack
@@ -556,7 +560,7 @@ deploy-console: web-build
 		--query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' --output text) && \
 	echo "==> Uploading web/dist to s3://$$BUCKET ..." && \
 	aws s3 sync web/dist "s3://$$BUCKET" --delete --exclude config.json --region $(REGION)
-	@ARCHIVED_INCIDENT_ID=$(ARCHIVED_INCIDENT_ID) bash scripts/console_config.sh $(CONSOLE_STACK) $(REGION) $(STT_LANGUAGE) $(VOICE_BACKEND)
+	@ARCHIVED_INCIDENT_ID=$(ARCHIVED_INCIDENT_ID) bash scripts/console_config.sh $(CONSOLE_STACK) $(REGION) $(STT_LANGUAGE) $(VOICE_BACKEND_ARG)
 	@echo "==> Warming the Lambdas the first voice turn touches..."
 	@for FN in beacon-voice-turn-$(STACK_NAME) beacon-dashboard-$(STACK_NAME) beacon-remediate-$(STACK_NAME); do \
 	  aws lambda invoke --function-name $$FN --payload '{}' /dev/null --region $(REGION) > /dev/null 2>&1 || true; \
@@ -617,7 +621,7 @@ console-config: web-build
 	@BUCKET=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \
 		--query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' --output text) && \
 	aws s3 sync web/dist "s3://$$BUCKET" --delete --exclude config.json --region $(REGION)
-	@ARCHIVED_INCIDENT_ID=$(ARCHIVED_INCIDENT_ID) bash scripts/console_config.sh $(CONSOLE_STACK) $(REGION) $(STT_LANGUAGE) $(VOICE_BACKEND)
+	@ARCHIVED_INCIDENT_ID=$(ARCHIVED_INCIDENT_ID) bash scripts/console_config.sh $(CONSOLE_STACK) $(REGION) $(STT_LANGUAGE) $(VOICE_BACKEND_ARG)
 
 teardown-console:
 	@BUCKET=$$(aws cloudformation describe-stacks --stack-name $(CONSOLE_STACK) --region $(REGION) \

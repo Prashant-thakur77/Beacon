@@ -154,3 +154,38 @@ def test_every_route_the_docs_name_actually_exists() -> None:
             if shape(route) not in real:
                 missing.append(f"{page.name} names {route}")
     assert not missing, "documented routes that do not exist: " + "; ".join(missing)
+
+
+def test_a_routine_deploy_cannot_move_the_console_off_assemblyai() -> None:
+    """The browser's voice backend is an operator's choice, not a build default.
+
+    `make deploy-console` passed `$(VOICE_BACKEND)` unconditionally, and its
+    Makefile default is `aws`. Re-deploying the console for an unrelated fix
+    therefore rewrote the live config.json from `assemblyai` to `aws` without
+    saying so -- the console of an AssemblyAI project quietly running the AWS
+    Transcribe cascade instead of the Voice Agent API. It is invisible from the
+    outside: every endpoint still answers 200.
+
+    The deploy now passes the backend only when the operator actually named it,
+    and the script keeps whatever is deployed otherwise.
+    """
+    from pathlib import Path
+
+    makefile = Path("Makefile").read_text(encoding="utf-8")
+    script = Path("scripts/console_config.sh").read_text(encoding="utf-8")
+
+    assert "$(STT_LANGUAGE) $(VOICE_BACKEND)" not in makefile, (
+        "deploy-console is passing the defaulted VOICE_BACKEND again"
+    )
+    assert makefile.count("$(STT_LANGUAGE) $(VOICE_BACKEND_ARG)") == 2, (
+        "both console_config.sh calls should pass the guarded argument"
+    )
+    assert "command line environment" in makefile, (
+        "VOICE_BACKEND_ARG must be empty unless VOICE_BACKEND was actually named"
+    )
+    assert 'VOICE_BACKEND="${4:-}"' in script, (
+        "an absent 4th argument must mean 'keep what is deployed', not 'use aws'"
+    )
+    assert "kept from the deployed console" in script, (
+        "the script should say which backend it wrote and where it came from"
+    )
