@@ -10,7 +10,30 @@ Deadline **Tue 30 Sep 2026, 20:30 IST**. Paste from here; keep the links exactly
 
 A voice agent with write access to AWS. Answer the phone at 3 AM, say "approve fix one", and it applies the fix and proves the recovery. Two-channel recording; the transcript is the safety artifact.
 
-## Long description
+## Long description — the 2,000-character version for the form
+
+The lablab field is capped at **2,000 characters** (minimum 600). This is the
+version to paste; it is 1964 characters. It keeps what the rubric asks that field
+for — problem, solution, target audience, unique features — plus the one line that
+matters most here, which is what breaks if AssemblyAI is removed.
+
+```
+It is 3 AM, payments are failing, and you are alone with a phone in your hand. Every voice-agent demo is a receptionist. This one holds write access to production, so the question is not whether it can talk but what it is allowed to do on your word.
+
+A CloudWatch alarm fires. Beacon reads the logs, diffs security groups against a golden snapshot, finds the CloudTrail change that caused it, dry-runs the one allowlisted fix under a locked-down role, and phones you. You say "fix it" and it reads back the blast radius. You say "approve fix one" and a Step Functions loop applies it, refusing to say recovered until CloudWatch agrees. Say "grant contract for seven days" and the next time that fault fires, nobody is woken at all.
+
+Built for the backend engineer on a team of one to five running AWS for users in another time zone: no second shift, nobody to escalate to.
+
+Remove AssemblyAI and you do not lose the voice interface, you lose the audit, and the audit is why it can hold a credential. The Voice Agent API carries the whole conversation on one socket: nine JSON-Schema tools called mid-sentence, turn detection tuned per channel, keyterms rebuilt per incident, en/hi code-switching, session resume after a drop. A phone call is G.711 mu-law forwarded untouched; the API takes it natively.
+
+Consent is checked against the transcript, never the model's argument. "Yes, do it" is refused; the exact phrase is not. Every approval is later re-transcribed from the session's own recording, per channel, and scored by its weakest word, because the agent reads the phrase back too and its own voice is not consent.
+
+Everything else either asks without acting (PagerDuty) or acts without asking (an SSM runbook restores a rule somebody deleted on purpose). Beacon does both, and the asking is what makes the acting defensible.
+
+Live on a real AWS account: 420 tests, five scripted phone calls through the real API, and a latency benchmark generated from them.
+```
+
+## Long description — the full version (for the README and anywhere without a limit)
 
 It is 3 AM. Payments are failing. You are alone, half-asleep, phone in hand. Every voice-agent demo is a receptionist; this one holds write access to production, so the question is not whether it can talk but what it is allowed to do on your word.
 
