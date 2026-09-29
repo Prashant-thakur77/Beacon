@@ -37,7 +37,7 @@ const FOOTER: Array<{ label: string; links: Array<{ text: string; href: string; 
     label: "Project",
     links: [
       { text: "GitHub repo", href: REPO, external: true },
-      { text: "Release · demo film", href: `${REPO}/releases/tag/v0.2.0`, external: true },
+      { text: "Release · film, deck, captions", href: `${REPO}/releases/tag/v0.6.0`, external: true },
       { text: "Blog: the transcript is the safety artifact", href: "https://builder.aws.com/post/3Jb5v7ouXDReILJ7WMuHrlB1leL_p/why-transcript-is-the-safety-artifactvoice-approved-aws-remediation-with-strands-and-step-functions", external: true },
     ],
   },

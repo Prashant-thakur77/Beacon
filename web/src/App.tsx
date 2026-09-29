@@ -495,8 +495,16 @@ export default function App() {
                   <button role="tab" aria-selected={voicePick !== "aws"} className={`seg${voicePick !== "aws" ? " on" : ""}`} onClick={() => setVoicePick("assemblyai")}>
                     AssemblyAI · full duplex
                   </button>
-                  <button role="tab" aria-selected={voicePick === "aws"} className={`seg${voicePick === "aws" ? " on" : ""}`} onClick={() => setVoicePick("aws")}>
+                  <button
+                    role="tab"
+                    aria-selected={voicePick === "aws"}
+                    className={`seg${voicePick === "aws" ? " on" : ""}`}
+                    disabled={config.cascadeEnabled === false}
+                    title={config.cascadeEnabled === false ? "The comparison backend needs Bedrock inference, which is not enabled on this demo account. The AssemblyAI path beside it is the one this project is built on." : undefined}
+                    onClick={() => setVoicePick("aws")}
+                  >
                     AWS cascade · push to talk
+                    {config.cascadeEnabled === false ? <span className="seg-note"> · needs Bedrock</span> : null}
                   </button>
                 </div>
               ) : null}

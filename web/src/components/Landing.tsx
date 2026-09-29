@@ -6,7 +6,12 @@ import { Marquee } from "./Marquee";
 /* The product landing page (`#home`). Everything here is the product's own
    words and screenshots; the console routes sit unchanged behind it. */
 
-const FILM = "https://youtu.be/a3SxZHvIkCo";
+/* The AssemblyAI cut, and the repository it was built in. "Watch the film"
+   pointed at the First Commit film on YouTube -- a different submission, a
+   different cut -- so anyone arriving from lablab.ai was shown the wrong one.
+   The release page carries the film, the captions and the deck together. */
+const FILM = "https://github.com/Prashant-thakur77/Beacon/releases/tag/v0.6.0";
+const REPO_BRANCH = "https://github.com/Prashant-thakur77/Beacon/tree/assemblyai";
 
 function minutes(v: number | null | undefined): string {
   if (v == null) return "–";
@@ -210,6 +215,9 @@ export function Landing({ tally, replay, local, onRunNight }: { tally: Tally | n
               ▶ Watch the film
             </a>
           )}
+          <a className="btn ghost" href={REPO_BRANCH} target="_blank" rel="noopener noreferrer">
+            Code on GitHub
+          </a>
         </div>
         <div className="hero-shot reveal">
           <div className="shot-card">
@@ -343,6 +351,9 @@ export function Landing({ tally, replay, local, onRunNight }: { tally: Tally | n
           </a>
           <a className="btn" href={FILM} target="_blank" rel="noopener noreferrer">
             ▶ Watch the film
+          </a>
+          <a className="btn ghost" href={REPO_BRANCH} target="_blank" rel="noopener noreferrer">
+            Code on GitHub
           </a>
         </div>
       </section>

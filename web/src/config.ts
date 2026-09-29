@@ -7,6 +7,10 @@ export interface Config {
   voiceBackend: "aws" | "assemblyai";
   archivedIncidentId: string;
   replay: boolean;
+  /** The AWS cascade needs Bedrock inference. An account without it answers
+      "Operation not allowed" on the first turn, so the comparison is offered
+      only where it can actually run. */
+  cascadeEnabled: boolean;
   /** `make local`: the whole product against moto in one process. */
   local: boolean;
   localPasscode: string;
@@ -19,6 +23,7 @@ const DEFAULTS: Config = {
   sttLanguage: "en-IN",
   voiceBackend: "aws",
   archivedIncidentId: "",
+  cascadeEnabled: true,
   replay: false,
   local: false,
   localPasscode: "",

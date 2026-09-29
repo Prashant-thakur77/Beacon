@@ -43,6 +43,7 @@ cat > web/dist/config.json <<JSON
   "region": "${REGION}",
   "sttLanguage": "${STT_LANGUAGE}",
   "voiceBackend": "${VOICE_BACKEND}",
+  "cascadeEnabled": ${CASCADE_ENABLED:-true},
   "archivedIncidentId": "${ARCHIVED_INCIDENT_ID:-}"
 }
 JSON
