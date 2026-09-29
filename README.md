@@ -2,6 +2,10 @@
 
 **The on-call agent that fixes the 3 AM page with your voice — and the second time it happens, does not wake you at all.**
 
+> **Two submissions live in this repository.**
+> This branch (`main`, tagged [`first-commit-submission`](https://github.com/Prashant-thakur77/Beacon/tree/first-commit-submission)) is the **First Commit** entry, kept exactly as it was judged.
+> The **AssemblyAI Voice Agent hackathon** entry is on the **[`assemblyai`](https://github.com/Prashant-thakur77/Beacon/tree/assemblyai)** branch — it adds the phone channel, the consent certificate, per-channel attestation and a measured latency benchmark. **If you arrived here from lablab.ai, you want that branch.**
+
 [![CI](https://github.com/Prashant-thakur77/Beacon/actions/workflows/build.yaml/badge.svg)](https://github.com/Prashant-thakur77/Beacon/actions/workflows/build.yaml)
 [![Release](https://img.shields.io/github/v/release/Prashant-thakur77/Beacon?label=release)](https://github.com/Prashant-thakur77/Beacon/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
