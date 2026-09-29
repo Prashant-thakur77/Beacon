@@ -335,13 +335,17 @@ export default function App() {
       ) : freshDeployment ? (
         <Announce text="No incidents tonight · view the archived night" onClick={() => void startReplay()} />
       ) : config ? (
-        <Announce text={`Live on AWS · ${config.region}${healthQ.data?.version ? ` · v${healthQ.data.version}` : ""} · Judge passcode in the submission`} href="#safety" />
+        <Announce text={`Built on the AssemblyAI Voice Agent API · live on AWS ${config.region}${healthQ.data?.version ? ` · v${healthQ.data.version}` : ""} · judge passcode in the submission`} href="#safety" />
       ) : null}
       <header className={`topbar${menuOpen ? " open" : ""}`} ref={topbarRef}>
         <a className="brand" href="#home" aria-label="Beacon Night Shift, home">
           <span className="dot" />
           Beacon <span className="sub">Night Shift</span>
         </a>
+        <span className="aai" title="Speech, turn detection, the managed LLM and TTS on one socket — and the transcript every approval is checked against">
+          <span className="pulse" aria-hidden="true" />
+          Voice by AssemblyAI<span className="long"> · Universal-3 Pro</span>
+        </span>
         <button type="button" className={`burger${menuOpen ? " x" : ""}`} aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} aria-controls="site-nav" onClick={() => setMenuOpen((o) => !o)}>
           <span />
           <span />

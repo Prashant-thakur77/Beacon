@@ -117,6 +117,9 @@ export function Safety({ safety }: { safety: SafetyData | null }) {
   return (
     <div className="stack">
       <Marquee />
+      <div className="banner">
+        Consent is decided here, against the transcript the <b>AssemblyAI Voice Agent API</b> produced — never against the argument the model wrote. Everything below bounds what that consent is allowed to reach.
+      </div>
       <div className="panel">
         <div className="panel-h">
           <h2>Kill switch</h2>

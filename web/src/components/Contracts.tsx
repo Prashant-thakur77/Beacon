@@ -27,7 +27,7 @@ export function Contracts({
   return (
     <div className="stack">
       <div className="banner">
-        ☾ A Sleep Contract is a standing approval you grant by voice: one alarm, one allowlisted action, exact resources, a use count, an expiry — and your own words as the record.
+        ☾ A Sleep Contract is a standing approval you grant by voice: one alarm, one allowlisted action, exact resources, a use count, an expiry — and your own words as the record, transcribed by AssemblyAI and replayable on the Audit page. Agreement is not enough: only the exact grant phrase creates one.
       </div>
       {contracts.length === 0 ? (
         <div className="empty">

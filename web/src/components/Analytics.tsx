@@ -377,6 +377,7 @@ export function Analytics({ data, loading, source, now, onReplay }: { data: Anal
           The night, <em>in numbers.</em>
         </h1>
         <p className="lede">Recovery, sleep and cost across every night Beacon has worked, computed from the same incidents the board shows.</p>
+        <p className="lede dim-note">Every fix counted here was applied on a spoken phrase the <b>AssemblyAI Voice Agent API</b> transcribed, and each one can be re-scored against its own session recording on the Audit page.</p>
       </div>
       <div className="panel-h">
         <h2>Operations analytics</h2>
