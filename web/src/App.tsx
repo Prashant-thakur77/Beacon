@@ -491,22 +491,27 @@ export default function App() {
           {current ? (
             <section>
               {api && config && !replay && chooseBackend(config) === "assemblyai" ? (
+                config.cascadeEnabled === false ? (
+                  // One voice path, named. The cascade toggle used to sit here for a
+                  // side-by-side, but offering a different speech backend argues
+                  // against the thing this console is for -- and the cascade needs
+                  // Bedrock, which this account is refused. The code is still in the
+                  // repository; it is simply not what the demo runs on.
+                  <div className="backend-badge">
+                    <span className="pulse" aria-hidden="true" />
+                    AssemblyAI · full duplex
+                    <span className="sub"> · Universal-3 Pro, turn detection, tools and TTS on one socket</span>
+                  </div>
+                ) : (
                 <div className="backend-switch" role="tablist" aria-label="Voice backend">
                   <button role="tab" aria-selected={voicePick !== "aws"} className={`seg${voicePick !== "aws" ? " on" : ""}`} onClick={() => setVoicePick("assemblyai")}>
                     AssemblyAI · full duplex
                   </button>
-                  <button
-                    role="tab"
-                    aria-selected={voicePick === "aws"}
-                    className={`seg${voicePick === "aws" ? " on" : ""}`}
-                    disabled={config.cascadeEnabled === false}
-                    title={config.cascadeEnabled === false ? "The comparison backend needs Bedrock inference, which is not enabled on this demo account. The AssemblyAI path beside it is the one this project is built on." : undefined}
-                    onClick={() => setVoicePick("aws")}
-                  >
+                  <button role="tab" aria-selected={voicePick === "aws"} className={`seg${voicePick === "aws" ? " on" : ""}`} onClick={() => setVoicePick("aws")}>
                     AWS cascade · push to talk
-                    {config.cascadeEnabled === false ? <span className="seg-note"> · needs Bedrock</span> : null}
                   </button>
                 </div>
+                )
               ) : null}
               {api && config && !replay && chooseBackend(config) === "assemblyai" && voicePick !== "aws" ? (
                 <TalkDuplex

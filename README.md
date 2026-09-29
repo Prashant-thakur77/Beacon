@@ -106,7 +106,7 @@ Every applied change therefore ships with a **consent certificate** (`src/beacon
 
 The clearest demonstration is in the film, and nobody scripted it: an approval came back at **75 %** and was refused, came back again at **74 %** and was refused again, and the engineer typed it instead. Nothing reached production until the words were certain. The thing that stopped a change to a live AWS account was a confidence number from a transcription model.
 
-The console's default voice path is the Voice Agent API; the AWS cascade (Transcribe → Nova → Polly) stays one toggle away for the side-by-side. Each AssemblyAI API is used where it fits, not everywhere:
+The console has one voice path, and it is the Voice Agent API. The earlier AWS cascade (Transcribe → Nova → Polly) is still in the tree — it is what the First Commit build ran on — but it is not offered beside this one: a toggle to a different speech backend argues against the claim this console exists to make, and the cascade needs Bedrock inference, which the demo account is refused. Each AssemblyAI API is used where it fits, not everywhere:
 
 | AssemblyAI API | What it does here | Where |
 |---|---|---|

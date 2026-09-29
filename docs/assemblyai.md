@@ -83,7 +83,7 @@ LeMUR was probed on this key and answers 404, so the summary uses the pre-record
 
 `make voice-test` runs six scenarios that speak real audio into the Voice Agent API and assert on what was heard, which tools ran, and how the incident ended — see [voice-testing.md](voice-testing.md). It is the only way to test the properties that matter here (*agreement is not consent*; *interrupting withdraws the fix*), and writing it found three real bugs: a non-idempotent `local/break`, a clipped first word that made the server correctly refuse a grant, and the assumption that the fix number is always one.
 
-Backend switch: the Talk panel has an *AssemblyAI · full duplex / AWS cascade · push to talk* toggle, remembered per browser, for the side-by-side.
+Backend switch: the Talk panel showed an *AssemblyAI · full duplex / AWS cascade · push to talk* toggle for the side-by-side. It is gone from the deployed console (`cascadeEnabled: false` in config.json): the cascade needs Bedrock inference, which this account is refused, so the control could only fail — and offering a rival speech backend beside the one the project is built on undercuts the argument anyway. The panel now names the path it runs: *AssemblyAI · full duplex*. The toggle still appears where `cascadeEnabled` is true.
 
 ## Day by day
 
