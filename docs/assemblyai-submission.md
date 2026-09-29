@@ -109,20 +109,23 @@ A pull request Beacon opened by voice: https://github.com/Prashant-thakur77/beac
 
 Chapters
 0:00 03:12 — the page nobody answers
-0:22 The page lands on the phone
-0:40 The Night Board: what changed
-0:49 One socket, full duplex
-1:00 Propose a fix, dry run first
-1:10 Interrupt the read-back — the fix is withdrawn
-1:23 "Approve fix two", and the verify loop
-1:39 A Sleep Contract, in your own words
-1:50 The pull request that ends the incident
-2:02 The recording, played back
-2:13 Who it is for
-2:22 Market
-2:33 Revenue
-2:45 Why this needed this generation of models
-3:17 Built solo, in ten days
+0:28 Beacon Night Shift — and what unlocks it
+0:37 One socket: browser, phone, Telegram
+0:57 A real call, two channels
+1:18 The page lands on the phone
+1:43 Refused at 75%, refused at 74%
+1:59 The Night Board: what changed
+2:09 One socket, full duplex
+2:30 Interrupt the read-back — the fix is withdrawn
+2:42 "Approve fix two", and the verify loop
+2:59 A Sleep Contract, in your own words
+3:10 The pull request that ends the incident
+3:22 The recording, played back
+3:33 Who it is for
+3:41 Market
+3:52 Revenue
+4:05 Why this needed this generation of models
+4:28 Built solo, in ten days
 
 Music: "Immersed" by Kevin MacLeod (incompetech.com), CC BY 4.0.
 Narration: Chatterbox TTS. No editor was used — the film is assembled by ffmpeg from
@@ -138,7 +141,7 @@ video/script-assemblyai.md; the pipeline is in the repo.
 - Live console (passcode in the form): https://6die6lduac6ipxkeg73nxsuvpu0yzkim.lambda-url.us-east-1.on.aws/
 - Repository (MIT, branch `assemblyai`): https://github.com/Prashant-thakur77/Beacon/tree/assemblyai
 - The pull request Beacon opened by voice: https://github.com/Prashant-thakur77/beacon-demo-infra/pull/2
-- Film (4:46): *(YouTube link — upload `Beacon-AssemblyAI.mp4` from the release)* · direct download: https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4
+- Film (4:48): *(YouTube link — upload `Beacon-AssemblyAI.mp4` from the release)* · direct download: https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-AssemblyAI.mp4
 - Deck (12 slides): https://github.com/Prashant-thakur77/Beacon/releases/download/v0.6.0/Beacon-deck.pdf
 - Release with every artefact: https://github.com/Prashant-thakur77/Beacon/releases/tag/v0.6.0
 - Telegram bot: https://t.me/GoodNightShiftbot (allowlisted to the author; the film shows it)
@@ -157,7 +160,7 @@ Voice Agent API · Universal-3 Pro · pre-recorded transcription · dual-channel
 | 1:50–2:10 | **The approval refused at 75%, refused again at 74%, and typed instead** — the confidence gate, unscripted, on a live account |
 | 2:10–3:05 | The same night on a laptop: read-back → barge-in withdraws the fix → *approve fix one* → verified → contract → *open the pull request* → the recording in the audit |
 | 3:05–4:10 | Business case: who it is for, market, revenue model, why it needed this generation of AI |
-| 4:10–4:46 | Built solo in ten days; what is next; the live URL and passcode |
+| 4:12–4:48 | Built solo in ten days; what is next; the live URL and passcode |
 
 ## Judge's 90 seconds
 
