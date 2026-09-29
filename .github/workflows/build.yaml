@@ -2,10 +2,13 @@ name: Build and Publish
 
 on:
   push:
-    branches: [main]
+    # assemblyai is the branch under review for the AssemblyAI hackathon, and the
+    # README on it carries this badge. Without it here the badge showed main's
+    # result for a branch CI had never run.
+    branches: [main, assemblyai]
     tags: ["v*"]
   pull_request:
-    branches: [main]
+    branches: [main, assemblyai]
 
 env:
   GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/beacon

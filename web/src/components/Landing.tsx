@@ -234,7 +234,7 @@ export function Landing({ tally, replay, local, onRunNight }: { tally: Tally | n
             approve fix one
           </div>
         </div>
-        <div className="faint small">Built on AWS · First Commit 2026</div>
+        <div className="faint small">Voice by AssemblyAI · Universal-3 Pro · running on AWS</div>
       </section>
 
       {/* 2 · ink band */}
