@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@aws-sdk/client-transcribe-streaming": "^3.700.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.1144.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
